@@ -1,0 +1,82 @@
+.teamify-side-panel {
+  background-image:
+    radial-gradient(circle at 10% 10%, rgba(99, 102, 241, 0.09), transparent 50%),
+    radial-gradient(circle at 90% 90%, rgba(14, 165, 233, 0.08), transparent 45%);
+}
+
+:root:not(.dark) .dashboard-root,
+:root:not(.dark) .dashboard-root p,
+:root:not(.dark) .dashboard-root span,
+:root:not(.dark) .dashboard-root h1,
+:root:not(.dark) .dashboard-root h2,
+:root:not(.dark) .dashboard-root h3,
+:root:not(.dark) .dashboard-root h4,
+:root:not(.dark) .dashboard-root h5,
+:root:not(.dark) .dashboard-root h6,
+:root:not(.dark) .dashboard-root li,
+:root:not(.dark) .dashboard-root label,
+:root:not(.dark) .dashboard-root strong,
+:root:not(.dark) .dashboard-root button {
+  color: #000 !important;
+}
+
+:root:not(.dark) .dashboard-root .recharts-cartesian-axis-tick-value,
+:root:not(.dark) .dashboard-root .recharts-text {
+  fill: #000 !important;
+}
+
+:root:not(.dark) .dashboard-root .recharts-tooltip-wrapper,
+:root:not(.dark) .dashboard-root .recharts-tooltip-wrapper * {
+  color: #000 !important;
+}
+
+.teamify-surface {
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  box-shadow:
+    0 1px 1px rgba(15, 23, 42, 0.03),
+    0 12px 30px rgba(15, 23, 42, 0.08);
+}
+
+.dark .teamify-surface {
+  background: linear-gradient(180deg, #0f172a 0%, #111827 100%);
+  box-shadow:
+    0 1px 1px rgba(2, 6, 23, 0.5),
+    0 14px 32px rgba(2, 6, 23, 0.42);
+}
+
+.teamify-chart-wrap {
+  height: 240px;
+  width: 100%;
+}
+
+.teamify-ring-wrap {
+  position: relative;
+  height: 210px;
+  width: 100%;
+}
+
+.teamify-ring-center {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.teamify-ring-value {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  transform: translateY(2px);
+}
+
+@media (max-width: 420px) {
+  .teamify-chart-wrap {
+    height: 200px;
+  }
+
+  .teamify-ring-wrap {
+    height: 185px;
+  }
+}
