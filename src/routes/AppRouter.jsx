@@ -4,6 +4,8 @@ import OtpLoginPage from '@/pages/auth/OtpLoginPage'
 import TeamDashboardPage from '@/pages/dashboard/TeamDashboardPage'
 import PortalLoginPage from '@/pages/portal/PortalLoginPage'
 import PortalDashboardPage from '@/pages/portal/PortalDashboardPage'
+import AdminShopListingPage from '@/pages/shops/AdminShopListingPage'
+import PortalShopListingPage from '@/pages/shops/PortalShopListingPage'
 import {
   selectAuthScope,
   selectIsAuthenticated,
@@ -34,12 +36,28 @@ function AppRouter() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/dashboard/teamify/shops"
+          element={
+            <ProtectedRoute requiredScope="admin" redirectTo="/">
+              <AdminShopListingPage />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/portal/login" element={<PortalLoginPage />} />
         <Route
           path="/portal/dashboard"
           element={
             <ProtectedRoute requiredScope="portal" redirectTo="/portal/login">
               <PortalDashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/portal/dashboard/shops"
+          element={
+            <ProtectedRoute requiredScope="portal" redirectTo="/portal/login">
+              <PortalShopListingPage />
             </ProtectedRoute>
           }
         />

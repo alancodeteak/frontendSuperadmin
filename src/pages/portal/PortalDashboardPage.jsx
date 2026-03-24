@@ -6,6 +6,7 @@ function PortalDashboardPage() {
       brandTitle="Teamify Portal"
       pageTitle="Portal Dashboard"
       logoutRedirectTo="/portal/login"
+      shopsPagePath="/portal/dashboard/shops"
     />
   )
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -14,6 +14,7 @@ import {
   YAxis,
 } from 'recharts'
 import DashboardLayout from '@/components/layout/DashboardLayout'
+import AppSidebar from '@/components/layout/AppSidebar'
 import StatCard from '@/components/common/StatCard'
 import TeamMemberRow from '@/components/common/TeamMemberRow'
 import {
@@ -58,6 +59,7 @@ function TeamDashboardPage({
   brandTitle = 'Teamify',
   pageTitle = 'Team Dashboard',
   logoutRedirectTo = '/',
+  shopsPagePath = '/dashboard/teamify/shops',
 }) {
   const dispatch = useDispatch()
   const navigate = useNavigate()
@@ -66,18 +68,10 @@ function TeamDashboardPage({
   )
   const { logoutStatus } = useSelector((state) => state.auth)
   const { themeMode, toggleTheme } = useTheme()
-  const [currentDateTime, setCurrentDateTime] = useState(() => new Date())
 
   useEffect(() => {
     dispatch(getDashboardData())
   }, [dispatch])
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentDateTime(new Date())
-    }, 1000)
-    return () => clearInterval(timer)
-  }, [])
 
   const utilization = useMemo(() => {
     if (!members.length) return 0
@@ -105,16 +99,6 @@ function TeamDashboardPage({
     themeMode === 'dark'
       ? 'inline-flex w-full max-w-full flex-wrap rounded-xl bg-slate-800 p-1 md:w-auto'
       : 'inline-flex w-full max-w-full flex-wrap rounded-xl bg-white p-1 ring-1 ring-slate-300 md:w-auto'
-  const formattedDate = currentDateTime.toLocaleDateString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  })
-  const formattedTime = currentDateTime.toLocaleTimeString('en-IN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  })
   const isLoggingOut = logoutStatus === 'loading'
 
   const handleLogout = async () => {
@@ -124,61 +108,34 @@ function TeamDashboardPage({
     navigate(logoutRedirectTo, { replace: true })
   }
 
+  const sidebarNavItems = [
+    ...tabs.map((tab) => ({
+      id: tab,
+      label: tab[0].toUpperCase() + tab.slice(1),
+      active: activeTab === tab,
+      onClick: () => dispatch(setActiveTab(tab)),
+    })),
+    {
+      id: 'shops',
+      label: 'Shop Listing',
+      active: false,
+      onClick: () => navigate(shopsPagePath),
+    },
+  ]
+
   return (
     <DashboardLayout>
-      <aside className="teamify-side-panel teamify-surface mb-3 w-full rounded-3xl p-3 ring-1 ring-slate-200 transition duration-300 dark:bg-slate-900 dark:ring-slate-700 sm:p-4 lg:mb-0 lg:w-[240px] lg:p-5">
-        <div className="mb-6 flex items-center gap-3 lg:mb-8">
-          <div className="grid h-10 w-10 place-items-center rounded-xl bg-indigo-600 text-sm font-bold text-white">
-            T
-          </div>
-          <div>
-            <h1 className="text-lg font-semibold tracking-tight text-black dark:text-slate-100">
-              {brandTitle}
-            </h1>
-            <p className="text-xs text-black dark:text-slate-300">{pageTitle}</p>
-          </div>
-        </div>
-        <div className="mb-5 rounded-xl bg-white/70 px-3 py-2 text-xs text-black ring-1 ring-slate-300 dark:bg-slate-800/70 dark:text-slate-100 dark:ring-slate-700">
-          <p className="font-semibold">{formattedDate}</p>
-          <p>{formattedTime}</p>
-        </div>
+      <AppSidebar
+        brandTitle={brandTitle}
+        subTitle={pageTitle}
+        navItems={sidebarNavItems}
+        themeMode={themeMode}
+        onToggleTheme={toggleTheme}
+        onLogout={handleLogout}
+        isLoggingOut={isLoggingOut}
+      />
 
-        <nav className="space-y-2">
-          {tabs.map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              onClick={() => dispatch(setActiveTab(tab))}
-              className={`w-full rounded-xl px-4 py-2 text-left text-sm font-medium capitalize transition duration-300 ${
-                activeTab === tab
-                  ? 'bg-indigo-600 text-white shadow'
-                  : 'text-black hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
-        </nav>
-
-        <button
-          type="button"
-          onClick={toggleTheme}
-          className="mt-6 w-full rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-black transition duration-300 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-800 lg:mt-8"
-        >
-          Switch to {themeMode === 'dark' ? 'Light' : 'Dark'} Mode
-        </button>
-
-        <button
-          type="button"
-          onClick={handleLogout}
-          disabled={isLoggingOut}
-          className="mt-3 w-full rounded-xl border border-red-300 px-4 py-2 text-sm font-medium text-red-700 transition duration-300 hover:bg-red-50 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-900/30"
-        >
-          {isLoggingOut ? 'Logging out...' : 'Logout'}
-        </button>
-      </aside>
-
-      <main className="flex-1">
+      <main className="flex-1 rounded-3xl bg-white p-1 dark:bg-slate-950/40 sm:p-2">
         <header className="teamify-surface mb-3 rounded-3xl p-3 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700 sm:p-4 md:mb-4 md:p-5">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>

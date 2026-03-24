@@ -20,4 +20,9 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+  background-color: #ffffff;
+}
+
+:root.dark body {
+  background-color: #020617;
 }
