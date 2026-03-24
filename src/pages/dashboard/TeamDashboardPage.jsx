@@ -97,8 +97,8 @@ function TeamDashboardPage({
   ]
   const rangeContainerClass =
     themeMode === 'dark'
-      ? 'inline-flex w-full max-w-full flex-wrap rounded-xl bg-slate-800 p-1 md:w-auto'
-      : 'inline-flex w-full max-w-full flex-wrap rounded-xl bg-white p-1 ring-1 ring-slate-300 md:w-auto'
+      ? 'relative inline-flex w-full max-w-full rounded-xl bg-slate-800 p-1 md:w-auto'
+      : 'relative inline-flex w-full max-w-full rounded-xl bg-white p-1 ring-1 ring-slate-300 md:w-auto'
   const isLoggingOut = logoutStatus === 'loading'
 
   const handleLogout = async () => {
@@ -148,16 +148,25 @@ function TeamDashboardPage({
             </div>
 
             <div className={rangeContainerClass}>
+              <span
+                className={`absolute top-1 bottom-1 rounded-lg transition-all duration-300 ease-out ${
+                  themeMode === 'dark' ? 'bg-slate-700 shadow-sm' : 'bg-indigo-600 shadow-sm'
+                }`}
+                style={{
+                  width: 'calc((100% - 0.5rem) / 3)',
+                  transform: `translateX(calc(${ranges.indexOf(selectedRange)} * 100%))`,
+                }}
+              />
               {ranges.map((range) => (
                 <button
                   key={range}
                   type="button"
                   onClick={() => dispatch(setSelectedRange(range))}
-                  className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium capitalize transition duration-300 md:flex-none md:px-4 ${
+                  className={`relative z-10 flex-1 rounded-lg px-3 py-2 text-sm font-medium capitalize transition-all duration-300 ease-out hover:-translate-y-0.5 md:px-4 ${
                     selectedRange === range
                       ? themeMode === 'dark'
-                        ? 'bg-slate-700 text-slate-100 shadow-sm'
-                        : 'bg-indigo-600 text-white shadow-sm'
+                        ? 'text-slate-100'
+                        : 'text-white'
                       : themeMode === 'dark'
                         ? 'text-slate-300 hover:bg-slate-700/60'
                         : 'text-black hover:bg-slate-100'
