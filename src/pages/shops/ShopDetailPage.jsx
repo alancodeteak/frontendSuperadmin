@@ -1,10 +1,11 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import AppSidebar from '@/components/layout/AppSidebar'
 import { buildSidebarNav } from '@/components/layout/sidebarNavConfig'
+import { presignUpload, putPresignedUpload } from '@/apis/uploadsApi'
 import { logoutLocal } from '@/redux/slices/authSlice'
 import { logoutAction } from '@/redux/thunks/authThunks'
 import {
@@ -12,7 +13,10 @@ import {
   selectSupermarketDetailError,
   selectSupermarketDetailStatus,
 } from '@/redux/slices/supermarketsSlice'
-import { fetchSupermarketDetailAction } from '@/redux/thunks/supermarketsThunks'
+import {
+  fetchSupermarketDetailAction,
+  updateSupermarketAction,
+} from '@/redux/thunks/supermarketsThunks'
 import { useTheme } from '@/context/useTheme'
 
 function ShopDetailPage({
@@ -28,6 +32,8 @@ function ShopDetailPage({
   const { userId } = useParams()
   const { themeMode, toggleTheme } = useTheme()
   const isDark = themeMode === 'dark'
+  const { session } = useSelector((state) => state.auth)
+  const accessToken = session?.accessToken ?? null
 
   const detail = useSelector(selectSupermarketDetail)
   const detailStatus = useSelector(selectSupermarketDetailStatus)
@@ -35,10 +41,88 @@ function ShopDetailPage({
   const { logoutStatus } = useSelector((state) => state.auth)
   const isLoggingOut = logoutStatus === 'loading'
 
+  const [uploading, setUploading] = useState({ photo: false, promotion: false })
+  const [progress, setProgress] = useState({ photo: 0, promotion: 0 })
+  const [uploadError, setUploadError] = useState('')
+  const [uploadToast, setUploadToast] = useState('')
+  const toastTimerRef = useRef(null)
+
   useEffect(() => {
     if (!userId) return
     dispatch(fetchSupermarketDetailAction({ user_id: userId }))
   }, [dispatch, userId])
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
+    }
+  }, [])
+
+  const showToast = (message) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
+    setUploadToast(message)
+    toastTimerRef.current = setTimeout(() => {
+      setUploadToast('')
+      toastTimerRef.current = null
+    }, 2200)
+  }
+
+  const validateImageFile = (file) => {
+    if (!file) return 'No file selected'
+    if (file.size > 10 * 1024 * 1024) return 'Image must be 10MB or smaller'
+    const allowed = ['image/png', 'image/jpeg', 'image/webp']
+    if (!allowed.includes(file.type)) return 'Only PNG, JPEG, or WEBP images are allowed'
+    return null
+  }
+
+  const uploadAndPatch = async ({ file, category }) => {
+    const err = validateImageFile(file)
+    if (err) {
+      setUploadError(err)
+      return
+    }
+    if (!accessToken) {
+      setUploadError('Not authenticated. Please log in again.')
+      return
+    }
+    if (!userId) return
+
+    setUploadError('')
+    setProgress((p) => ({ ...p, [category]: 0 }))
+    setUploading((p) => ({ ...p, [category]: true }))
+
+    try {
+      const presign = await presignUpload(
+        {
+          purpose: 'shop_owner',
+          filename: file.name,
+          content_type: file.type,
+          category,
+        },
+        { accessToken },
+      )
+
+      await putPresignedUpload({
+        uploadUrl: presign.upload_url,
+        file,
+        contentType: file.type,
+        onProgress: (pct) => setProgress((p) => ({ ...p, [category]: pct })),
+      })
+
+      const patch =
+        category === 'photo'
+          ? { photo: presign.key }
+          : { promotion: { promotion_image_s3_key: presign.key } }
+
+      await dispatch(updateSupermarketAction({ user_id: userId, patch })).unwrap()
+      await dispatch(fetchSupermarketDetailAction({ user_id: userId }))
+      showToast(category === 'photo' ? 'Photo updated' : 'Promotion image updated')
+    } catch (e) {
+      setUploadError(e?.message ?? 'Upload failed. Please try again.')
+    } finally {
+      setUploading((p) => ({ ...p, [category]: false }))
+    }
+  }
 
   const navSections = useMemo(
     () =>
@@ -74,6 +158,14 @@ function ShopDetailPage({
   const subscription = detail?.subscription ?? null
   const promotion = detail?.promotion ?? null
 
+  const isHttpUrl = (value) => /^https?:\/\//i.test(String(value ?? '').trim())
+  const shopPhotoSrc =
+    shopOwner?.photo_url ||
+    (isHttpUrl(shopOwner?.photo) ? shopOwner.photo : null)
+  const promoImageSrc =
+    promotion?.promotion_image_url ||
+    (isHttpUrl(promotion?.promotion_image_s3_key) ? promotion.promotion_image_s3_key : null)
+
   return (
     <DashboardLayout>
       <AppSidebar
@@ -87,6 +179,15 @@ function ShopDetailPage({
       />
 
       <main className={isDark ? 'flex-1 rounded-3xl bg-slate-950/40 p-1 sm:p-2' : 'flex-1 rounded-3xl bg-white p-1 sm:p-2'}>
+        {uploadToast ? (
+          <div
+            className="pointer-events-none fixed bottom-6 left-1/2 z-50 max-w-[min(90vw,360px)] -translate-x-1/2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-center text-sm font-semibold text-black shadow-lg ring-1 ring-slate-200/80 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:ring-slate-700"
+            role="status"
+            aria-live="polite"
+          >
+            {uploadToast}
+          </div>
+        ) : null}
         <header className={`${surfaceClass} mb-3 p-4 md:mb-4 md:p-5`}>
           <p className={`text-xs font-semibold uppercase tracking-[0.16em] ${sectionTitle}`}>
             {brandTitle}
@@ -108,10 +209,53 @@ function ShopDetailPage({
             </p>
           ) : null}
 
+          {uploadError ? (
+            <p className="mb-3 text-sm font-semibold text-red-700 dark:text-red-300">{uploadError}</p>
+          ) : null}
+
           {detailStatus === 'succeeded' && detail ? (
             <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
               <div className={`rounded-2xl border p-3 ${isDark ? 'border-slate-700 bg-slate-800/40' : 'border-slate-200 bg-white'}`}>
                 <p className={`text-xs font-semibold uppercase tracking-[0.16em] ${sectionTitle}`}>Shop Owner</p>
+                <div className="mt-3 flex items-start gap-3">
+                  {shopPhotoSrc ? (
+                    <img
+                      src={shopPhotoSrc}
+                      alt={`${shopOwner?.shop_name ?? 'Shop'} photo`}
+                      className="h-16 w-16 shrink-0 rounded-2xl object-cover ring-1 ring-slate-200 dark:ring-slate-700"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-slate-100 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700">
+                      No photo
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                      <label className="inline-flex items-center">
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            e.target.value = ''
+                            if (file) uploadAndPatch({ file, category: 'photo' })
+                          }}
+                          disabled={uploading.photo || uploading.promotion}
+                        />
+                        <span
+                          className={`cursor-pointer rounded-xl border px-3 py-1.5 text-xs font-semibold transition ${
+                            isDark
+                              ? 'border-slate-700 bg-slate-900/40 text-slate-100 hover:bg-slate-800'
+                              : 'border-slate-200 bg-white text-black hover:bg-slate-50'
+                          } ${uploading.photo ? 'opacity-70 cursor-not-allowed' : ''}`}
+                        >
+                          {uploading.photo ? `Uploading… ${progress.photo}%` : 'Upload Photo'}
+                        </span>
+                      </label>
+                      <p className={`text-xs ${subtleText}`}>PNG/JPG/WEBP • Max 10MB</p>
+                    </div>
                 <div className="mt-3 space-y-1 text-sm">
                   <p className={strongText}>
                     <span className={subtleText}>Shop:</span> {shopOwner?.shop_name ?? '—'}
@@ -131,6 +275,8 @@ function ShopDetailPage({
                   <p className={strongText}>
                     <span className={subtleText}>Payment:</span> {shopOwner?.payment_status ?? '—'}
                   </p>
+                </div>
+                  </div>
                 </div>
               </div>
 
@@ -176,6 +322,47 @@ function ShopDetailPage({
                 <div className="mt-3 space-y-1 text-sm">
                   {promotion ? (
                     <>
+                      <div className="mb-2 flex flex-wrap items-center gap-2">
+                        <label className="inline-flex items-center">
+                          <input
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0]
+                              e.target.value = ''
+                              if (file) uploadAndPatch({ file, category: 'promotion' })
+                            }}
+                            disabled={uploading.photo || uploading.promotion}
+                          />
+                          <span
+                            className={`cursor-pointer rounded-xl border px-3 py-1.5 text-xs font-semibold transition ${
+                              isDark
+                                ? 'border-slate-700 bg-slate-900/40 text-slate-100 hover:bg-slate-800'
+                                : 'border-slate-200 bg-white text-black hover:bg-slate-50'
+                            } ${uploading.promotion ? 'opacity-70 cursor-not-allowed' : ''}`}
+                          >
+                            {uploading.promotion
+                              ? `Uploading… ${progress.promotion}%`
+                              : 'Upload Promotion Image'}
+                          </span>
+                        </label>
+                        <p className={`text-xs ${subtleText}`}>PNG/JPG/WEBP • Max 10MB</p>
+                      </div>
+                      <div className="mb-2">
+                        {promoImageSrc ? (
+                          <img
+                            src={promoImageSrc}
+                            alt="Promotion"
+                            className="h-20 w-full rounded-2xl object-cover ring-1 ring-slate-200 dark:ring-slate-700"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="grid h-20 w-full place-items-center rounded-2xl bg-slate-100 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700">
+                            No promotion image
+                          </div>
+                        )}
+                      </div>
                       <p className={strongText}>
                         <span className={subtleText}>Enabled:</span> {promotion.is_marketing_enabled ? 'Yes' : 'No'}
                       </p>
