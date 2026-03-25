@@ -13,6 +13,50 @@ function isExpiredTimestamp(expiresAt) {
   return Number.isNaN(expiresTime) || expiresTime <= Date.now()
 }
 
+const STORAGE_KEY = 'yaadro_auth_session_v1'
+
+function loadSessionFromStorage() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return null
+    const session = {
+      accessToken: parsed.accessToken ?? null,
+      tokenType: parsed.tokenType ?? null,
+      expiresAt: parsed.expiresAt ?? null,
+      role: parsed.role ?? null,
+      scope: parsed.scope ?? null,
+    }
+    if (!session.accessToken) return null
+    if (isExpiredTimestamp(session.expiresAt)) return null
+    return session
+  } catch {
+    return null
+  }
+}
+
+function persistSessionToStorage(session) {
+  try {
+    if (!session?.accessToken) {
+      localStorage.removeItem(STORAGE_KEY)
+      return
+    }
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        accessToken: session.accessToken,
+        tokenType: session.tokenType,
+        expiresAt: session.expiresAt,
+        role: session.role,
+        scope: session.scope,
+      }),
+    )
+  } catch {
+    // ignore storage failures (private mode, quota, etc)
+  }
+}
+
 const initialState = {
   session: {
     accessToken: null,
@@ -30,7 +74,10 @@ const initialState = {
 
 const authSlice = createSlice({
   name: 'auth',
-  initialState,
+  initialState: (() => {
+    const stored = typeof window !== 'undefined' ? loadSessionFromStorage() : null
+    return stored ? { ...initialState, session: stored } : initialState
+  })(),
   reducers: {
     logoutLocal(state) {
       state.session = {
@@ -39,6 +86,9 @@ const authSlice = createSlice({
         expiresAt: null,
         role: null,
         scope: null,
+      }
+      if (typeof window !== 'undefined') {
+        persistSessionToStorage(null)
       }
       state.verifyOtpStatus = 'idle'
       state.sendOtpStatus = 'idle'
@@ -98,6 +148,9 @@ const authSlice = createSlice({
           role: action.payload?.role ?? null,
           scope: action.meta.arg.scope ?? 'admin',
         }
+        if (typeof window !== 'undefined') {
+          persistSessionToStorage(state.session)
+        }
       })
       .addCase(verifyOtpAction.rejected, (state, action) => {
         state.verifyOtpStatus = 'failed'
@@ -118,6 +171,9 @@ const authSlice = createSlice({
           expiresAt: action.payload?.expires_at ?? null,
           role: action.payload?.role ?? null,
           scope: 'portal',
+        }
+        if (typeof window !== 'undefined') {
+          persistSessionToStorage(state.session)
         }
       })
       .addCase(verifyPortalOtpAction.rejected, (state, action) => {

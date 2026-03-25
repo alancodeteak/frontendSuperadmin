@@ -23,6 +23,10 @@ function getInitials(value) {
   return parts.map((p) => p[0]?.toUpperCase()).join('')
 }
 
+function isHttpUrl(value) {
+  return /^https?:\/\//i.test(String(value ?? '').trim())
+}
+
 function ShopListingPage({
   brandTitle = 'Teamify',
   sidebarSubTitle = 'Team Dashboard',
@@ -49,6 +53,7 @@ function ShopListingPage({
   const [page, setPage] = useState(1)
   const limit = 20
   const [debouncedQuery, setDebouncedQuery] = useState('')
+  const [failedImageIds, setFailedImageIds] = useState(() => new Set())
 
   const showCopyToast = useCallback((message) => {
     if (copyToastTimerRef.current) {
@@ -103,8 +108,24 @@ function ShopListingPage({
     dispatch(fetchSupermarketsAction(parsedParams))
   }, [dispatch, parsedParams])
 
+  useEffect(() => {
+    const sample = (listItems ?? [])[0] ?? null
+    const counts = (listItems ?? []).reduce(
+      (acc, it) => {
+        if (it?.photo_url) acc.photoUrl += 1
+        if (it?.photo) acc.photo += 1
+        return acc
+      },
+      { photoUrl: 0, photo: 0 },
+    )
+    // #region agent log
+    fetch('http://127.0.0.1:7540/ingest/3b199916-37e1-41e0-afdc-9e7dca648ca4',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c70081'},body:JSON.stringify({sessionId:'c70081',runId:'listing-images-1',hypothesisId:'H1',location:'ShopListingPage.jsx:shops-map',message:'List sample fields',data:{hasItems:Array.isArray(listItems)&&listItems.length>0,count:Array.isArray(listItems)?listItems.length:0,counts,keys:sample?Object.keys(sample).slice(0,20):null,photo_url:sample?.photo_url??null,photo:sample?.photo??null,protocol:typeof window!=='undefined'?window.location.protocol:null},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+  }, [listItems])
+
   const shops = useMemo(() => {
     return (listItems ?? []).map((it) => ({
+      photo_url: it.photo_url || null,
       photo: it.photo || null,
       shop_name: it.shop_name ?? '—',
       user_id: it.user_id ?? null,
@@ -251,26 +272,59 @@ function ShopListingPage({
               className="shop-flip-card group relative rounded-3xl transition duration-300 hover:-translate-y-1 hover:shadow-2xl"
             >
               <div className="shop-flip-inner">
-                <button
-                  type="button"
+                <div
+                  role="button"
+                  tabIndex={0}
                   onClick={() => {
                     const next = detailPathFor(shop.user_id)
                     if (next) navigate(next)
                   }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      const next = detailPathFor(shop.user_id)
+                      if (next) navigate(next)
+                    }
+                  }}
                   className="shop-flip-front teamify-surface block w-full text-left ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700"
                 >
-                  {shop.photo ? (
-                    <img
-                      src={shop.photo}
-                      alt={shop.shop_name}
-                      className="h-36 w-full object-cover transition duration-300 group-hover:scale-[1.03]"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="grid h-36 w-full place-items-center bg-slate-100 text-xl font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-200">
-                      {getInitials(shop.shop_name)}
-                    </div>
-                  )}
+                  {(() => {
+                    const idKey = shop.user_id ?? shop.shop_name
+                    const src =
+                      shop.photo_url || (isHttpUrl(shop.photo) ? shop.photo : null)
+                    const failed = failedImageIds.has(String(idKey))
+
+                    // #region agent log
+                    fetch('http://127.0.0.1:7540/ingest/3b199916-37e1-41e0-afdc-9e7dca648ca4',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c70081'},body:JSON.stringify({sessionId:'c70081',runId:'listing-images-1',hypothesisId:'H2',location:'ShopListingPage.jsx:card-img',message:'Computed image src',data:{hasPhotoUrl:!!shop.photo_url,hasPhoto:!!shop.photo,photoIsHttp:isHttpUrl(shop.photo),srcIsHttp:isHttpUrl(src),srcNull:!src,alreadyFailed:failed},timestamp:Date.now()})}).catch(()=>{});
+                    // #endregion
+
+                    if (!src || failed) {
+                      return (
+                        <div className="grid h-36 w-full place-items-center bg-slate-100 text-xl font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-200">
+                          {getInitials(shop.shop_name)}
+                        </div>
+                      )
+                    }
+
+                    return (
+                      <img
+                        src={src}
+                        alt={shop.shop_name}
+                        className="h-36 w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+                        loading="lazy"
+                        onError={() => {
+                          // #region agent log
+                          fetch('http://127.0.0.1:7540/ingest/3b199916-37e1-41e0-afdc-9e7dca648ca4',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c70081'},body:JSON.stringify({sessionId:'c70081',runId:'listing-images-1',hypothesisId:'H3',location:'ShopListingPage.jsx:img-onError',message:'Image failed to load',data:{srcIsHttp:isHttpUrl(src),srcHost:typeof src==='string'?new URL(src, window.location.href).host:null,protocol:window.location.protocol},timestamp:Date.now()})}).catch(()=>{});
+                          // #endregion
+                          setFailedImageIds((prev) => {
+                            const next = new Set(prev)
+                            next.add(String(idKey))
+                            return next
+                          })
+                        }}
+                      />
+                    )
+                  })()}
                   <div className="space-y-1.5 p-3">
                     <h3 className="text-base font-semibold text-black dark:text-slate-100">
                       {shop.shop_name}
@@ -323,7 +377,7 @@ function ShopListingPage({
                       </button>
                     </div>
                   </div>
-                </button>
+                </div>
                 <div className="shop-flip-back teamify-surface flex flex-col justify-center p-4 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
                   <p className="text-xs font-semibold uppercase tracking-[0.12em] text-indigo-600 dark:text-indigo-300">
                     Address
