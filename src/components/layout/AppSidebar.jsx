@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 function ChevronIcon({ open, className = '' }) {
   return (
@@ -111,6 +111,90 @@ function DefaultIcon({ name, className = '' }) {
           />
         </svg>
       )
+    case 'settings':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={common} aria-hidden="true">
+          <path
+            d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"
+            stroke="currentColor"
+            strokeWidth="1.8"
+          />
+          <path
+            d="M19.4 15a8.6 8.6 0 0 0 .1-1 8.6 8.6 0 0 0-.1-1l2-1.6-2-3.4-2.4 1a7.6 7.6 0 0 0-1.7-1l-.4-2.6H9.1l-.4 2.6a7.6 7.6 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a8.6 8.6 0 0 0-.1 1 8.6 8.6 0 0 0 .1 1l-2 1.6 2 3.4 2.4-1c.53.4 1.1.75 1.7 1l.4 2.6h5.8l.4-2.6c.6-.25 1.17-.6 1.7-1l2.4 1 2-3.4-2-1.6Z"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinejoin="round"
+          />
+        </svg>
+      )
+    case 'users':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={common} aria-hidden="true">
+          <path
+            d="M16 11a3 3 0 1 0-6 0 3 3 0 0 0 6 0Z"
+            stroke="currentColor"
+            strokeWidth="1.8"
+          />
+          <path
+            d="M4.5 19.5c1.2-3.4 4-5.5 8.5-5.5s7.3 2.1 8.5 5.5"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+          />
+        </svg>
+      )
+    case 'report':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={common} aria-hidden="true">
+          <path
+            d="M7 3h7l3 3v15a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M14 3v4h4"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M8.5 11h7M8.5 14.5h7M8.5 18h5"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+          />
+        </svg>
+      )
+    case 'wallet':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={common} aria-hidden="true">
+          <path
+            d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2H6a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h14v-2"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M20 11h-4a2 2 0 0 0-2 2v0a2 2 0 0 0 2 2h4v-4Z"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinejoin="round"
+          />
+        </svg>
+      )
+    case 'activity':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={common} aria-hidden="true">
+          <path
+            d="M4 13h3l2-6 4 14 2-8h3"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      )
     default:
       return (
         <svg viewBox="0 0 24 24" fill="none" className={common} aria-hidden="true">
@@ -136,7 +220,8 @@ function AppSidebar({
 }) {
   const [currentDateTime, setCurrentDateTime] = useState(() => new Date())
   const isDark = themeMode === 'dark'
-  const [openGroups, setOpenGroups] = useState({})
+  const [toast, setToast] = useState(null)
+  const toastTimerRef = useRef(null)
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -168,31 +253,41 @@ function AppSidebar({
     ]
   }, [navItems, navSections])
 
-  const isItemActive = useCallback((item) => {
-    if (item?.active) return true
-    if (item?.children?.length) return item.children.some((c) => isItemActive(c))
-    return false
-  }, [])
-
-  useEffect(() => {
-    const next = {}
+  const activeCategoryId = useMemo(() => {
     for (const section of effectiveSections) {
-      for (const item of section.items ?? []) {
-        if (item?.children?.length) {
-          next[item.id] = openGroups[item.id] ?? isItemActive(item)
-        }
+      for (const category of section.items ?? []) {
+        if (category?.children?.some((c) => c?.active)) return category.id
       }
     }
-    setOpenGroups((prev) => ({ ...next, ...prev }))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return null
   }, [effectiveSections])
 
+  const [openCategoryId, setOpenCategoryId] = useState(() => activeCategoryId ?? null)
+
+  const showToast = (message) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
+    setToast(message)
+    toastTimerRef.current = setTimeout(() => {
+      setToast(null)
+      toastTimerRef.current = null
+    }, 1800)
+  }
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
+    }
+  }, [])
+
   const rowBase =
-    'w-full rounded-xl px-3 py-2 text-left text-sm font-medium transition duration-200'
+    'w-full rounded-xl px-3 py-2 text-left text-sm font-medium transition-all duration-200'
   const rowInactive = isDark
     ? 'text-slate-300 hover:bg-slate-800'
     : 'text-black hover:bg-slate-100'
   const rowActive = 'bg-indigo-600 text-white shadow'
+  const rowDisabled = isDark
+    ? 'text-slate-500 opacity-70 cursor-not-allowed'
+    : 'text-slate-400 opacity-75 cursor-not-allowed'
 
   const iconWrapClass = isDark
     ? 'grid h-8 w-8 place-items-center rounded-xl bg-slate-800 text-slate-200'
@@ -200,6 +295,16 @@ function AppSidebar({
 
   return (
     <aside className="teamify-side-panel teamify-surface mb-3 flex w-full flex-col rounded-3xl p-3 ring-1 ring-slate-200 transition duration-300 dark:bg-slate-900 dark:ring-slate-700 sm:p-4 lg:mb-0 lg:h-[calc(100vh-2.5rem)] lg:w-[260px] lg:p-5 lg:sticky lg:top-5">
+      {toast ? (
+        <div
+          className="pointer-events-none fixed bottom-6 left-1/2 z-50 max-w-[min(90vw,360px)] -translate-x-1/2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-center text-sm font-semibold text-black shadow-lg ring-1 ring-slate-200/80 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:ring-slate-700"
+          role="status"
+          aria-live="polite"
+        >
+          {toast}
+        </div>
+      ) : null}
+
       <div className="mb-6 flex items-center gap-3 lg:mb-8">
         <div className="grid h-10 w-10 place-items-center rounded-xl bg-indigo-600 text-sm font-bold text-white">
           T
@@ -233,79 +338,89 @@ function AppSidebar({
               ) : null}
               <div className="space-y-2">
                 {(section.items ?? []).map((item) => {
+                  const isOpen = openCategoryId === item.id
                   const hasChildren = !!item.children?.length
-                  const active = isItemActive(item)
-                  const open = !!openGroups[item.id]
-
-                  if (hasChildren) {
-                    return (
-                      <div key={item.id} className="space-y-1">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setOpenGroups((p) => ({ ...p, [item.id]: !p[item.id] }))
-                          }
-                          className={`${rowBase} ${active ? rowActive : rowInactive}`}
-                          aria-expanded={open}
-                        >
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="flex min-w-0 items-center gap-3">
-                              <span className={iconWrapClass}>
-                                {item.icon ? (
-                                  item.icon
-                                ) : (
-                                  <DefaultIcon name={item.iconName} className="h-4 w-4" />
-                                )}
-                              </span>
-                              <span className="truncate">{item.label}</span>
-                            </div>
-                            <ChevronIcon open={open} className={active ? 'text-white' : ''} />
-                          </div>
-                        </button>
-                        {open ? (
-                          <div className="space-y-1 pl-11">
-                            {item.children.map((child) => {
-                              const childActive = isItemActive(child)
-                              return (
-                                <button
-                                  key={child.id}
-                                  type="button"
-                                  onClick={child.onClick}
-                                  className={`${rowBase} ${
-                                    childActive ? rowActive : rowInactive
-                                  }`}
-                                >
-                                  <div className="flex items-center gap-2">
-                                    <span className="h-1.5 w-1.5 rounded-full bg-current opacity-60" />
-                                    <span className="truncate">{child.label}</span>
-                                  </div>
-                                </button>
-                              )
-                            })}
-                          </div>
-                        ) : null}
-                      </div>
-                    )
-                  }
+                  const isCategoryActive = item.children?.some((c) => c?.active)
 
                   return (
-                    <button
+                    <div
                       key={item.id}
-                      type="button"
-                      onClick={item.onClick}
-                      className={`${rowBase} ${active ? rowActive : rowInactive}`}
+                      className="space-y-1"
+                      onMouseEnter={() => setOpenCategoryId(item.id)}
+                      onMouseLeave={() => setOpenCategoryId(null)}
                     >
-                      <div className="flex min-w-0 items-center gap-3">
-                        <span className={iconWrapClass}>
-                          {item.icon ? (
-                            item.icon
-                          ) : (
-                            <DefaultIcon name={item.iconName} className="h-4 w-4" />
-                          )}
-                        </span>
-                        <span className="truncate">{item.label}</span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setOpenCategoryId((prev) => (prev === item.id ? null : item.id))
+                        }
+                        className={`${rowBase} ${isCategoryActive ? rowActive : rowInactive}`}
+                        aria-expanded={isOpen}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex min-w-0 items-center gap-3">
+                            <span className={iconWrapClass}>
+                              {item.icon ? (
+                                item.icon
+                              ) : (
+                                <DefaultIcon name={item.iconName} className="h-4 w-4" />
+                              )}
+                            </span>
+                            <span className="truncate font-semibold">
+                              {String(item.label ?? '')}
+                            </span>
+                          </div>
+                          <ChevronIcon open={isOpen} className={isCategoryActive ? 'text-white' : ''} />
+                        </div>
+                      </button>
+
+                      <div
+                        className={`pl-11 transition-all duration-1000 ease-out motion-reduce:transition-none ${
+                          isOpen && hasChildren
+                            ? 'max-h-96 opacity-100 translate-y-0'
+                            : 'max-h-0 opacity-0 -translate-y-1 pointer-events-none'
+                        } overflow-hidden`}
+                      >
+                        <div className="relative space-y-1 pt-1">
+                          <span
+                            aria-hidden="true"
+                            className="pointer-events-none absolute bottom-1 top-2 left-2 w-px bg-current opacity-20"
+                          />
+                          {item.children.map((child) => {
+                            const childActive = !!child.active
+                            const disabled = !!child.disabled
+                            return (
+                              <button
+                                key={child.id}
+                                type="button"
+                                onClick={() => {
+                                  if (disabled) {
+                                    showToast(child.disabledReason || 'Coming soon')
+                                    return
+                                  }
+                                  child.onClick?.()
+                                }}
+                                disabled={disabled}
+                                className={`${rowBase} ${
+                                  disabled
+                                    ? rowDisabled
+                                    : childActive
+                                      ? rowActive
+                                      : rowInactive
+                                }`}
+                              >
+                                <div className="relative flex min-w-0 items-center gap-3">
+                                  <span aria-hidden="true" className="relative w-4 shrink-0">
+                                    <span className="absolute left-2 top-1/2 h-px w-2 -translate-y-1/2 bg-current opacity-20" />
+                                  </span>
+                                  <span className="truncate">{child.label}</span>
+                                </div>
+                              </button>
+                            )
+                          })}
+                        </div>
                       </div>
-                    </button>
+                    </div>
                   )
                 })}
               </div>

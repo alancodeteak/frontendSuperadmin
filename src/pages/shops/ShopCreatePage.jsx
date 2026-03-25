@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import AppSidebar from '@/components/layout/AppSidebar'
+import { buildSidebarNav } from '@/components/layout/sidebarNavConfig'
 import LocationPickerMap from '@/components/shops/LocationPickerMap'
 import { logoutLocal } from '@/redux/slices/authSlice'
 import { logoutAction } from '@/redux/thunks/authThunks'
@@ -354,66 +355,16 @@ function ShopCreatePage({
   }
 
   const navSections = useMemo(
-    () => [
-      {
-        id: 'profile',
-        title: 'Profile',
-        items: [
-          {
-            id: 'home',
-            label: 'Home',
-            iconName: 'home',
-            active: false,
-            onClick: () => navigate(listingPath.replace('/shops', '')),
-          },
-          {
-            id: 'dashboard',
-            label: 'Dashboard',
-            iconName: 'menu',
-            children: [
-              {
-                id: 'overview',
-                label: 'Overview',
-                active: false,
-                onClick: () => navigate(listingPath.replace('/shops', '')),
-              },
-              {
-                id: 'tasks',
-                label: 'Tasks',
-                active: false,
-                onClick: () => navigate(listingPath.replace('/shops', '')),
-              },
-              {
-                id: 'analytics',
-                label: 'Analytics',
-                active: false,
-                onClick: () => navigate(listingPath.replace('/shops', '')),
-              },
-            ],
-          },
-        ],
-      },
-      {
-        id: 'shops',
-        title: 'Shops',
-        items: [
-          {
-            id: 'view',
-            label: 'View Shops',
-            iconName: 'store',
-            active: false,
-            onClick: () => navigate(listingPath),
-          },
-          {
-            id: 'create',
-            label: 'Create Shop',
-            iconName: 'plus',
-            active: true,
-            onClick: () => navigate(createPath),
-          },
-        ],
-      },
-    ],
+    () =>
+      buildSidebarNav({
+        navigate,
+        activeKey: 'shops.create',
+        paths: {
+          dashboardPath: listingPath.replace('/shops', ''),
+          shopsPath: listingPath,
+          createShopPath: createPath,
+        },
+      }),
     [createPath, listingPath, navigate],
   )
 

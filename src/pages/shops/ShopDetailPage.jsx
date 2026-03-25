@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import AppSidebar from '@/components/layout/AppSidebar'
+import { buildSidebarNav } from '@/components/layout/sidebarNavConfig'
 import { logoutLocal } from '@/redux/slices/authSlice'
 import { logoutAction } from '@/redux/thunks/authThunks'
 import {
@@ -40,33 +41,16 @@ function ShopDetailPage({
   }, [dispatch, userId])
 
   const navSections = useMemo(
-    () => [
-      {
-        id: 'profile',
-        title: 'Profile',
-        items: [
-          { id: 'home', label: 'Home', iconName: 'home', active: false, onClick: () => navigate(dashboardPath) },
-          {
-            id: 'dashboard',
-            label: 'Dashboard',
-            iconName: 'menu',
-            children: [
-              { id: 'overview', label: 'Overview', active: false, onClick: () => navigate(dashboardPath) },
-              { id: 'tasks', label: 'Tasks', active: false, onClick: () => navigate(dashboardPath) },
-              { id: 'analytics', label: 'Analytics', active: false, onClick: () => navigate(dashboardPath) },
-            ],
-          },
-        ],
-      },
-      {
-        id: 'shops',
-        title: 'Shops',
-        items: [
-          { id: 'view', label: 'View Shops', iconName: 'store', active: true, onClick: () => navigate(shopsPath) },
-          { id: 'create', label: 'Create Shop', iconName: 'plus', active: false, onClick: () => navigate(createPath) },
-        ],
-      },
-    ],
+    () =>
+      buildSidebarNav({
+        navigate,
+        activeKey: 'shops.view',
+        paths: {
+          dashboardPath,
+          shopsPath,
+          createShopPath: createPath,
+        },
+      }),
     [createPath, dashboardPath, navigate, shopsPath],
   )
 

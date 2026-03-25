@@ -15,19 +15,16 @@ import {
 } from 'recharts'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import AppSidebar from '@/components/layout/AppSidebar'
+import { buildSidebarNav } from '@/components/layout/sidebarNavConfig'
 import StatCard from '@/components/common/StatCard'
 import TeamMemberRow from '@/components/common/TeamMemberRow'
-import {
-  setActiveTab,
-  setSelectedRange,
-} from '@/redux/slices/dashboardSlice'
+import { setSelectedRange } from '@/redux/slices/dashboardSlice'
 import { logoutLocal } from '@/redux/slices/authSlice'
 import { getDashboardData } from '@/redux/thunks/dashboardThunks'
 import { logoutAction } from '@/redux/thunks/authThunks'
 import { useTheme } from '@/context/useTheme'
 import '@/App.css'
 
-const tabs = ['overview', 'tasks', 'analytics']
 const ranges = ['daily', 'weekly', 'monthly']
 const chartDataByRange = {
   daily: [
@@ -63,7 +60,7 @@ function TeamDashboardPage({
 }) {
   const dispatch = useDispatch()
   const navigate = useNavigate()
-  const { stats, members, loading, activeTab, selectedRange } = useSelector(
+  const { stats, members, loading, selectedRange } = useSelector(
     (state) => state.dashboard,
   )
   const { logoutStatus } = useSelector((state) => state.auth)
@@ -108,65 +105,19 @@ function TeamDashboardPage({
     navigate(logoutRedirectTo, { replace: true })
   }
 
-  const navSections = [
-    {
-      id: 'profile',
-      title: 'Profile',
-      items: [
-        {
-          id: 'home',
-          label: 'Home',
-          iconName: 'home',
-          active: true,
-          onClick: () => navigate('/dashboard/teamify'),
+  const navSections = useMemo(
+    () =>
+      buildSidebarNav({
+        navigate,
+        activeKey: 'home.dashboard',
+        paths: {
+          dashboardPath: '/dashboard/teamify',
+          shopsPath: shopsPagePath,
+          createShopPath: `${shopsPagePath}/create`,
         },
-        {
-          id: 'dashboard',
-          label: 'Dashboard',
-          iconName: 'menu',
-          children: tabs.map((tab) => ({
-            id: tab,
-            label: tab[0].toUpperCase() + tab.slice(1),
-            active: activeTab === tab,
-            onClick: () => dispatch(setActiveTab(tab)),
-          })),
-        },
-      ],
-    },
-    {
-      id: 'menu',
-      title: 'Menu',
-      items: [
-        {
-          id: 'analytics',
-          label: 'Analytics',
-          iconName: 'chart',
-          active: activeTab === 'analytics',
-          onClick: () => dispatch(setActiveTab('analytics')),
-        },
-        {
-          id: 'tasks',
-          label: 'Tasks',
-          iconName: 'task',
-          active: activeTab === 'tasks',
-          onClick: () => dispatch(setActiveTab('tasks')),
-        },
-      ],
-    },
-    {
-      id: 'shops',
-      title: 'Shops',
-      items: [
-        {
-          id: 'shops-list',
-          label: 'View Shops',
-          iconName: 'store',
-          active: false,
-          onClick: () => navigate(shopsPagePath),
-        },
-      ],
-    },
-  ]
+      }),
+    [navigate, shopsPagePath],
+  )
 
   return (
     <DashboardLayout>
