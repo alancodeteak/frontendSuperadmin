@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
 import DashboardLayout from '@/components/layout/DashboardLayout'
@@ -49,6 +50,7 @@ function ShopListingPage({
   caption = 'Manage and review registered shops',
   dashboardPath = '/dashboard/teamify',
   shopsPath = '/dashboard/teamify/shops',
+  createPath = '/dashboard/teamify/shops/create',
   logoutRedirectTo = '/',
 }) {
   const dispatch = useDispatch()
@@ -56,6 +58,27 @@ function ShopListingPage({
   const { themeMode, toggleTheme } = useTheme()
   const { logoutStatus } = useSelector((state) => state.auth)
   const isLoggingOut = logoutStatus === 'loading'
+  const [copyToast, setCopyToast] = useState(null)
+  const copyToastTimerRef = useRef(null)
+
+  const showCopyToast = useCallback((message) => {
+    if (copyToastTimerRef.current) {
+      clearTimeout(copyToastTimerRef.current)
+    }
+    setCopyToast(message)
+    copyToastTimerRef.current = setTimeout(() => {
+      setCopyToast(null)
+      copyToastTimerRef.current = null
+    }, 2200)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (copyToastTimerRef.current) {
+        clearTimeout(copyToastTimerRef.current)
+      }
+    }
+  }, [])
 
   const handleLogout = async () => {
     if (isLoggingOut) return
@@ -64,55 +87,93 @@ function ShopListingPage({
     navigate(logoutRedirectTo, { replace: true })
   }
 
-  const sidebarNavItems = [
+  const navSections = [
     {
-      id: 'overview',
-      label: 'Overview',
-      active: false,
-      onClick: () => navigate(dashboardPath),
-    },
-    {
-      id: 'tasks',
-      label: 'Tasks',
-      active: false,
-      onClick: () => navigate(dashboardPath),
-    },
-    {
-      id: 'analytics',
-      label: 'Analytics',
-      active: false,
-      onClick: () => navigate(dashboardPath),
+      id: 'tabs',
+      title: null,
+      items: [
+        {
+          id: 'overview',
+          label: 'Overview',
+          active: false,
+          onClick: () => navigate(dashboardPath),
+        },
+        {
+          id: 'tasks',
+          label: 'Tasks',
+          active: false,
+          onClick: () => navigate(dashboardPath),
+        },
+        {
+          id: 'analytics',
+          label: 'Analytics',
+          active: false,
+          onClick: () => navigate(dashboardPath),
+        },
+      ],
     },
     {
       id: 'shops',
-      label: 'Shop Listing',
-      active: true,
-      onClick: () => navigate(shopsPath),
+      title: 'Shops',
+      items: [
+        {
+          id: 'view',
+          label: 'View Shops',
+          active: true,
+          onClick: () => navigate(shopsPath),
+        },
+        {
+          id: 'create',
+          label: 'Create Shop',
+          active: false,
+          onClick: () => navigate(createPath),
+        },
+      ],
     },
   ]
 
-  const handleCopy = async (value) => {
+  const handleCopy = async (value, label) => {
     if (!value) return
 
     try {
       await navigator.clipboard.writeText(value)
+      showCopyToast(label)
     } catch {
-      // Clipboard can fail on insecure contexts; keep UI silent.
+      showCopyToast('Could not copy — try again')
     }
   }
+
+  const isDark = themeMode === 'dark'
+
+  const copyIconClass = isDark
+    ? 'h-3 w-3 object-contain invert opacity-100'
+    : 'h-3 w-3 object-contain opacity-100'
+
+  const copyButtonClass = isDark
+    ? 'rounded-md border border-slate-700 bg-transparent p-1 transition-all duration-150 ease-out hover:bg-slate-800 hover:scale-[1.08] active:scale-[0.95]'
+    : 'rounded-md border border-white/90 bg-slate-50/90 p-1 transition-all duration-150 ease-out hover:bg-slate-100 hover:scale-[1.08] active:scale-[0.95]'
 
   return (
     <DashboardLayout>
       <AppSidebar
         brandTitle={brandTitle}
         subTitle={sidebarSubTitle}
-        navItems={sidebarNavItems}
+        navSections={navSections}
         themeMode={themeMode}
         onToggleTheme={toggleTheme}
         onLogout={handleLogout}
         isLoggingOut={isLoggingOut}
       />
-      <main className="flex-1 rounded-3xl bg-white p-1 dark:bg-slate-950/40 sm:p-2">
+      <main className="relative flex-1 rounded-3xl bg-white p-1 dark:bg-slate-950/40 sm:p-2">
+        {copyToast && (
+          <div
+            className="pointer-events-none fixed bottom-6 left-1/2 z-50 max-w-[min(90vw,360px)] -translate-x-1/2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-center text-sm font-medium text-black shadow-lg ring-1 ring-slate-200/80 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:ring-slate-700"
+            role="status"
+            aria-live="polite"
+          >
+            {copyToast}
+          </div>
+        )}
         <header className="teamify-surface mb-3 rounded-3xl p-4 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700 md:mb-4 md:p-5">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-600 dark:text-indigo-300">
             {brandTitle}
@@ -141,41 +202,50 @@ function ShopListingPage({
                     <h3 className="text-base font-semibold text-black dark:text-slate-100">
                       {shop.name}
                     </h3>
-                    <div className="flex items-center justify-between gap-2 text-[14px] leading-5 font-medium text-black dark:text-slate-300">
+                    <div className="flex items-center gap-2 text-[14px] leading-5 font-medium text-black dark:text-slate-300">
                       <p className="truncate">
-                        User ID: <span className="tabular-nums">{shop.id}</span>
+                        User ID:{' '}
+                        <span className="tabular-nums">{shop.id}</span>
                       </p>
                       <button
                         type="button"
                         aria-label={`Copy user id for ${shop.name}`}
                         title="Copy User ID"
-                        onClick={() => handleCopy(shop.id)}
-                        className="rounded-md border border-slate-300 p-1 transition-colors duration-200 hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+                        onClick={() =>
+                          handleCopy(shop.id, `User ID copied: ${shop.id}`)
+                        }
+                        className={copyButtonClass}
                       >
                         <img
                           src="/icons/copy.png"
                           alt=""
                           aria-hidden="true"
-                          className="h-3 w-3 object-contain"
+                          className={copyIconClass}
                         />
                       </button>
                     </div>
-                    <div className="flex items-center justify-between gap-2 text-[14px] leading-5 font-medium text-black dark:text-slate-300">
+                    <div className="flex items-center gap-2 text-[14px] leading-5 font-medium text-black dark:text-slate-300">
                       <p className="truncate">
-                        Phone: <span className="tabular-nums">{shop.phoneNumber}</span>
+                        Phone:{' '}
+                        <span className="tabular-nums">{shop.phoneNumber}</span>
                       </p>
                       <button
                         type="button"
                         aria-label={`Copy phone number for ${shop.name}`}
                         title="Copy Phone Number"
-                        onClick={() => handleCopy(shop.phoneNumber)}
-                        className="rounded-md border border-slate-300 p-1 transition-colors duration-200 hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+                        onClick={() =>
+                          handleCopy(
+                            shop.phoneNumber,
+                            `Phone number copied: ${shop.phoneNumber}`,
+                          )
+                        }
+                        className={copyButtonClass}
                       >
                         <img
                           src="/icons/copy.png"
                           alt=""
                           aria-hidden="true"
-                          className="h-3 w-3 object-contain"
+                          className={copyIconClass}
                         />
                       </button>
                     </div>

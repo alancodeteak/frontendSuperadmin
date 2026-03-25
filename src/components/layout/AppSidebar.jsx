@@ -4,12 +4,14 @@ function AppSidebar({
   brandTitle,
   subTitle,
   navItems,
+  navSections,
   themeMode,
   onToggleTheme,
   onLogout,
   isLoggingOut,
 }) {
   const [currentDateTime, setCurrentDateTime] = useState(() => new Date())
+  const isDark = themeMode === 'dark'
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -43,27 +45,63 @@ function AppSidebar({
         </div>
       </div>
 
-      <div className="mb-5 rounded-xl bg-white/70 px-3 py-2 text-xs text-black ring-1 ring-slate-300 dark:bg-slate-800/70 dark:text-slate-100 dark:ring-slate-700">
+      <div
+        className={`mb-5 rounded-xl px-3 py-2 text-xs ring-1 ${
+          isDark
+            ? 'bg-slate-800/70 text-slate-100 ring-slate-700'
+            : 'bg-white text-black ring-slate-200'
+        }`}
+      >
         <p className="font-semibold">{formattedDate}</p>
         <p>{formattedTime}</p>
       </div>
 
-      <nav className="space-y-2">
-        {navItems.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            onClick={item.onClick}
-            className={`w-full rounded-xl px-4 py-2 text-left text-sm font-medium transition duration-300 ${
-              item.active
-                ? 'bg-indigo-600 text-white shadow'
-                : 'text-black hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
-            }`}
-          >
-            {item.label}
-          </button>
-        ))}
-      </nav>
+      {navSections?.length ? (
+        <nav className="space-y-4">
+          {navSections.map((section) => (
+            <div key={section.id} className="space-y-2">
+              {section.title ? (
+                <p className="px-2 text-xs font-semibold uppercase tracking-[0.16em] text-indigo-600 dark:text-indigo-300">
+                  {section.title}
+                </p>
+              ) : null}
+              <div className="space-y-2">
+                {section.items.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={item.onClick}
+                    className={`w-full rounded-xl px-4 py-2 text-left text-sm font-medium transition duration-300 ${
+                      item.active
+                        ? 'bg-indigo-600 text-white shadow'
+                        : 'text-black hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </nav>
+      ) : (
+        <nav className="space-y-2">
+          {(navItems ?? []).map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={item.onClick}
+              className={`w-full rounded-xl px-4 py-2 text-left text-sm font-medium transition duration-300 ${
+                item.active
+                  ? 'bg-indigo-600 text-white shadow'
+                  : 'text-black hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </nav>
+      )}
 
       <div className="mt-auto space-y-3 pt-6">
         <button

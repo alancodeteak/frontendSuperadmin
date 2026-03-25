@@ -9,6 +9,7 @@ function PortalShopListingPage() {
       caption="Review shop profiles registered in the portal"
       dashboardPath="/portal/dashboard"
       shopsPath="/portal/dashboard/shops"
+      createPath="/portal/dashboard/shops/create"
       logoutRedirectTo="/portal/login"
     />
   )

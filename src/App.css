@@ -84,7 +84,7 @@
 }
 
 .shop-flip-card:hover .shop-flip-inner {
-  animation: shopFlipPeek 400ms cubic-bezier(0.22, 0.61, 0.36, 1) 1;
+  animation: shopFlipPeek 750ms cubic-bezier(0.22, 0.61, 0.36, 1) 1;
 }
 
 .shop-flip-front,

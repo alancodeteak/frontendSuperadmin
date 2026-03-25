@@ -6,6 +6,8 @@ import PortalLoginPage from '@/pages/portal/PortalLoginPage'
 import PortalDashboardPage from '@/pages/portal/PortalDashboardPage'
 import AdminShopListingPage from '@/pages/shops/AdminShopListingPage'
 import PortalShopListingPage from '@/pages/shops/PortalShopListingPage'
+import AdminShopCreatePage from '@/pages/shops/AdminShopCreatePage'
+import PortalShopCreatePage from '@/pages/shops/PortalShopCreatePage'
 import {
   selectAuthScope,
   selectIsAuthenticated,
@@ -44,6 +46,14 @@ function AppRouter() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/dashboard/teamify/shops/create"
+          element={
+            <ProtectedRoute requiredScope="admin" redirectTo="/">
+              <AdminShopCreatePage />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/portal/login" element={<PortalLoginPage />} />
         <Route
           path="/portal/dashboard"
@@ -58,6 +68,14 @@ function AppRouter() {
           element={
             <ProtectedRoute requiredScope="portal" redirectTo="/portal/login">
               <PortalShopListingPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/portal/dashboard/shops/create"
+          element={
+            <ProtectedRoute requiredScope="portal" redirectTo="/portal/login">
+              <PortalShopCreatePage />
             </ProtectedRoute>
           }
         />

@@ -9,6 +9,7 @@ function AdminShopListingPage() {
       caption="Manage and review registered shops"
       dashboardPath="/dashboard/teamify"
       shopsPath="/dashboard/teamify/shops"
+      createPath="/dashboard/teamify/shops/create"
       logoutRedirectTo="/"
     />
   )
