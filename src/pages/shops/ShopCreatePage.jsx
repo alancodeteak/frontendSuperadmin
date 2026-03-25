@@ -7,6 +7,7 @@ import AppSidebar from '@/components/layout/AppSidebar'
 import LocationPickerMap from '@/components/shops/LocationPickerMap'
 import { logoutLocal } from '@/redux/slices/authSlice'
 import { logoutAction } from '@/redux/thunks/authThunks'
+import { createSupermarketAction } from '@/redux/thunks/supermarketsThunks'
 import { useTheme } from '@/context/useTheme'
 import '@/App.css'
 
@@ -67,7 +68,6 @@ function ShopCreatePage({
   listingPath = '/dashboard/teamify/shops',
   createPath = '/dashboard/teamify/shops/create',
   logoutRedirectTo = '/',
-  submitMockDelayMs = 900,
 }) {
   const dispatch = useDispatch()
   const navigate = useNavigate()
@@ -315,30 +315,14 @@ function ShopCreatePage({
         ? `${form.phone_dial_code}${String(form.phone_local).replace(/\s+/g, '')}`
         : null
       const payload = {
-        shop_owner: {
-          shop_id: form.shop_id,
-          user_id: Number(form.user_id),
-          shop_name: form.shop_name,
-          phone: fullPhone,
-          email: form.email || null,
-          shop_license_no: form.shop_license_no || null,
-          contact_person_number: form.contact_person_number || fullPhone || null,
-          contact_person_email: form.contact_person_email || null,
-          photo: form.photoFile ? '[uploaded-file]' : null,
-          is_automated: Boolean(form.is_automated),
-          self_assigned: Boolean(form.self_assigned),
-          is_sms_activated: Boolean(form.is_sms_activated),
-          whatsapp: Boolean(form.whatsapp),
-          is_supermarket: Boolean(form.is_supermarket),
-          single_sms: Boolean(form.single_sms),
-          geo_coordinates:
-            form.latitude && form.longitude
-              ? {
-                  latitude: Number(form.latitude),
-                  longitude: Number(form.longitude),
-                }
-              : null,
-        },
+        user_id: Number(form.user_id),
+        shop_name: form.shop_name,
+        password: form.password,
+        phone: fullPhone,
+        email: form.email || null,
+        shop_license_no: form.shop_license_no || null,
+        // API expects `photo` as string (url/key). Until backend adds upload/presign, keep preview-only.
+        photo: null,
         address: {
           street_address: form.street_address,
           city: form.city,
@@ -354,20 +338,16 @@ function ShopCreatePage({
           ? {
               start_date: new Date().toISOString(),
               amount: Number(form.subscription_amount),
-              status: form.subscription_status,
+              status: String(form.subscription_status || '').toLowerCase(),
             }
           : null,
       }
-      // Mock: keep payload visible in devtools for API wiring later.
-      console.log('Create shop (mock) payload', payload)
 
-      await new Promise((r) => setTimeout(r, submitMockDelayMs))
-      // Mock submit success
-      setSubmitSuccess('Shop created successfully (mock).')
-      // Navigate back after short pause to keep UX smooth.
-      setTimeout(() => navigate(listingPath, { replace: true }), 900)
-    } catch {
-      setSubmitError('Failed to create shop. Please try again.')
+      await dispatch(createSupermarketAction(payload)).unwrap()
+      setSubmitSuccess('Shop created successfully.')
+      setTimeout(() => navigate(listingPath, { replace: true }), 700)
+    } catch (error) {
+      setSubmitError(error?.message ?? 'Failed to create shop. Please try again.')
     } finally {
       setIsSubmitting(false)
     }
@@ -376,26 +356,40 @@ function ShopCreatePage({
   const navSections = useMemo(
     () => [
       {
-        id: 'tabs',
-        title: null,
+        id: 'profile',
+        title: 'Profile',
         items: [
           {
-            id: 'overview',
-            label: 'Overview',
+            id: 'home',
+            label: 'Home',
+            iconName: 'home',
             active: false,
             onClick: () => navigate(listingPath.replace('/shops', '')),
           },
           {
-            id: 'tasks',
-            label: 'Tasks',
-            active: false,
-            onClick: () => navigate(listingPath.replace('/shops', '')),
-          },
-          {
-            id: 'analytics',
-            label: 'Analytics',
-            active: false,
-            onClick: () => navigate(listingPath.replace('/shops', '')),
+            id: 'dashboard',
+            label: 'Dashboard',
+            iconName: 'menu',
+            children: [
+              {
+                id: 'overview',
+                label: 'Overview',
+                active: false,
+                onClick: () => navigate(listingPath.replace('/shops', '')),
+              },
+              {
+                id: 'tasks',
+                label: 'Tasks',
+                active: false,
+                onClick: () => navigate(listingPath.replace('/shops', '')),
+              },
+              {
+                id: 'analytics',
+                label: 'Analytics',
+                active: false,
+                onClick: () => navigate(listingPath.replace('/shops', '')),
+              },
+            ],
           },
         ],
       },
@@ -406,12 +400,14 @@ function ShopCreatePage({
           {
             id: 'view',
             label: 'View Shops',
+            iconName: 'store',
             active: false,
             onClick: () => navigate(listingPath),
           },
           {
             id: 'create',
             label: 'Create Shop',
+            iconName: 'plus',
             active: true,
             onClick: () => navigate(createPath),
           },
@@ -499,7 +495,7 @@ function ShopCreatePage({
     : 'grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 pr-4'
 
   const switchClass = (enabled) =>
-    `relative h-6 w-11 rounded-full transition-colors duration-200 ${
+    `relative h-6 w-11 overflow-hidden rounded-full transition-colors duration-200 ${
       enabled
         ? isDark
           ? 'bg-indigo-500'
@@ -510,7 +506,7 @@ function ShopCreatePage({
     }`
 
   const knobClass = (enabled) =>
-    `absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform duration-200 ${
+    `absolute left-0 top-0.5 h-5 w-5 rounded-full bg-white transition-transform duration-200 ${
       enabled ? 'translate-x-5' : 'translate-x-0.5'
     }`
 

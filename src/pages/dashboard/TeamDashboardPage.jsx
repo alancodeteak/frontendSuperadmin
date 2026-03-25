@@ -108,18 +108,63 @@ function TeamDashboardPage({
     navigate(logoutRedirectTo, { replace: true })
   }
 
-  const sidebarNavItems = [
-    ...tabs.map((tab) => ({
-      id: tab,
-      label: tab[0].toUpperCase() + tab.slice(1),
-      active: activeTab === tab,
-      onClick: () => dispatch(setActiveTab(tab)),
-    })),
+  const navSections = [
+    {
+      id: 'profile',
+      title: 'Profile',
+      items: [
+        {
+          id: 'home',
+          label: 'Home',
+          iconName: 'home',
+          active: true,
+          onClick: () => navigate('/dashboard/teamify'),
+        },
+        {
+          id: 'dashboard',
+          label: 'Dashboard',
+          iconName: 'menu',
+          children: tabs.map((tab) => ({
+            id: tab,
+            label: tab[0].toUpperCase() + tab.slice(1),
+            active: activeTab === tab,
+            onClick: () => dispatch(setActiveTab(tab)),
+          })),
+        },
+      ],
+    },
+    {
+      id: 'menu',
+      title: 'Menu',
+      items: [
+        {
+          id: 'analytics',
+          label: 'Analytics',
+          iconName: 'chart',
+          active: activeTab === 'analytics',
+          onClick: () => dispatch(setActiveTab('analytics')),
+        },
+        {
+          id: 'tasks',
+          label: 'Tasks',
+          iconName: 'task',
+          active: activeTab === 'tasks',
+          onClick: () => dispatch(setActiveTab('tasks')),
+        },
+      ],
+    },
     {
       id: 'shops',
-      label: 'Shop Listing',
-      active: false,
-      onClick: () => navigate(shopsPagePath),
+      title: 'Shops',
+      items: [
+        {
+          id: 'shops-list',
+          label: 'View Shops',
+          iconName: 'store',
+          active: false,
+          onClick: () => navigate(shopsPagePath),
+        },
+      ],
     },
   ]
 
@@ -128,7 +173,7 @@ function TeamDashboardPage({
       <AppSidebar
         brandTitle={brandTitle}
         subTitle={pageTitle}
-        navItems={sidebarNavItems}
+        navSections={navSections}
         themeMode={themeMode}
         onToggleTheme={toggleTheme}
         onLogout={handleLogout}

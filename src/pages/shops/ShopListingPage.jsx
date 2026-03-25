@@ -1,47 +1,26 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import AppSidebar from '@/components/layout/AppSidebar'
 import { logoutLocal } from '@/redux/slices/authSlice'
 import { logoutAction } from '@/redux/thunks/authThunks'
+import {
+  selectSupermarketsListError,
+  selectSupermarketsListItems,
+  selectSupermarketsListMeta,
+  selectSupermarketsListStatus,
+} from '@/redux/slices/supermarketsSlice'
+import { fetchSupermarketsAction } from '@/redux/thunks/supermarketsThunks'
 import { useTheme } from '@/context/useTheme'
 import '@/App.css'
 
-const mockShops = [
-  {
-    id: 'SHP-1001',
-    name: 'Green Basket Mart',
-    phoneNumber: '+91 98765 43210',
-    address: '12 Lake View Road, Coimbatore, Tamil Nadu',
-    photo:
-      'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=480&q=80',
-  },
-  {
-    id: 'SHP-1002',
-    name: 'Sunrise Grocery',
-    phoneNumber: '+91 99440 11223',
-    address: '45 Market Street, Peelamedu, Coimbatore',
-    photo:
-      'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=480&q=80',
-  },
-  {
-    id: 'SHP-1003',
-    name: 'Urban Fresh Store',
-    phoneNumber: '+91 90031 44556',
-    address: '88 Cross Cut Road, Gandhipuram, Coimbatore',
-    photo:
-      'https://images.unsplash.com/photo-1488459716781-31db52582fe9?auto=format&fit=crop&w=480&q=80',
-  },
-  {
-    id: 'SHP-1004',
-    name: 'Daily Needs Point',
-    phoneNumber: '+91 98400 77889',
-    address: '22 Avinashi Road, Hope College, Coimbatore',
-    photo:
-      'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=480&q=80',
-  },
-]
+function getInitials(value) {
+  const cleaned = String(value ?? '').trim()
+  if (!cleaned) return 'S'
+  const parts = cleaned.split(/\s+/g).slice(0, 2)
+  return parts.map((p) => p[0]?.toUpperCase()).join('')
+}
 
 function ShopListingPage({
   brandTitle = 'Teamify',
@@ -58,8 +37,17 @@ function ShopListingPage({
   const { themeMode, toggleTheme } = useTheme()
   const { logoutStatus } = useSelector((state) => state.auth)
   const isLoggingOut = logoutStatus === 'loading'
+  const listItems = useSelector(selectSupermarketsListItems)
+  const listMeta = useSelector(selectSupermarketsListMeta)
+  const listStatus = useSelector(selectSupermarketsListStatus)
+  const listError = useSelector(selectSupermarketsListError)
   const [copyToast, setCopyToast] = useState(null)
   const copyToastTimerRef = useRef(null)
+
+  const [query, setQuery] = useState('')
+  const [page, setPage] = useState(1)
+  const limit = 20
+  const [debouncedQuery, setDebouncedQuery] = useState('')
 
   const showCopyToast = useCallback((message) => {
     if (copyToastTimerRef.current) {
@@ -80,6 +68,52 @@ function ShopListingPage({
     }
   }, [])
 
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedQuery(query.trim())
+    }, 300)
+    return () => clearTimeout(t)
+  }, [query])
+
+  const parsedParams = useMemo(() => {
+    const q = debouncedQuery
+    if (!q) return { page, limit }
+
+    const onlyDigits = /^[0-9]+$/.test(q)
+    if (onlyDigits) {
+      return { page, limit, user_id: Number(q) }
+    }
+
+    const shopIdLike = /^shop/i.test(q)
+    if (shopIdLike) {
+      return { page, limit, shop_id: q.toUpperCase() }
+    }
+
+    const phoneCandidate = q.replace(/\s+/g, '')
+    const phoneLike = /^\+?[0-9]{6,}$/.test(phoneCandidate)
+    if (phoneLike) {
+      return { page, limit, phone: phoneCandidate }
+    }
+
+    return { page, limit, name: q }
+  }, [debouncedQuery, limit, page])
+
+  useEffect(() => {
+    dispatch(fetchSupermarketsAction(parsedParams))
+  }, [dispatch, parsedParams])
+
+  const shops = useMemo(() => {
+    return (listItems ?? []).map((it) => ({
+      photo: it.photo || null,
+      shop_name: it.shop_name ?? '—',
+      user_id: it.user_id ?? null,
+      phone: it.phone ?? '—',
+      location: it.location ?? '—',
+      latitude: it.latitude ?? null,
+      longitude: it.longitude ?? null,
+    }))
+  }, [listItems])
+
   const handleLogout = async () => {
     if (isLoggingOut) return
     await dispatch(logoutAction())
@@ -89,28 +123,32 @@ function ShopListingPage({
 
   const navSections = [
     {
-      id: 'tabs',
-      title: null,
+      id: 'profile',
+      title: 'Profile',
       items: [
         {
-          id: 'overview',
-          label: 'Overview',
+          id: 'home',
+          label: 'Home',
+          iconName: 'home',
           active: false,
           onClick: () => navigate(dashboardPath),
         },
         {
-          id: 'tasks',
-          label: 'Tasks',
-          active: false,
-          onClick: () => navigate(dashboardPath),
-        },
-        {
-          id: 'analytics',
-          label: 'Analytics',
-          active: false,
-          onClick: () => navigate(dashboardPath),
+          id: 'dashboard',
+          label: 'Dashboard',
+          iconName: 'menu',
+          children: [
+            { id: 'overview', label: 'Overview', active: false, onClick: () => navigate(dashboardPath) },
+            { id: 'tasks', label: 'Tasks', active: false, onClick: () => navigate(dashboardPath) },
+            { id: 'analytics', label: 'Analytics', active: false, onClick: () => navigate(dashboardPath) },
+          ],
         },
       ],
+    },
+    {
+      id: 'tabs',
+      title: 'Menu',
+      items: [],
     },
     {
       id: 'shops',
@@ -119,12 +157,14 @@ function ShopListingPage({
         {
           id: 'view',
           label: 'View Shops',
+          iconName: 'store',
           active: true,
           onClick: () => navigate(shopsPath),
         },
         {
           id: 'create',
           label: 'Create Shop',
+          iconName: 'plus',
           active: false,
           onClick: () => navigate(createPath),
         },
@@ -152,6 +192,12 @@ function ShopListingPage({
   const copyButtonClass = isDark
     ? 'rounded-md border border-slate-700 bg-transparent p-1 transition-all duration-150 ease-out hover:bg-slate-800 hover:scale-[1.08] active:scale-[0.95]'
     : 'rounded-md border border-white/90 bg-slate-50/90 p-1 transition-all duration-150 ease-out hover:bg-slate-100 hover:scale-[1.08] active:scale-[0.95]'
+
+  const detailPathFor = (userId) => {
+    if (!userId) return null
+    const base = shopsPath.endsWith('/shops') ? shopsPath : shopsPath
+    return `${base}/${encodeURIComponent(String(userId))}`
+  }
 
   return (
     <DashboardLayout>
@@ -184,36 +230,102 @@ function ShopListingPage({
           <p className="mt-1 text-sm text-black dark:text-slate-300">{caption}</p>
         </header>
 
+        <section className="teamify-surface mb-3 rounded-3xl p-4 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700 md:mb-4 md:p-5">
+          <label className="mb-2 block text-xs font-semibold text-black dark:text-slate-200">
+            Search
+          </label>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <input
+              value={query}
+              onChange={(e) => {
+                setPage(1)
+                setQuery(e.target.value)
+              }}
+              placeholder="Search by name, phone, user id, or shop id"
+              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-black shadow-sm transition-colors duration-200 placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-100 dark:placeholder:text-slate-400"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                setPage(1)
+                setQuery('')
+              }}
+              className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-black transition duration-200 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-100 dark:hover:bg-slate-800"
+            >
+              Clear
+            </button>
+          </div>
+
+          {listError ? (
+            <p className="mt-3 text-sm font-medium text-red-700 dark:text-red-300">
+              {listError.message ?? 'Failed to load shops'}
+            </p>
+          ) : null}
+        </section>
+
+        {listStatus === 'loading' ? (
+          <p className="mb-3 text-sm font-semibold text-black dark:text-slate-200">
+            Loading shops...
+          </p>
+        ) : null}
+
+        {listStatus !== 'loading' && shops.length === 0 ? (
+          <div className="teamify-surface rounded-3xl p-8 text-center ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
+            <p className="text-base font-semibold text-black dark:text-slate-100">
+              No shops found
+            </p>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+              Try a different search.
+            </p>
+          </div>
+        ) : null}
+
         <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {mockShops.map((shop) => (
+          {shops.map((shop) => (
             <article
-              key={shop.id}
+              key={shop.user_id ?? shop.shop_name}
               className="shop-flip-card group relative rounded-3xl transition duration-300 hover:-translate-y-1 hover:shadow-2xl"
             >
               <div className="shop-flip-inner">
-                <div className="shop-flip-front teamify-surface ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
-                  <img
-                    src={shop.photo}
-                    alt={shop.name}
-                    className="h-36 w-full object-cover transition duration-300 group-hover:scale-[1.03]"
-                    loading="lazy"
-                  />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = detailPathFor(shop.user_id)
+                    if (next) navigate(next)
+                  }}
+                  className="shop-flip-front teamify-surface block w-full text-left ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700"
+                >
+                  {shop.photo ? (
+                    <img
+                      src={shop.photo}
+                      alt={shop.shop_name}
+                      className="h-36 w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="grid h-36 w-full place-items-center bg-slate-100 text-xl font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-200">
+                      {getInitials(shop.shop_name)}
+                    </div>
+                  )}
                   <div className="space-y-1.5 p-3">
                     <h3 className="text-base font-semibold text-black dark:text-slate-100">
-                      {shop.name}
+                      {shop.shop_name}
                     </h3>
                     <div className="flex items-center gap-2 text-[14px] leading-5 font-medium text-black dark:text-slate-300">
                       <p className="truncate">
-                        User ID:{' '}
-                        <span className="tabular-nums">{shop.id}</span>
+                        User ID: <span className="tabular-nums">{shop.user_id ?? '—'}</span>
                       </p>
                       <button
                         type="button"
-                        aria-label={`Copy user id for ${shop.name}`}
+                        aria-label={`Copy user id for ${shop.shop_name}`}
                         title="Copy User ID"
-                        onClick={() =>
-                          handleCopy(shop.id, `User ID copied: ${shop.id}`)
-                        }
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleCopy(
+                            shop.user_id ? String(shop.user_id) : '',
+                            shop.user_id ? `User ID copied: ${shop.user_id}` : 'Nothing to copy',
+                          )
+                        }}
                         className={copyButtonClass}
                       >
                         <img
@@ -226,19 +338,16 @@ function ShopListingPage({
                     </div>
                     <div className="flex items-center gap-2 text-[14px] leading-5 font-medium text-black dark:text-slate-300">
                       <p className="truncate">
-                        Phone:{' '}
-                        <span className="tabular-nums">{shop.phoneNumber}</span>
+                        Phone: <span className="tabular-nums">{shop.phone}</span>
                       </p>
                       <button
                         type="button"
-                        aria-label={`Copy phone number for ${shop.name}`}
+                        aria-label={`Copy phone number for ${shop.shop_name}`}
                         title="Copy Phone Number"
-                        onClick={() =>
-                          handleCopy(
-                            shop.phoneNumber,
-                            `Phone number copied: ${shop.phoneNumber}`,
-                          )
-                        }
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleCopy(shop.phone, `Phone number copied: ${shop.phone}`)
+                        }}
                         className={copyButtonClass}
                       >
                         <img
@@ -250,22 +359,47 @@ function ShopListingPage({
                       </button>
                     </div>
                   </div>
-                </div>
+                </button>
                 <div className="shop-flip-back teamify-surface flex flex-col justify-center p-4 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
                   <p className="text-xs font-semibold uppercase tracking-[0.12em] text-indigo-600 dark:text-indigo-300">
                     Address
                   </p>
                   <h4 className="mt-2 text-base font-semibold text-black dark:text-slate-100">
-                    {shop.name}
+                    {shop.shop_name}
                   </h4>
                   <p className="mt-2 text-sm leading-5 text-black dark:text-slate-300">
-                    {shop.address}
+                    {shop.location}
                   </p>
                 </div>
               </div>
             </article>
           ))}
         </section>
+
+        <div className="mt-5 flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page <= 1 || listStatus === 'loading'}
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-black transition duration-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-100 dark:hover:bg-slate-800"
+          >
+            Prev
+          </button>
+          <p className="text-sm font-semibold text-black dark:text-slate-200">
+            Page {listMeta?.currentPage ?? page} / {listMeta?.totalPages ?? '—'}
+          </p>
+          <button
+            type="button"
+            onClick={() => setPage((p) => p + 1)}
+            disabled={
+              listStatus === 'loading' ||
+              (listMeta?.totalPages ? page >= listMeta.totalPages : false)
+            }
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-black transition duration-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-100 dark:hover:bg-slate-800"
+          >
+            Next
+          </button>
+        </div>
       </main>
     </DashboardLayout>
   )
