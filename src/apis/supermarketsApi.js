@@ -1,5 +1,11 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000'
 
+function debugLog(message, data) {
+  // #region agent log
+  fetch('http://127.0.0.1:7540/ingest/3b199916-37e1-41e0-afdc-9e7dca648ca4',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c70081'},body:JSON.stringify({sessionId:'c70081',runId:'supermarkets-api',hypothesisId:'SUP_API',location:'supermarketsApi.js',message,data,timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
+}
+
 /**
  * @typedef {'active'|'inactive'|'suspended'|'blocked'} SupermarketStatus
  */
@@ -56,6 +62,13 @@ async function readJson(response) {
 }
 
 async function requestJson({ path, method = 'GET', accessToken, body }) {
+  debugLog('request:start', {
+    method,
+    path,
+    hasBody: Boolean(body),
+    hasAccessToken: Boolean(accessToken),
+  })
+
   const response = await fetch(buildUrl(path), {
     method,
     headers: {
@@ -67,8 +80,23 @@ async function requestJson({ path, method = 'GET', accessToken, body }) {
 
   const json = await readJson(response)
   if (!response.ok) {
+    debugLog('request:error', {
+      method,
+      path,
+      status: response.status,
+      code: json?.error?.code ?? null,
+      message: json?.error?.message ?? null,
+    })
     throw normalizeApiError(json, 'Request failed. Please try again.')
   }
+
+  debugLog('request:success', {
+    method,
+    path,
+    status: response.status,
+    hasData: json?.data !== undefined,
+    hasMeta: json?.meta !== undefined,
+  })
   return json
 }
 
@@ -97,6 +125,11 @@ export async function listSupermarkets(
     method: 'GET',
     accessToken,
   })
+  console.log('***********supermarkets listing************',response)
+  debugLog('listSupermarkets:result', {
+    count: Array.isArray(response?.data) ? response.data.length : 0,
+    meta: response?.meta ?? null,
+  })
   return {
     items: response?.data ?? [],
     meta: response?.meta ?? null,
@@ -108,6 +141,11 @@ export async function getSupermarket({ user_id: userId }, { accessToken }) {
     path: `/supermarkets/${encodeURIComponent(String(userId))}`,
     method: 'GET',
     accessToken,
+  })
+  console.log('******getting detailed supermarket**********',response) 
+  debugLog('getSupermarket:result', {
+    user_id: userId ? String(userId) : null,
+    hasData: Boolean(response?.data),
   })
   return response?.data
 }
@@ -123,6 +161,11 @@ export async function createSupermarket(payload, { accessToken }) {
     accessToken,
     body: payload,
   })
+  console.log('**********supermarket created**********',response)
+  debugLog('createSupermarket:result', {
+    hasData: Boolean(response?.data),
+    user_id: response?.data?.shop_owner?.user_id ?? null,
+  })
   return response?.data
 }
 
@@ -133,6 +176,10 @@ export async function updateSupermarket({ user_id: userId, patch }, { accessToke
     accessToken,
     body: patch,
   })
+  debugLog('updateSupermarket:result', {
+    user_id: userId ? String(userId) : null,
+    hasData: Boolean(response?.data),
+  })
   return response?.data
 }
 
@@ -141,6 +188,11 @@ export async function deleteSupermarket({ user_id: userId }, { accessToken }) {
     path: `/supermarkets/${encodeURIComponent(String(userId))}`,
     method: 'DELETE',
     accessToken,
+  })
+  console.log('******supermarket deleted**********',response)
+  debugLog('deleteSupermarket:result', {
+    user_id: userId ? String(userId) : null,
+    data: response?.data ?? null,
   })
   return response?.data
 }

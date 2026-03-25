@@ -169,6 +169,12 @@ function ShopListingPage({
   }
 
   const isDark = themeMode === 'dark'
+  const searchInputClass = isDark
+    ? 'w-full rounded-2xl border border-slate-700 bg-slate-800/70 px-4 py-3 text-sm font-medium text-slate-100 shadow-sm transition-colors duration-200 placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none'
+    : 'w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-black shadow-sm transition-colors duration-200 placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none'
+  const clearButtonClass = isDark
+    ? 'rounded-2xl border border-slate-700 bg-slate-900/40 px-4 py-3 text-sm font-semibold text-slate-100 transition duration-200 hover:bg-slate-800'
+    : 'rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-black transition duration-200 hover:bg-slate-50'
 
   const copyIconClass = isDark
     ? 'h-3 w-3 object-contain invert opacity-100'
@@ -227,7 +233,7 @@ function ShopListingPage({
                 setQuery(e.target.value)
               }}
               placeholder="Search by name, phone, user id, or shop id"
-              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-black shadow-sm transition-colors duration-200 placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-100 dark:placeholder:text-slate-400"
+              className={searchInputClass}
             />
             <button
               type="button"
@@ -235,7 +241,7 @@ function ShopListingPage({
                 setPage(1)
                 setQuery('')
               }}
-              className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-black transition duration-200 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-100 dark:hover:bg-slate-800"
+              className={clearButtonClass}
             >
               Clear
             </button>
