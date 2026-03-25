@@ -1,5 +1,34 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000'
 
+/**
+ * @typedef {'active'|'inactive'|'suspended'|'blocked'} SupermarketStatus
+ */
+
+/**
+ * @typedef {Object} SupermarketCreateRequest
+ * @property {number} user_id
+ * @property {string} shop_name
+ * @property {string} password
+ * @property {SupermarketStatus=} status
+ * @property {string|null=} phone
+ * @property {string|null=} email
+ * @property {string|null=} shop_license_no
+ * @property {string|null=} photo
+ * @property {Object} address
+ * @property {string} address.street_address
+ * @property {string} address.city
+ * @property {string} address.state
+ * @property {string} address.pincode
+ * @property {number|null=} address.latitude
+ * @property {number|null=} address.longitude
+ * @property {Object|null=} promotion
+ * @property {boolean=} promotion.is_marketing_enabled
+ * @property {Object|null=} subscription
+ * @property {string=} subscription.start_date
+ * @property {number=} subscription.amount
+ * @property {string=} subscription.status
+ */
+
 function buildUrl(path) {
   return `${API_BASE_URL}${path}`
 }
@@ -83,6 +112,10 @@ export async function getSupermarket({ user_id: userId }, { accessToken }) {
   return response?.data
 }
 
+/**
+ * @param {SupermarketCreateRequest} payload
+ * @param {{ accessToken: string }} opts
+ */
 export async function createSupermarket(payload, { accessToken }) {
   const response = await requestJson({
     path: '/supermarkets/',

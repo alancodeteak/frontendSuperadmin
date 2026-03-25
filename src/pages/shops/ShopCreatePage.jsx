@@ -55,6 +55,7 @@ const initialForm = {
   is_marketing_enabled: false,
 
   // Step 5 (Security & Subscription)
+  status: 'active',
   password: '',
   confirm_password: '',
   show_password: false,
@@ -96,6 +97,7 @@ function ShopCreatePage({
     pincode: false,
     latitude: false,
     longitude: false,
+    status: false,
     password: false,
     confirm_password: false,
     subscription_amount: false,
@@ -159,6 +161,7 @@ function ShopCreatePage({
 
   const errors = useMemo(() => {
     const next = {}
+    const allowedStatus = ['active', 'inactive', 'suspended', 'blocked']
 
     const required = (key, label) => {
       if (!String(form[key] ?? '').trim()) next[key] = `${label} is required`
@@ -189,6 +192,13 @@ function ShopCreatePage({
       form.password !== form.confirm_password
     ) {
       next.confirm_password = 'Passwords do not match'
+    }
+
+    if (String(form.status ?? '').trim()) {
+      const normalized = String(form.status).trim()
+      if (!allowedStatus.includes(normalized)) {
+        next.status = 'Status must be active, inactive, suspended, or blocked'
+      }
     }
 
     if (form.subscription_enabled) {
@@ -244,7 +254,7 @@ function ShopCreatePage({
       return
     }
     if (stepIndex === 4) {
-      const keys = ['password', 'confirm_password']
+      const keys = ['status', 'password', 'confirm_password']
       if (form.subscription_enabled) keys.push('subscription_amount', 'subscription_status')
       markTouchedMany(keys)
     }
@@ -271,6 +281,7 @@ function ShopCreatePage({
     }
     if (stepIndex === 4) {
       return (
+        !errors.status &&
         !errors.password &&
         !errors.confirm_password &&
         !errors.subscription_amount &&
@@ -318,6 +329,7 @@ function ShopCreatePage({
       const payload = {
         user_id: Number(form.user_id),
         shop_name: form.shop_name,
+        status: form.status,
         password: form.password,
         phone: fullPhone,
         email: form.email || null,
@@ -1181,9 +1193,36 @@ function ShopCreatePage({
                       }`}
                     >
                       <p className={`text-xs font-semibold uppercase tracking-[0.16em] ${sectionTitle}`}>
-                        Password
+                        Security
                       </p>
                       <div className="mt-3 grid grid-cols-1 gap-3">
+                        <div>
+                          <label className={`mb-1 block text-xs font-semibold ${strongText}`}>
+                            Status <span className="text-red-500">*</span>
+                          </label>
+                          <select
+                            className={baseSelect}
+                            value={form.status}
+                            onChange={(e) => {
+                              markTouched('status')
+                              setForm((prev) => ({
+                                ...prev,
+                                status: String(e.target.value || '').toLowerCase(),
+                              }))
+                            }}
+                            onBlur={() => markTouched('status')}
+                          >
+                            <option value="active">active</option>
+                            <option value="inactive">inactive</option>
+                            <option value="suspended">suspended</option>
+                            <option value="blocked">blocked</option>
+                          </select>
+                          {showFieldError('status') ? (
+                            <p className="mt-1 text-xs font-medium text-red-700 dark:text-red-300">
+                              {errors.status}
+                            </p>
+                          ) : null}
+                        </div>
                         <div>
                           <label className={`mb-1 block text-xs font-semibold ${strongText}`}>
                             New Password <span className="text-red-500">*</span>
