@@ -6,13 +6,14 @@ function buildUrl(path) {
   return `${API_BASE_URL}${path}`
 }
 
-function normalizeApiError(payload, fallbackMessage) {
+function normalizeApiError(payload, fallbackMessage, httpStatus = null) {
   if (payload?.error) {
     return {
       code: payload.error.code ?? 'INTERNAL_SERVER_ERROR',
       message: payload.error.message ?? fallbackMessage,
       requestId: payload.error.request_id ?? null,
       details: payload.error.details ?? null,
+      httpStatus,
     }
   }
 
@@ -21,6 +22,7 @@ function normalizeApiError(payload, fallbackMessage) {
     message: fallbackMessage,
     requestId: null,
     details: null,
+    httpStatus,
   }
 }
 
@@ -28,17 +30,19 @@ async function readJson(response) {
   return response.json().catch(() => null)
 }
 
-async function requestJson({ path, method = 'GET', accessToken }) {
+async function requestJson({ path, method = 'GET', accessToken, body }) {
   const response = await fetch(buildUrl(path), {
     method,
     headers: {
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
     },
+    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   })
 
   const json = await readJson(response)
   if (!response.ok) {
-    throw normalizeApiError(json, 'Request failed. Please try again.')
+    throw normalizeApiError(json, 'Request failed. Please try again.', response.status)
   }
   return json
 }
@@ -96,6 +100,46 @@ export async function getDeliveryPartnerDetail(
   const response = await requestJson({
     path: `${DELIVERY_PARTNERS_PATH}${encodeURIComponent(id)}`,
     method: 'GET',
+    accessToken,
+  })
+  return response?.data ?? null
+}
+
+export async function blockDeliveryPartner(
+  { delivery_partner_id: deliveryPartnerId, blocked },
+  { accessToken },
+) {
+  const id = String(deliveryPartnerId ?? '').trim()
+  const response = await requestJson({
+    path: `${DELIVERY_PARTNERS_PATH}${encodeURIComponent(id)}/block`,
+    method: 'PATCH',
+    accessToken,
+    body: { blocked: Boolean(blocked) },
+  })
+  return response?.data ?? null
+}
+
+export async function deleteDeliveryPartner(
+  { delivery_partner_id: deliveryPartnerId },
+  { accessToken },
+) {
+  const id = String(deliveryPartnerId ?? '').trim()
+  const response = await requestJson({
+    path: `${DELIVERY_PARTNERS_PATH}${encodeURIComponent(id)}`,
+    method: 'DELETE',
+    accessToken,
+  })
+  return response?.data ?? null
+}
+
+export async function restoreDeliveryPartner(
+  { delivery_partner_id: deliveryPartnerId },
+  { accessToken },
+) {
+  const id = String(deliveryPartnerId ?? '').trim()
+  const response = await requestJson({
+    path: `${DELIVERY_PARTNERS_PATH}${encodeURIComponent(id)}/restore`,
+    method: 'PATCH',
     accessToken,
   })
   return response?.data ?? null

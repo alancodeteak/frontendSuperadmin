@@ -48,6 +48,10 @@ function DeliveryPartnersListingPage({
   const [page, setPage] = useState(1)
   const limit = 10
   const [failedImgs, setFailedImgs] = useState(() => new Set())
+  const [deletedFilter, setDeletedFilter] = useState('undeleted') // undeleted | deleted | all
+  const [shopFilter, setShopFilter] = useState('all') // all | <shop_id>
+  const [orderCountFilter, setOrderCountFilter] = useState('all') // all | zero | gt0
+  const [filtersOpen, setFiltersOpen] = useState(false)
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQuery(query.trim()), 300)
@@ -122,6 +126,62 @@ function DeliveryPartnersListingPage({
     ? 'w-full max-w-[420px] rounded-xl border border-slate-700 bg-slate-800/70 px-3 py-2 text-sm font-medium text-slate-100 placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30'
     : 'w-full max-w-[420px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-black placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30'
 
+  const selectClass = isDark
+    ? 'w-full rounded-xl border border-slate-700 bg-slate-800/70 px-3 py-2 text-sm font-semibold text-slate-100 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30'
+    : 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30'
+
+  const ghostButtonClass = `rounded-xl border px-3 py-2 text-sm font-semibold transition ${
+    isDark
+      ? 'border-slate-700 bg-slate-900/40 text-slate-100 hover:bg-slate-800'
+      : 'border-slate-200 bg-white text-slate-900 hover:bg-slate-50'
+  }`
+
+  const hasActiveFilters =
+    deletedFilter !== 'undeleted' ||
+    shopFilter !== 'all' ||
+    orderCountFilter !== 'all' ||
+    Boolean(debouncedQuery)
+
+  const clearAll = () => {
+    setPage(1)
+    setQuery('')
+    setDeletedFilter('undeleted')
+    setShopFilter('all')
+    setOrderCountFilter('all')
+    setFiltersOpen(false)
+  }
+
+  const shopOptions = useMemo(() => {
+    const map = new Map()
+    for (const it of items ?? []) {
+      const shopId = it?.shop_id ? String(it.shop_id) : ''
+      if (!shopId) continue
+      const label = it?.shop_name ? `${it.shop_name} (${shopId})` : shopId
+      if (!map.has(shopId)) map.set(shopId, label)
+    }
+    return Array.from(map.entries())
+      .sort((a, b) => a[1].localeCompare(b[1]))
+      .map(([value, label]) => ({ value, label }))
+  }, [items])
+
+  const filteredItems = useMemo(() => {
+    const list = items ?? []
+    return list.filter((it) => {
+      const isDeleted = Boolean(it?.is_deleted)
+      if (deletedFilter === 'deleted' && !isDeleted) return false
+      if (deletedFilter === 'undeleted' && isDeleted) return false
+
+      const shopId = it?.shop_id ? String(it.shop_id) : ''
+      if (shopFilter !== 'all' && shopId !== String(shopFilter)) return false
+
+      const orders = Number(it?.order_count ?? NaN)
+      if (orderCountFilter === 'zero') return Number.isFinite(orders) ? orders === 0 : false
+      if (orderCountFilter === 'gt0') return Number.isFinite(orders) ? orders > 0 : false
+
+      return true
+    })
+  }, [items, deletedFilter, shopFilter, orderCountFilter])
+
   return (
     <DashboardLayout>
       <AppSidebar
@@ -146,7 +206,8 @@ function DeliveryPartnersListingPage({
         </header>
 
         <section className={`${surface} mb-3 p-4 md:mb-4 md:p-5`}>
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <input
               value={query}
               onChange={(e) => {
@@ -156,18 +217,80 @@ function DeliveryPartnersListingPage({
               className={searchClass}
               placeholder="Search user, phone, shop"
             />
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${
-                  isDark
-                    ? 'border-slate-700 bg-slate-900/40 text-slate-100 hover:bg-slate-800'
-                    : 'border-slate-200 bg-white text-slate-900 hover:bg-slate-50'
-                }`}
-              >
-                More filters
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className={ghostButtonClass}
+                  onClick={() => setFiltersOpen((v) => !v)}
+                >
+                  Filters{filtersOpen ? ' ▲' : ' ▼'}
+                </button>
+                <button
+                  type="button"
+                  className={ghostButtonClass}
+                  onClick={clearAll}
+                  disabled={!hasActiveFilters}
+                >
+                  Clear
+                </button>
+              </div>
             </div>
+
+            {hasActiveFilters ? (
+              <p className={`text-xs font-semibold ${subtle}`}>
+                Showing <span className={strong}>{filteredItems.length}</span> of{' '}
+                <span className={strong}>{(items ?? []).length}</span> results
+              </p>
+            ) : null}
+
+            {filtersOpen ? (
+              <div className={`grid grid-cols-1 gap-2 md:grid-cols-3`}>
+                <select
+                  className={selectClass}
+                  value={deletedFilter}
+                  onChange={(e) => {
+                    setPage(1)
+                    setDeletedFilter(e.target.value)
+                  }}
+                  aria-label="Filter by deleted status"
+                >
+                  <option value="undeleted">Undeleted (default)</option>
+                  <option value="deleted">Deleted</option>
+                  <option value="all">All</option>
+                </select>
+
+                <select
+                  className={selectClass}
+                  value={shopFilter}
+                  onChange={(e) => {
+                    setPage(1)
+                    setShopFilter(e.target.value)
+                  }}
+                  aria-label="Filter by shop"
+                >
+                  <option value="all">All shops</option>
+                  {shopOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  className={selectClass}
+                  value={orderCountFilter}
+                  onChange={(e) => {
+                    setPage(1)
+                    setOrderCountFilter(e.target.value)
+                  }}
+                  aria-label="Filter by order count"
+                >
+                  <option value="all">All orders</option>
+                  <option value="zero">Orders = 0</option>
+                  <option value="gt0">Orders &gt; 0</option>
+                </select>
+              </div>
+            ) : null}
           </div>
         </section>
 
@@ -191,13 +314,13 @@ function DeliveryPartnersListingPage({
               </div>
             ) : null}
 
-            {status !== 'loading' && !error && (items ?? []).length === 0 ? (
+            {status !== 'loading' && !error && (filteredItems ?? []).length === 0 ? (
               <div className={`px-4 py-10 text-center ${subtle}`}>
                 No delivery partners found.
               </div>
             ) : null}
 
-            {(items ?? []).map((it) => {
+            {(filteredItems ?? []).map((it) => {
               const idKey = it.delivery_partner_id ?? `${it.shop_id}-${it.phone}`
               const src = it.photo_url || (isHttpUrl(it.photo) ? it.photo : null)
               const failed = failedImgs.has(String(idKey))

@@ -43,12 +43,14 @@ function formatReadableDateTime(value) {
   const dayDiff = Math.round((startOfThatDay - startOfToday) / (24 * 60 * 60 * 1000))
 
   const time = new Intl.DateTimeFormat(undefined, {
+    hour12: true,
     hour: 'numeric',
     minute: '2-digit',
   }).format(d)
+  const timeUpper = time.replace(/\b(am|pm)\b/gi, (m) => m.toUpperCase())
 
-  if (dayDiff === 0) return `Today ${time}`
-  if (dayDiff === -1) return `Yesterday ${time}`
+  if (dayDiff === 0) return `Today ${timeUpper}`
+  if (dayDiff === -1) return `Yesterday ${timeUpper}`
 
   const date = new Intl.DateTimeFormat(undefined, {
     month: 'short',
@@ -56,7 +58,7 @@ function formatReadableDateTime(value) {
     year: 'numeric',
   }).format(d)
 
-  return `${date} ${time}`
+  return `${date} ${timeUpper}`
 }
 
 function displayValue(value) {
