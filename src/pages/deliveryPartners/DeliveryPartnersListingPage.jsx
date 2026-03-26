@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import AppSidebar from '@/components/layout/AppSidebar'
 import { buildSidebarNav } from '@/components/layout/sidebarNavConfig'
+import { getRandomAvatarUrl } from '@/utils/avatarFallback'
 import {
   selectDeliveryPartnersListError,
   selectDeliveryPartnersListItems,
@@ -16,13 +17,6 @@ import { logoutLocal } from '@/redux/slices/authSlice'
 import { logoutAction } from '@/redux/thunks/authThunks'
 import { useTheme } from '@/context/useTheme'
 import '@/App.css'
-
-function initials(name) {
-  const cleaned = String(name ?? '').trim()
-  if (!cleaned) return 'DP'
-  const parts = cleaned.split(/\s+/g).slice(0, 2)
-  return parts.map((p) => p[0]?.toUpperCase()).join('')
-}
 
 function isHttpUrl(value) {
   return /^https?:\/\//i.test(String(value ?? '').trim())
@@ -61,17 +55,39 @@ function DeliveryPartnersListingPage({
   }, [query])
 
   const params = useMemo(
-    () => ({
-      page,
-      limit,
-      query: debouncedQuery || undefined,
-    }),
+    () => {
+      const q = String(debouncedQuery || '').trim()
+      if (!q) return { page, limit }
+
+      const onlyDigits = /^[0-9]+$/.test(q)
+      if (onlyDigits) return { page, limit, phone: q }
+
+      const dpLike = /^dp/i.test(q)
+      if (dpLike) return { page, limit, delivery_partner_id: q.toUpperCase() }
+
+      const shopIdLike = /^shop/i.test(q)
+      if (shopIdLike) return { page, limit, shop_id: q.toUpperCase() }
+
+      // Single-term search is more likely a shop name; multi-term looks like a person name.
+      const isMultiTerm = /\s/.test(q)
+      return isMultiTerm ? { page, limit, name: q } : { page, limit, shop_name: q }
+    },
     [debouncedQuery, page],
   )
 
   useEffect(() => {
     dispatch(fetchDeliveryPartnersAction(params))
   }, [dispatch, params])
+
+  const fallbackAvatarById = useMemo(() => {
+    const map = {}
+    for (const it of items ?? []) {
+      const idKey = it?.delivery_partner_id ?? `${it?.shop_id}-${it?.phone}`
+      if (!idKey) continue
+      map[String(idKey)] = getRandomAvatarUrl()
+    }
+    return map
+  }, [items])
 
   const navSections = useMemo(
     () =>
@@ -97,14 +113,14 @@ function DeliveryPartnersListingPage({
 
   const surface = isDark
     ? 'teamify-surface rounded-3xl ring-1 ring-slate-700 bg-slate-900'
-    : 'teamify-surface rounded-3xl ring-1 ring-slate-200 bg-white'
+    : 'teamify-surface rounded-3xl ring-1 ring-slate-200/70 bg-white'
 
-  const subtle = isDark ? 'text-slate-300' : 'text-slate-600'
+  const subtle = isDark ? 'text-slate-300' : 'text-slate-700'
   const strong = isDark ? 'text-slate-100' : 'text-black'
 
   const searchClass = isDark
-    ? 'w-full max-w-[420px] rounded-xl border border-slate-700 bg-slate-800/70 px-3 py-2 text-sm font-medium text-slate-100 placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none'
-    : 'w-full max-w-[420px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-black placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none'
+    ? 'w-full max-w-[420px] rounded-xl border border-slate-700 bg-slate-800/70 px-3 py-2 text-sm font-medium text-slate-100 placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30'
+    : 'w-full max-w-[420px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-black placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30'
 
   return (
     <DashboardLayout>
@@ -118,7 +134,7 @@ function DeliveryPartnersListingPage({
         isLoggingOut={isLoggingOut}
       />
 
-      <main className="relative flex-1 rounded-3xl bg-white p-1 dark:bg-slate-950/40 sm:p-2">
+      <main className="relative flex-1 rounded-3xl bg-slate-50 p-1 dark:bg-slate-950/40 sm:p-2">
         <header className="teamify-surface mb-3 rounded-3xl p-4 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700 md:mb-4 md:p-5">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-600 dark:text-indigo-300">
             {brandTitle}
@@ -146,7 +162,7 @@ function DeliveryPartnersListingPage({
                 className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${
                   isDark
                     ? 'border-slate-700 bg-slate-900/40 text-slate-100 hover:bg-slate-800'
-                    : 'border-slate-200 bg-white text-black hover:bg-slate-50'
+                    : 'border-slate-200 bg-white text-slate-900 hover:bg-slate-50'
                 }`}
               >
                 More filters
@@ -157,11 +173,10 @@ function DeliveryPartnersListingPage({
 
         <section className={`${surface} p-0`}>
           <div className="overflow-hidden rounded-3xl">
-            <div className="grid grid-cols-[1.2fr_1fr_1fr_0.9fr_0.9fr_0.6fr] gap-0 border-b border-slate-200 px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:border-slate-700 dark:text-slate-400">
+            <div className="grid grid-cols-[1.2fr_1fr_0.9fr_0.9fr_0.6fr] gap-0 border-b border-slate-200 bg-slate-50/70 px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-600 dark:border-slate-700 dark:bg-transparent dark:text-slate-400">
               <div>Partner</div>
               <div>Email/Phone</div>
-              <div>Shop</div>
-              <div>Shop ID</div>
+              <div>Shop Name</div>
               <div>Partner ID</div>
               <div className="text-right">View</div>
             </div>
@@ -186,10 +201,11 @@ function DeliveryPartnersListingPage({
               const idKey = it.delivery_partner_id ?? `${it.shop_id}-${it.phone}`
               const src = it.photo_url || (isHttpUrl(it.photo) ? it.photo : null)
               const failed = failedImgs.has(String(idKey))
+              const fallbackAvatar = fallbackAvatarById[String(idKey)] || getRandomAvatarUrl()
               return (
                 <div
                   key={idKey}
-                  className="grid grid-cols-[1.2fr_1fr_1fr_0.9fr_0.9fr_0.6fr] items-center gap-0 border-b border-slate-100 px-4 py-3 text-sm dark:border-slate-800"
+                  className="grid grid-cols-[1.2fr_1fr_0.9fr_0.9fr_0.6fr] items-center gap-0 border-b border-slate-100 px-4 py-3 text-sm transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900/40"
                 >
                   <div className="flex items-center gap-3">
                     {src && !failed ? (
@@ -207,9 +223,13 @@ function DeliveryPartnersListingPage({
                         }}
                       />
                     ) : (
-                      <div className="grid h-9 w-9 place-items-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700">
-                        {initials(it.name)}
-                      </div>
+                      <img
+                        src={fallbackAvatar}
+                        alt="Avatar"
+                        className="h-9 w-9 rounded-full object-cover ring-1 ring-slate-200 dark:ring-slate-700"
+                        loading="lazy"
+                        onError={() => {}}
+                      />
                     )}
                     <div className="min-w-0">
                       <p className={`truncate font-semibold ${strong}`}>{it.name ?? '—'}</p>
@@ -218,11 +238,17 @@ function DeliveryPartnersListingPage({
                   </div>
                   <div className={subtle}>{it.phone ?? '—'}</div>
                   <div className={strong}>{it.shop_name ?? '—'}</div>
-                  <div className={`${subtle} tabular-nums`}>{it.shop_id ?? '—'}</div>
                   <div className={`${subtle} tabular-nums`}>{it.delivery_partner_id ?? '—'}</div>
                   <div className="text-right">
                     <button
                       type="button"
+                      onClick={() => {
+                        const id = it?.delivery_partner_id
+                        if (!id) return
+                        navigate(
+                          `/dashboard/teamify/delivery-partners/${encodeURIComponent(String(id))}`,
+                        )
+                      }}
                       className="text-sm font-semibold text-indigo-600 hover:underline dark:text-indigo-300"
                     >
                       View →
@@ -244,7 +270,7 @@ function DeliveryPartnersListingPage({
                   className={`rounded-xl border px-3 py-2 text-sm font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed ${
                     isDark
                       ? 'border-slate-700 bg-slate-900/40 text-slate-100 hover:bg-slate-800'
-                      : 'border-slate-200 bg-white text-black hover:bg-slate-50'
+                      : 'border-slate-200 bg-white text-slate-900 hover:bg-slate-50'
                   }`}
                 >
                   Previous
@@ -258,7 +284,7 @@ function DeliveryPartnersListingPage({
                   className={`rounded-xl border px-3 py-2 text-sm font-semibold transition disabled:opacity-60 disabled:cursor-not-allowed ${
                     isDark
                       ? 'border-slate-700 bg-slate-900/40 text-slate-100 hover:bg-slate-800'
-                      : 'border-slate-200 bg-white text-black hover:bg-slate-50'
+                      : 'border-slate-200 bg-white text-slate-900 hover:bg-slate-50'
                   }`}
                 >
                   Next

@@ -11,6 +11,7 @@ import PortalShopCreatePage from '@/pages/shops/PortalShopCreatePage'
 import AdminShopDetailPage from '@/pages/shops/AdminShopDetailPage'
 import PortalShopDetailPage from '@/pages/shops/PortalShopDetailPage'
 import AdminDeliveryPartnersListingPage from '@/pages/deliveryPartners/AdminDeliveryPartnersListingPage'
+import AdminDeliveryPartnerDetailPage from '@/pages/deliveryPartners/AdminDeliveryPartnerDetailPage'
 import {
   selectAuthScope,
   selectIsAuthenticated,
@@ -70,6 +71,14 @@ function AppRouter() {
           element={
             <ProtectedRoute requiredScope="admin" redirectTo="/">
               <AdminDeliveryPartnersListingPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/teamify/delivery-partners/:deliveryPartnerId"
+          element={
+            <ProtectedRoute requiredScope="admin" redirectTo="/">
+              <AdminDeliveryPartnerDetailPage />
             </ProtectedRoute>
           }
         />

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { getRandomAvatarUrl } from '@/utils/avatarFallback'
 
 function ChevronIcon({ open, className = '' }) {
   return (
@@ -220,6 +221,7 @@ function AppSidebar({
 }) {
   const [currentDateTime, setCurrentDateTime] = useState(() => new Date())
   const isDark = themeMode === 'dark'
+  const profileAvatar = useMemo(() => getRandomAvatarUrl(), [])
   const [toast, setToast] = useState(null)
   const toastTimerRef = useRef(null)
 
@@ -279,6 +281,15 @@ function AppSidebar({
     }
   }, [])
 
+  useEffect(() => {
+    const el = typeof document !== 'undefined' ? document.querySelector('.teamify-side-panel') : null
+    if (!el) return
+    const s = window.getComputedStyle(el)
+    // #region agent log
+    fetch('http://127.0.0.1:7540/ingest/3b199916-37e1-41e0-afdc-9e7dca648ca4',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f18df4'},body:JSON.stringify({sessionId:'f18df4',runId:'fade-fonts-1',hypothesisId:'H5',location:'AppSidebar.jsx:panelStyle',message:'Sidebar panel computed style',data:{themeMode,isDark,backgroundImage:s.backgroundImage,backgroundColor:s.backgroundColor,filter:s.filter,opacity:s.opacity},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+  }, [isDark, themeMode])
+
   const rowBase =
     'w-full rounded-xl px-3 py-2 text-left text-sm font-medium transition-all duration-200'
   const rowInactive = isDark
@@ -294,7 +305,7 @@ function AppSidebar({
     : 'grid h-8 w-8 place-items-center rounded-xl bg-slate-100 text-slate-700'
 
   return (
-    <aside className="teamify-side-panel teamify-surface mb-3 flex w-full flex-col rounded-3xl p-3 ring-1 ring-slate-200 transition duration-300 dark:bg-slate-900 dark:ring-slate-700 sm:p-4 lg:mb-0 lg:h-[calc(100vh-2.5rem)] lg:w-[260px] lg:p-5 lg:sticky lg:top-5">
+    <aside className="teamify-side-panel teamify-surface mb-3 flex w-full flex-col rounded-3xl p-3 ring-1 ring-slate-200 transition duration-300 dark:ring-slate-700 sm:p-4 lg:mb-0 lg:h-[calc(100vh-2.5rem)] lg:w-[260px] lg:p-5 lg:sticky lg:top-5">
       {toast ? (
         <div
           className="pointer-events-none fixed bottom-6 left-1/2 z-50 max-w-[min(90vw,360px)] -translate-x-1/2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-center text-sm font-semibold text-black shadow-lg ring-1 ring-slate-200/80 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:ring-slate-700"
@@ -306,9 +317,12 @@ function AppSidebar({
       ) : null}
 
       <div className="mb-6 flex items-center gap-3 lg:mb-8">
-        <div className="grid h-10 w-10 place-items-center rounded-xl bg-indigo-600 text-sm font-bold text-white">
-          T
-        </div>
+        <img
+          src={profileAvatar}
+          alt="Profile avatar"
+          className="h-10 w-10 rounded-xl object-cover ring-1 ring-slate-200 dark:ring-slate-700"
+          loading="lazy"
+        />
         <div>
           <h1 className="text-lg font-semibold tracking-tight text-black dark:text-slate-100">
             {brandTitle}
@@ -325,7 +339,7 @@ function AppSidebar({
         }`}
       >
         <p className="font-semibold">{formattedDate}</p>
-        <p>{formattedTime}</p>
+        <p className={isDark ? 'text-slate-200' : 'text-black'}>{formattedTime}</p>
       </div>
 
       <nav className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
@@ -441,7 +455,7 @@ function AppSidebar({
           type="button"
           onClick={onLogout}
           disabled={isLoggingOut}
-          className="w-full rounded-xl border border-red-300 px-4 py-2 text-sm font-medium text-red-700 transition duration-300 hover:bg-red-50 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-900/30"
+          className="w-full rounded-xl border border-red-500 px-4 py-2 text-sm font-medium text-red-600 transition duration-300 hover:bg-red-50 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-900/30"
         >
           {isLoggingOut ? 'Logging out...' : 'Logout'}
         </button>

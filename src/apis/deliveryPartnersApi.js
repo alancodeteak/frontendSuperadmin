@@ -52,11 +52,30 @@ function buildQuery(params) {
 }
 
 export async function listDeliveryPartners(
-  { page = 1, limit = 10, query } = {},
+  {
+    page = 1,
+    limit = 20,
+    name,
+    delivery_partner_id: deliveryPartnerId,
+    shop_id: shopId,
+    shop_name: shopName,
+    phone,
+    current_status: currentStatus,
+    online_status: onlineStatus,
+  } = {},
   { accessToken },
 ) {
-  // Backend param name may differ; support both `q` and `search` later if needed.
-  const qs = buildQuery({ page, limit, q: query || undefined })
+  const qs = buildQuery({
+    page,
+    limit,
+    name,
+    delivery_partner_id: deliveryPartnerId,
+    shop_id: shopId,
+    shop_name: shopName,
+    phone,
+    current_status: currentStatus,
+    online_status: onlineStatus,
+  })
   const response = await requestJson({
     path: `${DELIVERY_PARTNERS_PATH}${qs}`,
     method: 'GET',
@@ -67,5 +86,18 @@ export async function listDeliveryPartners(
     items: response?.data ?? [],
     meta: response?.meta ?? null,
   }
+}
+
+export async function getDeliveryPartnerDetail(
+  { delivery_partner_id: deliveryPartnerId },
+  { accessToken },
+) {
+  const id = String(deliveryPartnerId ?? '').trim()
+  const response = await requestJson({
+    path: `${DELIVERY_PARTNERS_PATH}${encodeURIComponent(id)}`,
+    method: 'GET',
+    accessToken,
+  })
+  return response?.data ?? null
 }
 

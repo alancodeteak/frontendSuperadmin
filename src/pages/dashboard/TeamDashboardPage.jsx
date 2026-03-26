@@ -133,7 +133,7 @@ function TeamDashboardPage({
       />
 
       <main className="flex-1 rounded-3xl bg-white p-1 dark:bg-slate-950/40 sm:p-2">
-        <header className="teamify-surface mb-3 rounded-3xl p-3 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700 sm:p-4 md:mb-4 md:p-5">
+        <header className="teamify-surface mb-3 rounded-3xl p-3 ring-1 ring-slate-200 dark:ring-slate-700 sm:p-4 md:mb-4 md:p-5">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
               <h2 className="text-xl font-semibold tracking-tight text-black dark:text-slate-100 sm:text-2xl md:text-3xl">
@@ -183,7 +183,7 @@ function TeamDashboardPage({
         </section>
 
         <section className="grid grid-cols-1 gap-3 xl:grid-cols-[1.32fr_0.9fr]">
-          <article className="teamify-surface rounded-3xl p-3 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700 sm:p-4 md:p-5">
+          <article className="teamify-surface rounded-3xl p-3 ring-1 ring-slate-200 dark:ring-slate-700 sm:p-4 md:p-5">
             <div className="mb-5 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-black dark:text-slate-100">
                 Team Performance
@@ -217,7 +217,7 @@ function TeamDashboardPage({
             </div>
           </article>
 
-          <article className="teamify-surface rounded-3xl p-3 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700 sm:p-4 md:p-5">
+          <article className="teamify-surface rounded-3xl p-3 ring-1 ring-slate-200 dark:ring-slate-700 sm:p-4 md:p-5">
             <h3 className="text-lg font-semibold text-black dark:text-slate-100">
               Utilization
             </h3>
@@ -276,7 +276,7 @@ function TeamDashboardPage({
           </article>
         </section>
 
-        <section className="teamify-surface mt-3 rounded-3xl p-3 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700 sm:p-4 md:mt-4 md:p-5">
+        <section className="teamify-surface mt-3 rounded-3xl p-3 ring-1 ring-slate-200 dark:ring-slate-700 sm:p-4 md:mt-4 md:p-5">
           <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <h3 className="text-lg font-semibold text-black dark:text-slate-100">
               Team Members

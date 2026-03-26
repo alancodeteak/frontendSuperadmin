@@ -18,6 +18,73 @@ import {
   updateSupermarketAction,
 } from '@/redux/thunks/supermarketsThunks'
 import { useTheme } from '@/context/useTheme'
+import { getRandomAvatarUrl } from '@/utils/avatarFallback'
+
+function toDateMaybe(value) {
+  if (value === null || value === undefined) return null
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value
+  if (typeof value === 'number') {
+    const d = new Date(value)
+    return Number.isNaN(d.getTime()) ? null : d
+  }
+  const raw = String(value).trim()
+  if (!raw) return null
+  const d = new Date(raw)
+  return Number.isNaN(d.getTime()) ? null : d
+}
+
+function formatReadableDateTime(value) {
+  const d = toDateMaybe(value)
+  if (!d) return 'null'
+
+  const now = new Date()
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const startOfThatDay = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  const dayDiff = Math.round((startOfThatDay - startOfToday) / (24 * 60 * 60 * 1000))
+
+  const time = new Intl.DateTimeFormat(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(d)
+
+  if (dayDiff === 0) return `Today ${time}`
+  if (dayDiff === -1) return `Yesterday ${time}`
+
+  const date = new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: '2-digit',
+    year: 'numeric',
+  }).format(d)
+
+  return `${date} ${time}`
+}
+
+function displayValue(value) {
+  if (value === null || value === undefined) return 'null'
+  if (typeof value === 'boolean') return value ? 'true' : 'false'
+  if (typeof value === 'number') return Number.isFinite(value) ? String(value) : 'null'
+  if (typeof value === 'string') return value.length ? value : 'null'
+  if (value instanceof Date) return value.toISOString()
+  if (Array.isArray(value)) return value.length ? JSON.stringify(value) : '[]'
+  if (typeof value === 'object') return JSON.stringify(value)
+  return String(value)
+}
+
+function Field({ label, value, strongText, subtleText }) {
+  return (
+    <p className={strongText}>
+      <span className={subtleText}>{label}:</span> {displayValue(value)}
+    </p>
+  )
+}
+
+function TimeField({ label, value, strongText, subtleText }) {
+  return (
+    <p className={strongText}>
+      <span className={subtleText}>{label}:</span> {formatReadableDateTime(value)}
+    </p>
+  )
+}
 
 function ShopDetailPage({
   brandTitle = 'Teamify',
@@ -158,11 +225,13 @@ function ShopDetailPage({
   const address = detail?.address ?? null
   const subscription = detail?.subscription ?? null
   const promotion = detail?.promotion ?? null
+  const timelineCandidate = detail?.timeline ?? null
 
   const isHttpUrl = (value) => /^https?:\/\//i.test(String(value ?? '').trim())
   const shopPhotoSrc =
     shopOwner?.photo_url ||
     (isHttpUrl(shopOwner?.photo) ? shopOwner.photo : null)
+  const shopFallbackAvatar = useMemo(() => getRandomAvatarUrl(), [])
   const promoImageSrc =
     promotion?.promotion_image_url ||
     (isHttpUrl(promotion?.promotion_image_s3_key) ? promotion.promotion_image_s3_key : null)
@@ -179,7 +248,7 @@ function ShopDetailPage({
         isLoggingOut={isLoggingOut}
       />
 
-      <main className={isDark ? 'flex-1 rounded-3xl bg-slate-950/40 p-1 sm:p-2' : 'flex-1 rounded-3xl bg-white p-1 sm:p-2'}>
+      <main className="flex-1 bg-slate-50 dark:bg-slate-950">
         {uploadToast ? (
           <div
             className="pointer-events-none fixed bottom-6 left-1/2 z-50 max-w-[min(90vw,360px)] -translate-x-1/2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-center text-sm font-semibold text-black shadow-lg ring-1 ring-slate-200/80 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:ring-slate-700"
@@ -189,17 +258,71 @@ function ShopDetailPage({
             {uploadToast}
           </div>
         ) : null}
-        <header className={`${surfaceClass} mb-3 p-4 md:mb-4 md:p-5`}>
-          <p className={`text-xs font-semibold uppercase tracking-[0.16em] ${sectionTitle}`}>
-            {brandTitle}
-          </p>
-          <h2 className={`mt-1 text-2xl font-semibold tracking-tight ${strongText} md:text-3xl`}>
-            Shop Detail
-          </h2>
-          <p className={`mt-1 text-sm ${subtleText}`}>User ID: {userId}</p>
-        </header>
+        <div className="p-1 sm:p-2">
+          <div className={`${surfaceClass} overflow-hidden`}>
+            <div className="relative h-56 w-full bg-gradient-to-r from-indigo-600 to-purple-600">
+              <div className="absolute left-6 bottom-[-70px] flex items-end gap-5 md:left-10">
+                <img
+                  src={shopPhotoSrc || shopFallbackAvatar}
+                  alt={`${shopOwner?.shop_name ?? 'Shop'} photo`}
+                  className="h-28 w-28 rounded-full border-4 border-white object-cover shadow-md dark:border-slate-900 md:h-36 md:w-36"
+                  loading="lazy"
+                />
+                <div className="pb-4">
+                  <h1 className="text-3xl font-semibold text-white">
+                    {shopOwner?.shop_name ?? 'Shop Detail'}
+                  </h1>
+                  <p className="mt-1 text-sm text-white/90">
+                    User ID: {userId ?? '—'} • Shop ID: {shopOwner?.shop_id ?? '—'}
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white ring-1 ring-white/20">
+                      Status: {shopOwner?.status ?? '—'}
+                    </span>
+                    <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white ring-1 ring-white/20">
+                      Payment: {shopOwner?.payment_status ?? '—'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => navigate(shopsPath)}
+                      className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white ring-1 ring-white/20 transition hover:bg-white/20"
+                    >
+                      ← Back to Listing
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
 
-        <section className={`${surfaceClass} p-4 md:p-5`}>
+            <div className="mx-auto mt-24 max-w-[1500px] px-2 pb-2 sm:px-3 md:px-4 md:pb-4 lg:px-5 xl:px-6">
+              <div className="mb-3 grid grid-cols-2 gap-3 md:grid-cols-4">
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                  <p className="text-xs uppercase tracking-widest text-slate-400">Subscription</p>
+                  <p className={`mt-1 text-sm font-semibold ${strongText}`}>
+                    {subscription?.status ?? '—'}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                  <p className="text-xs uppercase tracking-widest text-slate-400">Amount</p>
+                  <p className={`mt-1 text-sm font-semibold ${strongText}`}>
+                    {subscription?.amount ?? '—'}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                  <p className="text-xs uppercase tracking-widest text-slate-400">Marketing</p>
+                  <p className={`mt-1 text-sm font-semibold ${strongText}`}>
+                    {promotion ? (promotion.is_marketing_enabled ? 'Yes' : 'No') : '—'}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                  <p className="text-xs uppercase tracking-widest text-slate-400">Phone</p>
+                  <p className={`mt-1 text-sm font-semibold ${strongText}`}>
+                    {shopOwner?.phone ?? '—'}
+                  </p>
+                </div>
+              </div>
+
+              <section className={`${surfaceClass} p-4 md:p-5`}>
           {detailStatus === 'loading' ? (
             <p className={`text-sm font-semibold ${strongText}`}>Loading...</p>
           ) : null}
@@ -219,18 +342,12 @@ function ShopDetailPage({
               <div className={`rounded-2xl border p-3 ${isDark ? 'border-slate-700 bg-slate-800/40' : 'border-slate-200 bg-white'}`}>
                 <p className={`text-xs font-semibold uppercase tracking-[0.16em] ${sectionTitle}`}>Shop Owner</p>
                 <div className="mt-3 flex items-start gap-3">
-                  {shopPhotoSrc ? (
-                    <img
-                      src={shopPhotoSrc}
-                      alt={`${shopOwner?.shop_name ?? 'Shop'} photo`}
-                      className="h-16 w-16 shrink-0 rounded-2xl object-cover ring-1 ring-slate-200 dark:ring-slate-700"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-slate-100 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700">
-                      No photo
-                    </div>
-                  )}
+                  <img
+                    src={shopPhotoSrc || shopFallbackAvatar}
+                    alt={`${shopOwner?.shop_name ?? 'Shop'} photo`}
+                    className="h-16 w-16 shrink-0 rounded-2xl object-cover ring-1 ring-slate-200 dark:ring-slate-700"
+                    loading="lazy"
+                  />
                   <div className="min-w-0 flex-1">
                     <div className="mb-2 flex flex-wrap items-center gap-2">
                       <label className="inline-flex items-center">
@@ -258,24 +375,13 @@ function ShopDetailPage({
                       <p className={`text-xs ${subtleText}`}>PNG/JPG/WEBP • Max 10MB</p>
                     </div>
                 <div className="mt-3 space-y-1 text-sm">
-                  <p className={strongText}>
-                    <span className={subtleText}>Shop:</span> {shopOwner?.shop_name ?? '—'}
-                  </p>
-                  <p className={strongText}>
-                    <span className={subtleText}>Shop ID:</span> {shopOwner?.shop_id ?? '—'}
-                  </p>
-                  <p className={strongText}>
-                    <span className={subtleText}>Phone:</span> {shopOwner?.phone ?? '—'}
-                  </p>
-                  <p className={strongText}>
-                    <span className={subtleText}>Email:</span> {shopOwner?.email ?? '—'}
-                  </p>
-                  <p className={strongText}>
-                    <span className={subtleText}>Status:</span> {shopOwner?.status ?? '—'}
-                  </p>
-                  <p className={strongText}>
-                    <span className={subtleText}>Payment:</span> {shopOwner?.payment_status ?? '—'}
-                  </p>
+                  <Field label="Shop" value={shopOwner?.shop_name} strongText={strongText} subtleText={subtleText} />
+                  <Field label="Shop ID" value={shopOwner?.shop_id} strongText={strongText} subtleText={subtleText} />
+                  <Field label="User ID" value={shopOwner?.user_id ?? detail?.user_id} strongText={strongText} subtleText={subtleText} />
+                  <Field label="Phone" value={shopOwner?.phone} strongText={strongText} subtleText={subtleText} />
+                  <Field label="Email" value={shopOwner?.email} strongText={strongText} subtleText={subtleText} />
+                  <Field label="Status" value={shopOwner?.status} strongText={strongText} subtleText={subtleText} />
+                  <Field label="Payment" value={shopOwner?.payment_status} strongText={strongText} subtleText={subtleText} />
                 </div>
                   </div>
                 </div>
@@ -284,13 +390,23 @@ function ShopDetailPage({
               <div className={`rounded-2xl border p-3 ${isDark ? 'border-slate-700 bg-slate-800/40' : 'border-slate-200 bg-white'}`}>
                 <p className={`text-xs font-semibold uppercase tracking-[0.16em] ${sectionTitle}`}>Address</p>
                 <div className="mt-3 space-y-1 text-sm">
-                  <p className={strongText}>{address?.street_address ?? '—'}</p>
-                  <p className={strongText}>
-                    {address?.city ?? '—'}, {address?.state ?? '—'} - {address?.pincode ?? '—'}
-                  </p>
-                  <p className={strongText}>
-                    <span className={subtleText}>Geo:</span> {address?.latitude ?? '—'}, {address?.longitude ?? '—'}
-                  </p>
+                  <Field label="Street" value={address?.street_address} strongText={strongText} subtleText={subtleText} />
+                  <Field label="City" value={address?.city} strongText={strongText} subtleText={subtleText} />
+                  <Field label="State" value={address?.state} strongText={strongText} subtleText={subtleText} />
+                  <Field label="Pincode" value={address?.pincode} strongText={strongText} subtleText={subtleText} />
+                  <Field label="Latitude" value={address?.latitude} strongText={strongText} subtleText={subtleText} />
+                  <Field label="Longitude" value={address?.longitude} strongText={strongText} subtleText={subtleText} />
+                </div>
+              </div>
+
+              <div className={`rounded-2xl border p-3 ${isDark ? 'border-slate-700 bg-slate-800/40' : 'border-slate-200 bg-white'}`}>
+                <p className={`text-xs font-semibold uppercase tracking-[0.16em] ${sectionTitle}`}>Timeline</p>
+                <div className="mt-3 space-y-1 text-sm">
+                  <TimeField label="Created At" value={shopOwner?.created_at ?? detail?.created_at ?? timelineCandidate?.created_at} strongText={strongText} subtleText={subtleText} />
+                  <TimeField label="Updated At" value={shopOwner?.updated_at ?? detail?.updated_at ?? timelineCandidate?.updated_at} strongText={strongText} subtleText={subtleText} />
+                  <TimeField label="Approved At" value={shopOwner?.approved_at ?? detail?.approved_at ?? timelineCandidate?.approved_at} strongText={strongText} subtleText={subtleText} />
+                  <TimeField label="Deleted At" value={shopOwner?.deleted_at ?? detail?.deleted_at ?? timelineCandidate?.deleted_at} strongText={strongText} subtleText={subtleText} />
+                  <TimeField label="Last Login" value={shopOwner?.last_login_at ?? shopOwner?.last_login ?? detail?.last_login_at ?? detail?.last_login} strongText={strongText} subtleText={subtleText} />
                 </div>
               </div>
 
@@ -381,7 +497,23 @@ function ShopDetailPage({
               </div>
             </div>
           ) : null}
+
+          {detailStatus === 'succeeded' && detail ? (
+            <div className="mt-4">
+              <details className={`rounded-2xl border p-3 ${isDark ? 'border-slate-700 bg-slate-800/40' : 'border-slate-200 bg-white'}`}>
+                <summary className={`cursor-pointer text-sm font-semibold ${strongText}`}>
+                  All fields (raw)
+                </summary>
+                <pre className={`mt-3 overflow-auto rounded-xl p-3 text-xs leading-5 ${isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
+                  {JSON.stringify(detail, null, 2) ?? 'null'}
+                </pre>
+              </details>
+            </div>
+          ) : null}
         </section>
+            </div>
+          </div>
+        </div>
       </main>
     </DashboardLayout>
   )

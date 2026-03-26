@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import AppSidebar from '@/components/layout/AppSidebar'
 import { buildSidebarNav } from '@/components/layout/sidebarNavConfig'
+import { getRandomAvatarUrl } from '@/utils/avatarFallback'
 import { logoutLocal } from '@/redux/slices/authSlice'
 import { logoutAction } from '@/redux/thunks/authThunks'
 import {
@@ -307,9 +308,12 @@ function ShopListingPage({
 
                     if (!src || failed) {
                       return (
-                        <div className="grid h-36 w-full place-items-center bg-slate-100 text-xl font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-200">
-                          {getInitials(shop.shop_name)}
-                        </div>
+                        <img
+                          src={getRandomAvatarUrl()}
+                          alt="Avatar"
+                          className="h-36 w-full object-cover"
+                          loading="lazy"
+                        />
                       )
                     }
 

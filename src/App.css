@@ -4,30 +4,13 @@
     radial-gradient(circle at 90% 90%, rgba(14, 165, 233, 0.08), transparent 45%);
 }
 
-:root:not(.dark) .dashboard-root,
-:root:not(.dark) .dashboard-root p,
-:root:not(.dark) .dashboard-root span,
-:root:not(.dark) .dashboard-root h1,
-:root:not(.dark) .dashboard-root h2,
-:root:not(.dark) .dashboard-root h3,
-:root:not(.dark) .dashboard-root h4,
-:root:not(.dark) .dashboard-root h5,
-:root:not(.dark) .dashboard-root h6,
-:root:not(.dark) .dashboard-root li,
-:root:not(.dark) .dashboard-root label,
-:root:not(.dark) .dashboard-root strong,
-:root:not(.dark) .dashboard-root button {
-  color: #000 !important;
-}
-
 :root:not(.dark) .dashboard-root .recharts-cartesian-axis-tick-value,
 :root:not(.dark) .dashboard-root .recharts-text {
-  fill: #000 !important;
+  fill: #000;
 }
 
-:root:not(.dark) .dashboard-root .recharts-tooltip-wrapper,
 :root:not(.dark) .dashboard-root .recharts-tooltip-wrapper * {
-  color: #000 !important;
+  color: #000;
 }
 
 .teamify-surface {
