@@ -114,6 +114,7 @@ function TeamDashboardPage({
           dashboardPath: '/dashboard/teamify',
           shopsPath: shopsPagePath,
           createShopPath: `${shopsPagePath}/create`,
+          deliveryPartnersPath: '/dashboard/teamify/delivery-partners',
         },
       }),
     [navigate, shopsPagePath],

@@ -3,6 +3,7 @@ export function buildSidebarNav({ navigate, activeKey, paths }) {
     dashboardPath,
     shopsPath,
     createShopPath,
+    deliveryPartnersPath,
   } = paths ?? {}
 
   const isActive = (key) => key && activeKey === key
@@ -64,7 +65,17 @@ export function buildSidebarNav({ navigate, activeKey, paths }) {
           id: 'partners',
           label: 'Partners',
           iconName: 'users',
-          children: [comingSoon('partners-main', 'Partners')],
+          children: [
+            {
+              id: 'partners-delivery-partners',
+              label: 'Delivery Partners',
+              iconName: 'users',
+              active: isActive('partners.deliveryPartners'),
+              onClick: deliveryPartnersPath ? () => navigate(deliveryPartnersPath) : undefined,
+              disabled: !deliveryPartnersPath,
+              disabledReason: deliveryPartnersPath ? undefined : 'Missing route',
+            },
+          ],
         },
         {
           id: 'reports',

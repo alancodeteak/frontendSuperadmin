@@ -375,6 +375,7 @@ function ShopCreatePage({
           dashboardPath: listingPath.replace('/shops', ''),
           shopsPath: listingPath,
           createShopPath: createPath,
+          deliveryPartnersPath: '/dashboard/teamify/delivery-partners',
         },
       }),
     [createPath, listingPath, navigate],

@@ -152,6 +152,7 @@ function ShopListingPage({
           dashboardPath,
           shopsPath,
           createShopPath: createPath,
+          deliveryPartnersPath: '/dashboard/teamify/delivery-partners',
         },
       }),
     [createPath, dashboardPath, navigate, shopsPath],
