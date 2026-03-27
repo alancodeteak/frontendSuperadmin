@@ -319,6 +319,18 @@ function ShopDetailPage({
           createShopPath: createPath,
           deliveryPartnersPath: '/dashboard/teamify/delivery-partners',
           reportsPath,
+          accountsInvoicesPath:
+            reportsPath === null
+              ? '/portal/dashboard/accounts/invoices'
+              : '/dashboard/teamify/accounts/invoices',
+          accountsOverviewPath:
+            reportsPath === null
+              ? '/portal/dashboard/accounts/overview'
+              : '/dashboard/teamify/accounts/overview',
+          activityDailyPath:
+            reportsPath === null
+              ? null
+              : '/dashboard/teamify/activity/daily',
         },
       }),
     [createPath, dashboardPath, navigate, reportsPath, shopsPath],

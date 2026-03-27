@@ -5,6 +5,9 @@ export function buildSidebarNav({ navigate, activeKey, paths }) {
     createShopPath,
     deliveryPartnersPath,
     reportsPath,
+    accountsInvoicesPath,
+    accountsOverviewPath,
+    activityDailyPath,
   } = paths ?? {}
 
   const isActive = (key) => key && activeKey === key
@@ -103,9 +106,25 @@ export function buildSidebarNav({ navigate, activeKey, paths }) {
           label: 'Accounts',
           iconName: 'wallet',
           children: [
-            comingSoon('accounts-invoices', 'Invoices'),
+            accountsInvoicesPath
+              ? {
+                  id: 'accounts-invoices',
+                  label: 'Invoices',
+                  iconName: 'wallet',
+                  active: isActive('accounts.invoices'),
+                  onClick: () => navigate(accountsInvoicesPath),
+                }
+              : comingSoon('accounts-invoices', 'Invoices'),
             comingSoon('accounts-billing', 'Billing'),
-            comingSoon('accounts-overview', 'Overview'),
+            accountsOverviewPath
+              ? {
+                  id: 'accounts-overview',
+                  label: 'Overview',
+                  iconName: 'wallet',
+                  active: isActive('accounts.overview'),
+                  onClick: () => navigate(accountsOverviewPath),
+                }
+              : comingSoon('accounts-overview', 'Overview'),
           ],
         },
         {
@@ -113,7 +132,15 @@ export function buildSidebarNav({ navigate, activeKey, paths }) {
           label: 'Activity',
           iconName: 'activity',
           children: [
-            comingSoon('activity-daily', 'Daily'),
+            activityDailyPath
+              ? {
+                  id: 'activity-daily',
+                  label: 'Daily',
+                  iconName: 'activity',
+                  active: isActive('activity.daily'),
+                  onClick: () => navigate(activityDailyPath),
+                }
+              : comingSoon('activity-daily', 'Daily'),
             comingSoon('activity-activity', 'Activity'),
           ],
         },

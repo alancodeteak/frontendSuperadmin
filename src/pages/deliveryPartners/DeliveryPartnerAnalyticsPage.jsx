@@ -109,6 +109,8 @@ export default function DeliveryPartnerAnalyticsPage() {
           shopsPath: '/dashboard/teamify/shops',
           createShopPath: '/dashboard/teamify/shops/create',
           deliveryPartnersPath: '/dashboard/teamify/delivery-partners',
+          accountsInvoicesPath: '/dashboard/teamify/accounts/invoices',
+          accountsOverviewPath: '/dashboard/teamify/accounts/overview',
         },
       }),
     [navigate],

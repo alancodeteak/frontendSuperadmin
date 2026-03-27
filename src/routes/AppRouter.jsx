@@ -13,9 +13,16 @@ import PortalShopDetailPage from '@/pages/shops/PortalShopDetailPage'
 import AdminShopAnalyticsPage from '@/pages/shops/AdminShopAnalyticsPage'
 import PortalShopAnalyticsPage from '@/pages/shops/PortalShopAnalyticsPage'
 import AdminReportsPage from '@/pages/reports/AdminReportsPage'
+import AdminInvoiceDetailPage from '@/pages/accounts/AdminInvoiceDetailPage'
+import AdminInvoicesListPage from '@/pages/accounts/AdminInvoicesListPage'
+import AdminAccountsOverviewPage from '@/pages/accounts/AdminAccountsOverviewPage'
+import DailyActivityPage from '@/pages/activity/DailyActivityPage'
 import AdminDeliveryPartnersListingPage from '@/pages/deliveryPartners/AdminDeliveryPartnersListingPage'
 import AdminDeliveryPartnerDetailPage from '@/pages/deliveryPartners/AdminDeliveryPartnerDetailPage'
 import AdminDeliveryPartnerAnalyticsPage from '@/pages/deliveryPartners/AdminDeliveryPartnerAnalyticsPage'
+import PortalInvoiceDetailPage from '@/pages/accounts/PortalInvoiceDetailPage'
+import PortalInvoicesListPage from '@/pages/accounts/PortalInvoicesListPage'
+import PortalAccountsOverviewPage from '@/pages/accounts/PortalAccountsOverviewPage'
 import {
   selectAuthScope,
   selectIsAuthenticated,
@@ -110,6 +117,38 @@ function AppRouter() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/dashboard/teamify/activity/daily"
+          element={
+            <ProtectedRoute requiredScope="admin" redirectTo="/">
+              <DailyActivityPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/teamify/accounts/invoices"
+          element={
+            <ProtectedRoute requiredScope="admin" redirectTo="/">
+              <AdminInvoicesListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/teamify/accounts/overview"
+          element={
+            <ProtectedRoute requiredScope="admin" redirectTo="/">
+              <AdminAccountsOverviewPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/teamify/accounts/invoices/:invoiceId"
+          element={
+            <ProtectedRoute requiredScope="admin" redirectTo="/">
+              <AdminInvoiceDetailPage />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/portal/login" element={<PortalLoginPage />} />
         <Route
           path="/portal/dashboard"
@@ -148,6 +187,30 @@ function AppRouter() {
           element={
             <ProtectedRoute requiredScope="portal" redirectTo="/portal/login">
               <PortalShopCreatePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/portal/dashboard/accounts/invoices"
+          element={
+            <ProtectedRoute requiredScope="portal" redirectTo="/portal/login">
+              <PortalInvoicesListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/portal/dashboard/accounts/overview"
+          element={
+            <ProtectedRoute requiredScope="portal" redirectTo="/portal/login">
+              <PortalAccountsOverviewPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/portal/dashboard/accounts/invoices/:invoiceId"
+          element={
+            <ProtectedRoute requiredScope="portal" redirectTo="/portal/login">
+              <PortalInvoiceDetailPage />
             </ProtectedRoute>
           }
         />

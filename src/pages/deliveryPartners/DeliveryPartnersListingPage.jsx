@@ -105,6 +105,8 @@ function DeliveryPartnersListingPage({
           createShopPath: shopsCreatePath,
           deliveryPartnersPath: '/dashboard/teamify/delivery-partners',
           reportsPath,
+          accountsInvoicesPath: '/dashboard/teamify/accounts/invoices',
+          accountsOverviewPath: '/dashboard/teamify/accounts/overview',
         },
       }),
     [dashboardPath, navigate, reportsPath, shopsCreatePath, shopsPath],

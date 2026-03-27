@@ -276,6 +276,8 @@ export default function DeliveryPartnerDetailPage() {
           createShopPath: "/dashboard/teamify/shops/create",
           deliveryPartnersPath: "/dashboard/teamify/delivery-partners",
           reportsPath: "/dashboard/teamify/reports",
+          accountsInvoicesPath: "/dashboard/teamify/accounts/invoices",
+          accountsOverviewPath: "/dashboard/teamify/accounts/overview",
         },
       }),
     [navigate]
