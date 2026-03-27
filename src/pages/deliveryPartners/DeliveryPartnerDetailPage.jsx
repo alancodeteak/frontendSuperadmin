@@ -306,6 +306,12 @@ export default function DeliveryPartnerDetailPage() {
     detail?.photo_url ||
     fallbackAvatar
 
+  const onlineStatusRaw = String(detail?.online_status ?? "").trim().toLowerCase()
+  const isOnline =
+    onlineStatusRaw === "online" ||
+    onlineStatusRaw === "true" ||
+    onlineStatusRaw === "1"
+
 
 
   /* ================= UI ================= */
@@ -329,15 +335,24 @@ export default function DeliveryPartnerDetailPage() {
         {/* BACK BUTTON */}
 
         <div className="px-8 pt-6">
-
-          <button
-            onClick={() =>
-              navigate("/dashboard/teamify/delivery-partners")
-            }
-            className="rounded-xl border border-slate-600 px-5 py-2 text-sm text-white hover:bg-slate-800"
-          >
-            ← Back to Listing
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() =>
+                navigate("/dashboard/teamify/delivery-partners")
+              }
+              className="rounded-xl border border-slate-600 px-5 py-2 text-sm text-white hover:bg-slate-800"
+            >
+              ← Back to Listing
+            </button>
+            <button
+              onClick={() =>
+                navigate(`/dashboard/teamify/delivery-partners/${deliveryPartnerId}/analytics`)
+              }
+              className="rounded-xl bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-500"
+            >
+              View Analytics
+            </button>
+          </div>
 
         </div>
 
@@ -369,14 +384,22 @@ export default function DeliveryPartnerDetailPage() {
 
           {/* AVATAR */}
 
-          <img
-            src={avatarSrc}
-            alt={title}
-            className="h-40 w-40 rounded-full border-4 border-slate-950 object-cover shadow-lg"
-            onError={() =>
-              setAvatarOverride(getRandomAvatarUrl())
-            }
-          />
+          <div className="relative">
+            <img
+              src={avatarSrc}
+              alt={title}
+              className="h-40 w-40 rounded-full border-4 border-slate-950 object-cover shadow-lg"
+              onError={() =>
+                setAvatarOverride(getRandomAvatarUrl())
+              }
+            />
+            <span
+              className={`absolute bottom-2 right-2 block h-5 w-5 rounded-full border-2 border-slate-950 ${
+                isOnline ? "bg-emerald-500" : "bg-slate-500"
+              }`}
+              title={isOnline ? "Online" : "Offline"}
+            />
+          </div>
 
 
           {/* NAME */}
@@ -387,9 +410,26 @@ export default function DeliveryPartnerDetailPage() {
               {title}
             </h1>
 
-            <p className="text-slate-400">
-              Delivery Partner Profile
-            </p>
+            <div className="mt-1 flex items-center gap-2">
+              <p className="text-slate-400">
+                Delivery Partner Profile
+              </p>
+              <span
+                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                  isOnline
+                    ? "bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/40"
+                    : "bg-slate-500/20 text-slate-300 ring-1 ring-slate-500/40"
+                }`}
+                title={isOnline ? "Online" : "Offline"}
+              >
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${
+                    isOnline ? "bg-emerald-400" : "bg-slate-300"
+                  }`}
+                />
+                {isOnline ? "Online" : "Offline"}
+              </span>
+            </div>
 
           </div>
 

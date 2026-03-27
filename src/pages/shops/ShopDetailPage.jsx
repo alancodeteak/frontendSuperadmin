@@ -5,6 +5,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import AppSidebar from '@/components/layout/AppSidebar'
 import { buildSidebarNav } from '@/components/layout/sidebarNavConfig'
+import { getShopActivity } from '@/apis/analyticsApi'
 import { presignUpload, putPresignedUpload } from '@/apis/uploadsApi'
 import { logoutLocal } from '@/redux/slices/authSlice'
 import { logoutAction } from '@/redux/thunks/authThunks'
@@ -19,6 +20,82 @@ import {
 } from '@/redux/thunks/supermarketsThunks'
 import { useTheme } from '@/context/useTheme'
 import { getRandomAvatarUrl } from '@/utils/avatarFallback'
+
+const RANGE_OPTIONS = [7, 15, 30, 60, 90]
+const STATUS_OPTIONS = [
+  { key: 'all', label: 'All Statuses' },
+  { key: 'pending', label: 'Pending' },
+  { key: 'assigned', label: 'Assigned' },
+  { key: 'picked_up', label: 'Picked Up' },
+  { key: 'out_for_delivery', label: 'Out For Delivery' },
+  { key: 'delivered', label: 'Delivered' },
+  { key: 'customer_not_available', label: 'Customer Not Available' },
+  { key: 'cancelled', label: 'Cancelled' },
+]
+
+const SAMPLE_ACTIVITY = {
+  window_days: 7,
+  series: {
+    orders: [
+      { date: '2026-03-21', count: 9 },
+      { date: '2026-03-22', count: 14 },
+      { date: '2026-03-23', count: 11 },
+      { date: '2026-03-24', count: 17 },
+      { date: '2026-03-25', count: 19 },
+      { date: '2026-03-26', count: 16 },
+      { date: '2026-03-27', count: 22 },
+    ],
+    amount: [
+      { date: '2026-03-21', total_amount: 1850 },
+      { date: '2026-03-22', total_amount: 2760 },
+      { date: '2026-03-23', total_amount: 2310 },
+      { date: '2026-03-24', total_amount: 3140 },
+      { date: '2026-03-25', total_amount: 3525 },
+      { date: '2026-03-26', total_amount: 2990 },
+      { date: '2026-03-27', total_amount: 4020 },
+    ],
+    statuses: [
+      {
+        date: '2026-03-21',
+        statuses: { pending: 2, assigned: 1, picked_up: 1, out_for_delivery: 1, delivered: 3, customer_not_available: 0, cancelled: 1 },
+      },
+      {
+        date: '2026-03-22',
+        statuses: { pending: 3, assigned: 2, picked_up: 1, out_for_delivery: 1, delivered: 5, customer_not_available: 0, cancelled: 2 },
+      },
+      {
+        date: '2026-03-23',
+        statuses: { pending: 2, assigned: 2, picked_up: 1, out_for_delivery: 1, delivered: 4, customer_not_available: 1, cancelled: 0 },
+      },
+      {
+        date: '2026-03-24',
+        statuses: { pending: 3, assigned: 2, picked_up: 2, out_for_delivery: 2, delivered: 7, customer_not_available: 0, cancelled: 1 },
+      },
+      {
+        date: '2026-03-25',
+        statuses: { pending: 2, assigned: 3, picked_up: 2, out_for_delivery: 2, delivered: 8, customer_not_available: 1, cancelled: 1 },
+      },
+      {
+        date: '2026-03-26',
+        statuses: { pending: 2, assigned: 2, picked_up: 2, out_for_delivery: 2, delivered: 7, customer_not_available: 0, cancelled: 1 },
+      },
+      {
+        date: '2026-03-27',
+        statuses: { pending: 3, assigned: 3, picked_up: 2, out_for_delivery: 2, delivered: 10, customer_not_available: 1, cancelled: 1 },
+      },
+    ],
+  },
+  summary: {
+    total_orders: 108,
+    total_amount: 20595,
+    avg_order_value: 190.69,
+    delivered_rate: 40.74,
+  },
+  growth: {
+    orders_pct_vs_prev_period: 18.6,
+    amount_pct_vs_prev_period: 23.4,
+  },
+}
 
 function toDateMaybe(value) {
   if (value === null || value === undefined) return null
@@ -114,12 +191,49 @@ function ShopDetailPage({
   const [progress, setProgress] = useState({ photo: 0, promotion: 0 })
   const [uploadError, setUploadError] = useState('')
   const [uploadToast, setUploadToast] = useState('')
+  const [activity, setActivity] = useState(null)
+  const [activityStatus, setActivityStatus] = useState('idle')
+  const [activityError, setActivityError] = useState('')
+  const [activityDays, setActivityDays] = useState(7)
+  const [selectedMetric, setSelectedMetric] = useState('orders')
+  const [selectedStatus, setSelectedStatus] = useState('all')
   const toastTimerRef = useRef(null)
 
   useEffect(() => {
     if (!userId) return
     dispatch(fetchSupermarketDetailAction({ user_id: userId }))
   }, [dispatch, userId])
+
+  useEffect(() => {
+    let cancelled = false
+    const run = async () => {
+      if (!userId || !accessToken) {
+        setActivity(null)
+        setActivityStatus('idle')
+        setActivityError('')
+        return
+      }
+      setActivityStatus('loading')
+      setActivityError('')
+      try {
+        const data = await getShopActivity({ user_id: userId, days: activityDays }, { accessToken })
+        if (!cancelled) {
+          setActivity(data)
+          setActivityStatus('succeeded')
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setActivity(null)
+          setActivityStatus('failed')
+          setActivityError(error?.message ?? 'Failed to load activity')
+        }
+      }
+    }
+    run()
+    return () => {
+      cancelled = true
+    }
+  }, [accessToken, userId, activityDays])
 
   useEffect(() => {
     return () => {
@@ -237,6 +351,48 @@ function ShopDetailPage({
   const promoImageSrc =
     promotion?.promotion_image_url ||
     (isHttpUrl(promotion?.promotion_image_s3_key) ? promotion.promotion_image_s3_key : null)
+  const activitySummary = activity?.summary ?? null
+  const activityGrowth = activity?.growth ?? null
+  const hasLiveSeries = Boolean(
+    activity?.series &&
+      ((Array.isArray(activity?.series?.orders) && activity.series.orders.length > 0) ||
+        (Array.isArray(activity?.series?.amount) && activity.series.amount.length > 0)),
+  )
+  const displayActivity = hasLiveSeries ? activity : SAMPLE_ACTIVITY
+  const isUsingSampleData = !hasLiveSeries
+  const activitySummaryDisplay = displayActivity?.summary ?? null
+  const activityGrowthDisplay = displayActivity?.growth ?? null
+  const ordersSeries = displayActivity?.series?.orders ?? []
+  const amountSeries = displayActivity?.series?.amount ?? []
+  const statusSeries = displayActivity?.series?.statuses ?? []
+  const metricsTitle = selectedMetric === 'amount' ? 'Amount Per Day' : 'Orders Per Day'
+  const mergedChartRows = useMemo(
+    () =>
+      ordersSeries.map((row, idx) => ({
+        date: row?.date,
+        count: Number(row?.count ?? 0),
+        total_amount: Number(amountSeries?.[idx]?.total_amount ?? 0),
+      })),
+    [amountSeries, ordersSeries],
+  )
+  const visibleStatusRows = useMemo(() => {
+    if (selectedStatus === 'all') return statusSeries
+    return statusSeries.map((row) => ({
+      ...row,
+      statuses: {
+        [selectedStatus]: Number(row?.statuses?.[selectedStatus] ?? 0),
+      },
+    }))
+  }, [selectedStatus, statusSeries])
+  const peakSelectedMetric = mergedChartRows.reduce((acc, row) => {
+    const val = selectedMetric === 'amount' ? row.total_amount : row.count
+    return Math.max(acc, val)
+  }, 0)
+  const peakOrders = ordersSeries.reduce((acc, row) => Math.max(acc, Number(row?.count ?? 0)), 0)
+  const maxAmount = amountSeries.reduce(
+    (acc, row) => Math.max(acc, Number(row?.total_amount ?? 0)),
+    0,
+  )
 
   return (
     <DashboardLayout>
@@ -290,6 +446,13 @@ function ShopDetailPage({
                       className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white ring-1 ring-white/20 transition hover:bg-white/20"
                     >
                       ← Back to Listing
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigate(`${shopsPath}/${userId}/analytics`)}
+                      className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-indigo-700 ring-1 ring-white/50 transition hover:bg-white/90"
+                    >
+                      View Analytics
                     </button>
                   </div>
                 </div>
@@ -497,21 +660,234 @@ function ShopDetailPage({
                   )}
                 </div>
               </div>
+
+              <div className={`rounded-2xl border p-3 xl:col-span-2 ${isDark ? 'border-slate-700 bg-slate-800/40' : 'border-slate-200 bg-white'}`}>
+                <p className={`text-xs font-semibold uppercase tracking-[0.16em] ${sectionTitle}`}>
+                  Activity Charts, Graphs & Data
+                </p>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <div className="inline-flex rounded-xl border border-slate-200 p-1 dark:border-slate-700">
+                    {RANGE_OPTIONS.map((days) => (
+                      <button
+                        key={days}
+                        type="button"
+                        onClick={() => setActivityDays(days)}
+                        className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
+                          activityDays === days
+                            ? 'bg-indigo-600 text-white'
+                            : isDark
+                              ? 'text-slate-200 hover:bg-slate-800'
+                              : 'text-slate-700 hover:bg-slate-100'
+                        }`}
+                      >
+                        {days}D
+                      </button>
+                    ))}
+                  </div>
+                  <select
+                    value={selectedMetric}
+                    onChange={(e) => setSelectedMetric(e.target.value)}
+                    className={`rounded-xl border px-3 py-1.5 text-xs font-semibold ${
+                      isDark
+                        ? 'border-slate-700 bg-slate-900 text-slate-100'
+                        : 'border-slate-200 bg-white text-slate-700'
+                    }`}
+                  >
+                    <option value="orders">Orders Graph</option>
+                    <option value="amount">Amount Graph</option>
+                  </select>
+                  <select
+                    value={selectedStatus}
+                    onChange={(e) => setSelectedStatus(e.target.value)}
+                    className={`rounded-xl border px-3 py-1.5 text-xs font-semibold ${
+                      isDark
+                        ? 'border-slate-700 bg-slate-900 text-slate-100'
+                        : 'border-slate-200 bg-white text-slate-700'
+                    }`}
+                  >
+                    {STATUS_OPTIONS.map((option) => (
+                      <option key={option.key} value={option.key}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {activityStatus === 'loading' ? (
+                  <p className={`mt-3 text-sm ${subtleText}`}>Loading activity…</p>
+                ) : null}
+                {activityError ? (
+                  <p className="mt-3 text-sm font-semibold text-red-700 dark:text-red-300">{activityError}</p>
+                ) : null}
+                {activityStatus === 'succeeded' && activity ? (
+                  <div className="mt-3 space-y-4">
+                    <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                      <div className="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+                        <p className={`text-[11px] uppercase tracking-wider ${subtleText}`}>Orders</p>
+                        <p className={`mt-1 text-base font-semibold ${strongText}`}>
+                          {activitySummaryDisplay?.total_orders ?? 0}
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+                        <p className={`text-[11px] uppercase tracking-wider ${subtleText}`}>Amount</p>
+                        <p className={`mt-1 text-base font-semibold ${strongText}`}>
+                          {activitySummaryDisplay?.total_amount ?? 0}
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+                        <p className={`text-[11px] uppercase tracking-wider ${subtleText}`}>Delivered Rate</p>
+                        <p className={`mt-1 text-base font-semibold ${strongText}`}>
+                          {activitySummaryDisplay?.delivered_rate ?? 0}%
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+                        <p className={`text-[11px] uppercase tracking-wider ${subtleText}`}>Growth (Orders)</p>
+                        <p className={`mt-1 text-base font-semibold ${strongText}`}>
+                          {activityGrowthDisplay?.orders_pct_vs_prev_period === null ||
+                          activityGrowthDisplay?.orders_pct_vs_prev_period === undefined
+                            ? 'N/A'
+                            : `${activityGrowthDisplay.orders_pct_vs_prev_period}%`}
+                        </p>
+                      </div>
+                    </div>
+                    {isUsingSampleData ? (
+                      <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 dark:border-amber-700/60 dark:bg-amber-900/20 dark:text-amber-200 md:col-span-4">
+                        Temporary sample data is displayed because live activity data is not available for this shop/range.
+                      </div>
+                    ) : null}
+
+                    <div>
+                      <p className={`mb-2 text-xs font-semibold uppercase tracking-wider ${subtleText}`}>
+                        {metricsTitle}
+                      </p>
+                      <div className="space-y-2">
+                        {mergedChartRows.length ? (
+                          mergedChartRows.map((row) => {
+                            const value = selectedMetric === 'amount' ? row.total_amount : row.count
+                            const barColor = selectedMetric === 'amount' ? 'bg-emerald-500' : 'bg-indigo-500'
+                            const widthPct =
+                              peakSelectedMetric > 0
+                                ? Math.max(6, Math.round((value / peakSelectedMetric) * 100))
+                                : 6
+                            return (
+                              <div key={`metric-${row?.date}`} className="grid grid-cols-[90px_1fr_70px] items-center gap-2">
+                                <p className={`text-xs ${subtleText}`}>{row.date}</p>
+                                <div className="h-2 rounded-full bg-slate-200 dark:bg-slate-700">
+                                  <div
+                                    className={`h-2 rounded-full ${barColor}`}
+                                    style={{ width: `${widthPct}%` }}
+                                  />
+                                </div>
+                                <p className={`text-right text-xs font-semibold ${strongText}`}>{value}</p>
+                              </div>
+                            )
+                          })
+                        ) : (
+                          <p className={`text-sm ${subtleText}`}>No chart data in this period.</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className={`mb-2 text-xs font-semibold uppercase tracking-wider ${subtleText}`}>
+                        Amount Per Day
+                      </p>
+                      <div className="space-y-2">
+                        {amountSeries.length ? (
+                          amountSeries.map((row) => {
+                            const amount = Number(row?.total_amount ?? 0)
+                            const widthPct = maxAmount > 0 ? Math.max(6, Math.round((amount / maxAmount) * 100)) : 6
+                            return (
+                              <div key={`amount-${row?.date}`} className="grid grid-cols-[90px_1fr_70px] items-center gap-2">
+                                <p className={`text-xs ${subtleText}`}>{row?.date}</p>
+                                <div className="h-2 rounded-full bg-slate-200 dark:bg-slate-700">
+                                  <div
+                                    className="h-2 rounded-full bg-emerald-500"
+                                    style={{ width: `${widthPct}%` }}
+                                  />
+                                </div>
+                                <p className={`text-right text-xs font-semibold ${strongText}`}>{amount}</p>
+                              </div>
+                            )
+                          })
+                        ) : (
+                          <p className={`text-sm ${subtleText}`}>No amount data in this period.</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className={`mb-2 text-xs font-semibold uppercase tracking-wider ${subtleText}`}>
+                        Daily Statuses (Filtered)
+                      </p>
+                      <div className="space-y-2">
+                        {visibleStatusRows.length ? (
+                          visibleStatusRows.map((row) => {
+                            const statuses = row?.statuses ?? {}
+                            return (
+                              <div key={`status-${row?.date}`} className="rounded-xl border border-slate-200 p-2 dark:border-slate-700">
+                                <p className={`mb-1 text-xs font-semibold ${strongText}`}>{row?.date}</p>
+                                {selectedStatus === 'all' ? (
+                                  <p className={`text-xs ${subtleText}`}>
+                                    pending: {statuses.pending ?? 0} | assigned: {statuses.assigned ?? 0} | picked_up:{' '}
+                                    {statuses.picked_up ?? 0} | out_for_delivery: {statuses.out_for_delivery ?? 0} |
+                                    delivered: {statuses.delivered ?? 0} | customer_not_available:{' '}
+                                    {statuses.customer_not_available ?? 0} | cancelled: {statuses.cancelled ?? 0}
+                                  </p>
+                                ) : (
+                                  <p className={`text-xs ${subtleText}`}>
+                                    {selectedStatus}: {statuses[selectedStatus] ?? 0}
+                                  </p>
+                                )}
+                              </div>
+                            )
+                          })
+                        ) : (
+                          <p className={`text-sm ${subtleText}`}>No status data in this period.</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <p className={`mb-2 text-xs font-semibold uppercase tracking-wider ${subtleText}`}>
+                        Activity Data Table
+                      </p>
+                      <table className="min-w-full border-separate border-spacing-0 text-xs">
+                        <thead>
+                          <tr>
+                            <th className={`border-b border-slate-200 px-2 py-2 text-left ${subtleText} dark:border-slate-700`}>Date</th>
+                            <th className={`border-b border-slate-200 px-2 py-2 text-left ${subtleText} dark:border-slate-700`}>Orders</th>
+                            <th className={`border-b border-slate-200 px-2 py-2 text-left ${subtleText} dark:border-slate-700`}>Amount</th>
+                            <th className={`border-b border-slate-200 px-2 py-2 text-left ${subtleText} dark:border-slate-700`}>
+                              {selectedStatus === 'all' ? 'Delivered' : selectedStatus}
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {mergedChartRows.map((row, idx) => {
+                            const statuses = statusSeries?.[idx]?.statuses ?? {}
+                            const statusValue =
+                              selectedStatus === 'all'
+                                ? Number(statuses.delivered ?? 0)
+                                : Number(statuses[selectedStatus] ?? 0)
+                            return (
+                              <tr key={`tbl-${row.date}`}>
+                                <td className={`border-b border-slate-100 px-2 py-2 ${strongText} dark:border-slate-800`}>{row.date}</td>
+                                <td className={`border-b border-slate-100 px-2 py-2 ${strongText} dark:border-slate-800`}>{row.count}</td>
+                                <td className={`border-b border-slate-100 px-2 py-2 ${strongText} dark:border-slate-800`}>{row.total_amount}</td>
+                                <td className={`border-b border-slate-100 px-2 py-2 ${strongText} dark:border-slate-800`}>{statusValue}</td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
             </div>
           ) : null}
 
-          {detailStatus === 'succeeded' && detail ? (
-            <div className="mt-4">
-              <details className={`rounded-2xl border p-3 ${isDark ? 'border-slate-700 bg-slate-800/40' : 'border-slate-200 bg-white'}`}>
-                <summary className={`cursor-pointer text-sm font-semibold ${strongText}`}>
-                  All fields (raw)
-                </summary>
-                <pre className={`mt-3 overflow-auto rounded-xl p-3 text-xs leading-5 ${isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
-                  {JSON.stringify(detail, null, 2) ?? 'null'}
-                </pre>
-              </details>
-            </div>
-          ) : null}
+         
         </section>
             </div>
           </div>

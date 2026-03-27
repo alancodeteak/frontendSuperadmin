@@ -10,8 +10,11 @@ import AdminShopCreatePage from '@/pages/shops/AdminShopCreatePage'
 import PortalShopCreatePage from '@/pages/shops/PortalShopCreatePage'
 import AdminShopDetailPage from '@/pages/shops/AdminShopDetailPage'
 import PortalShopDetailPage from '@/pages/shops/PortalShopDetailPage'
+import AdminShopAnalyticsPage from '@/pages/shops/AdminShopAnalyticsPage'
+import PortalShopAnalyticsPage from '@/pages/shops/PortalShopAnalyticsPage'
 import AdminDeliveryPartnersListingPage from '@/pages/deliveryPartners/AdminDeliveryPartnersListingPage'
 import AdminDeliveryPartnerDetailPage from '@/pages/deliveryPartners/AdminDeliveryPartnerDetailPage'
+import AdminDeliveryPartnerAnalyticsPage from '@/pages/deliveryPartners/AdminDeliveryPartnerAnalyticsPage'
 import {
   selectAuthScope,
   selectIsAuthenticated,
@@ -59,6 +62,14 @@ function AppRouter() {
           }
         />
         <Route
+          path="/dashboard/teamify/shops/:userId/analytics"
+          element={
+            <ProtectedRoute requiredScope="admin" redirectTo="/">
+              <AdminShopAnalyticsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/dashboard/teamify/shops/create"
           element={
             <ProtectedRoute requiredScope="admin" redirectTo="/">
@@ -79,6 +90,14 @@ function AppRouter() {
           element={
             <ProtectedRoute requiredScope="admin" redirectTo="/">
               <AdminDeliveryPartnerDetailPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/teamify/delivery-partners/:deliveryPartnerId/analytics"
+          element={
+            <ProtectedRoute requiredScope="admin" redirectTo="/">
+              <AdminDeliveryPartnerAnalyticsPage />
             </ProtectedRoute>
           }
         />
@@ -104,6 +123,14 @@ function AppRouter() {
           element={
             <ProtectedRoute requiredScope="portal" redirectTo="/portal/login">
               <PortalShopDetailPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/portal/dashboard/shops/:userId/analytics"
+          element={
+            <ProtectedRoute requiredScope="portal" redirectTo="/portal/login">
+              <PortalShopAnalyticsPage />
             </ProtectedRoute>
           }
         />

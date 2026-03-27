@@ -145,3 +145,17 @@ export async function restoreDeliveryPartner(
   return response?.data ?? null
 }
 
+export async function getDeliveryPartnerActivity(
+  { delivery_partner_id: deliveryPartnerId, days = 7 },
+  { accessToken },
+) {
+  const id = String(deliveryPartnerId ?? '').trim()
+  const qs = buildQuery({ days })
+  const response = await requestJson({
+    path: `/analytics/delivery-partners/${encodeURIComponent(id)}/activity${qs}`,
+    method: 'GET',
+    accessToken,
+  })
+  return response?.data ?? null
+}
+

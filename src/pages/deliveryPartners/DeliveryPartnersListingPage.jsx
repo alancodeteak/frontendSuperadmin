@@ -296,10 +296,11 @@ function DeliveryPartnersListingPage({
 
         <section className={`${surface} p-0`}>
           <div className="overflow-hidden rounded-3xl">
-            <div className="grid grid-cols-[1.2fr_1fr_0.9fr_0.9fr_0.6fr] gap-0 border-b border-slate-200 bg-slate-50/70 px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-600 dark:border-slate-700 dark:bg-transparent dark:text-slate-400">
+            <div className="grid grid-cols-[1.2fr_1fr_0.9fr_0.8fr_0.9fr_0.6fr] gap-0 border-b border-slate-200 bg-slate-50/70 px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-600 dark:border-slate-700 dark:bg-transparent dark:text-slate-400">
               <div>Partner</div>
               <div>Email/Phone</div>
               <div>Shop Name</div>
+              <div>Status</div>
               <div>Partner ID</div>
               <div className="text-right">View</div>
             </div>
@@ -328,7 +329,7 @@ function DeliveryPartnersListingPage({
               return (
                 <div
                   key={idKey}
-                  className="grid grid-cols-[1.2fr_1fr_0.9fr_0.9fr_0.6fr] items-center gap-0 border-b border-slate-100 px-4 py-3 text-sm transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900/40"
+                  className="grid grid-cols-[1.2fr_1fr_0.9fr_0.8fr_0.9fr_0.6fr] items-center gap-0 border-b border-slate-100 px-4 py-3 text-sm transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900/40"
                 >
                   <div className="flex items-center gap-3">
                     {src && !failed ? (
@@ -356,11 +357,31 @@ function DeliveryPartnersListingPage({
                     )}
                     <div className="min-w-0">
                       <p className={`truncate font-semibold ${strong}`}>{it.name ?? '—'}</p>
-                      <p className={`truncate text-xs ${subtle}`}>{it.phone ?? '—'}</p>
+                      <div className="mt-0.5 flex items-center gap-1.5">
+                        <span
+                          className={`inline-block h-2 w-2 rounded-full ${
+                            String(it?.online_status ?? '').toLowerCase() === 'online'
+                              ? 'bg-emerald-500'
+                              : 'bg-slate-400'
+                          }`}
+                        />
+                        <p className={`truncate text-xs ${subtle}`}>{it.phone ?? '—'}</p>
+                      </div>
                     </div>
                   </div>
                   <div className={subtle}>{it.phone ?? '—'}</div>
                   <div className={strong}>{it.shop_name ?? '—'}</div>
+                  <div>
+                    <span
+                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                        String(it?.online_status ?? '').toLowerCase() === 'online'
+                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300'
+                          : 'bg-slate-100 text-slate-700 dark:bg-slate-700/40 dark:text-slate-200'
+                      }`}
+                    >
+                      {String(it?.online_status ?? '').toLowerCase() === 'online' ? 'Online' : 'Offline'}
+                    </span>
+                  </div>
                   <div className={`${subtle} tabular-nums`}>{it.delivery_partner_id ?? '—'}</div>
                   <div className="text-right">
                     <button
