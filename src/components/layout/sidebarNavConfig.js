@@ -4,6 +4,7 @@ export function buildSidebarNav({ navigate, activeKey, paths }) {
     shopsPath,
     createShopPath,
     deliveryPartnersPath,
+    reportsPath,
   } = paths ?? {}
 
   const isActive = (key) => key && activeKey === key
@@ -15,7 +16,7 @@ export function buildSidebarNav({ navigate, activeKey, paths }) {
     disabledReason: 'Coming soon',
   })
 
-  return [
+  const baseSections = [
     {
       id: 'main',
       title: null,
@@ -77,12 +78,26 @@ export function buildSidebarNav({ navigate, activeKey, paths }) {
             },
           ],
         },
-        {
-          id: 'reports',
-          label: 'Reports',
-          iconName: 'report',
-          children: [comingSoon('reports-main', 'Reports')],
-        },
+        ...(reportsPath === null
+          ? []
+          : [
+              {
+                id: 'reports',
+                label: 'Reports',
+                iconName: 'report',
+                children: [
+                  reportsPath
+                    ? {
+                        id: 'reports-main',
+                        label: 'Reports',
+                        iconName: 'report',
+                        active: isActive('reports.main'),
+                        onClick: () => navigate(reportsPath),
+                      }
+                    : comingSoon('reports-main', 'Reports'),
+                ],
+              },
+            ]),
         {
           id: 'accounts',
           label: 'Accounts',
@@ -111,5 +126,6 @@ export function buildSidebarNav({ navigate, activeKey, paths }) {
       ],
     },
   ]
+  return baseSections
 }
 

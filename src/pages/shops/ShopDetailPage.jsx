@@ -171,6 +171,7 @@ function ShopDetailPage({
   dashboardPath = '/dashboard/teamify',
   shopsPath = '/dashboard/teamify/shops',
   createPath = '/dashboard/teamify/shops/create',
+  reportsPath = '/dashboard/teamify/reports',
   logoutRedirectTo = '/',
 }) {
   const dispatch = useDispatch()
@@ -317,9 +318,10 @@ function ShopDetailPage({
           shopsPath,
           createShopPath: createPath,
           deliveryPartnersPath: '/dashboard/teamify/delivery-partners',
+          reportsPath,
         },
       }),
-    [createPath, dashboardPath, navigate, shopsPath],
+    [createPath, dashboardPath, navigate, reportsPath, shopsPath],
   )
 
   const handleLogout = async () => {

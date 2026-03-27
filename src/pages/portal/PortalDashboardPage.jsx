@@ -7,6 +7,7 @@ function PortalDashboardPage() {
       pageTitle="Portal Dashboard"
       logoutRedirectTo="/portal/login"
       shopsPagePath="/portal/dashboard/shops"
+      reportsPath={null}
     />
   )
 }

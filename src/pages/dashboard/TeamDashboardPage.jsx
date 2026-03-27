@@ -57,6 +57,7 @@ function TeamDashboardPage({
   pageTitle = 'Team Dashboard',
   logoutRedirectTo = '/',
   shopsPagePath = '/dashboard/teamify/shops',
+  reportsPath = '/dashboard/teamify/reports',
 }) {
   const dispatch = useDispatch()
   const navigate = useNavigate()
@@ -115,9 +116,10 @@ function TeamDashboardPage({
           shopsPath: shopsPagePath,
           createShopPath: `${shopsPagePath}/create`,
           deliveryPartnersPath: '/dashboard/teamify/delivery-partners',
+          reportsPath,
         },
       }),
-    [navigate, shopsPagePath],
+    [navigate, reportsPath, shopsPagePath],
   )
 
   return (

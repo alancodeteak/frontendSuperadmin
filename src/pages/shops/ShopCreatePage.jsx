@@ -69,6 +69,7 @@ function ShopCreatePage({
   sidebarSubTitle = 'Team Dashboard',
   listingPath = '/dashboard/teamify/shops',
   createPath = '/dashboard/teamify/shops/create',
+  reportsPath = '/dashboard/teamify/reports',
   logoutRedirectTo = '/',
 }) {
   const dispatch = useDispatch()
@@ -376,9 +377,10 @@ function ShopCreatePage({
           shopsPath: listingPath,
           createShopPath: createPath,
           deliveryPartnersPath: '/dashboard/teamify/delivery-partners',
+          reportsPath,
         },
       }),
-    [createPath, listingPath, navigate],
+    [createPath, listingPath, navigate, reportsPath],
   )
 
   const update = (key) => (e) =>

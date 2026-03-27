@@ -7,6 +7,7 @@ function PortalShopCreatePage() {
       sidebarSubTitle="Portal Dashboard"
       listingPath="/portal/dashboard/shops"
       createPath="/portal/dashboard/shops/create"
+      reportsPath={null}
       logoutRedirectTo="/portal/login"
     />
   )

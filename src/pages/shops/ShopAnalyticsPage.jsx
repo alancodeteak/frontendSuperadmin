@@ -50,6 +50,7 @@ function ShopAnalyticsPage({
   dashboardPath = '/dashboard/teamify',
   shopsPath = '/dashboard/teamify/shops',
   createPath = '/dashboard/teamify/shops/create',
+  reportsPath = '/dashboard/teamify/reports',
   detailBasePath = '/dashboard/teamify/shops',
   logoutRedirectTo = '/',
 }) {
@@ -104,9 +105,10 @@ function ShopAnalyticsPage({
           shopsPath,
           createShopPath: createPath,
           deliveryPartnersPath: '/dashboard/teamify/delivery-partners',
+          reportsPath,
         },
       }),
-    [createPath, dashboardPath, navigate, shopsPath],
+    [createPath, dashboardPath, navigate, reportsPath, shopsPath],
   )
 
   const current = activity?.series?.orders?.length ? activity : SAMPLE_ACTIVITY

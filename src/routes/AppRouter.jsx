@@ -12,6 +12,7 @@ import AdminShopDetailPage from '@/pages/shops/AdminShopDetailPage'
 import PortalShopDetailPage from '@/pages/shops/PortalShopDetailPage'
 import AdminShopAnalyticsPage from '@/pages/shops/AdminShopAnalyticsPage'
 import PortalShopAnalyticsPage from '@/pages/shops/PortalShopAnalyticsPage'
+import AdminReportsPage from '@/pages/reports/AdminReportsPage'
 import AdminDeliveryPartnersListingPage from '@/pages/deliveryPartners/AdminDeliveryPartnersListingPage'
 import AdminDeliveryPartnerDetailPage from '@/pages/deliveryPartners/AdminDeliveryPartnerDetailPage'
 import AdminDeliveryPartnerAnalyticsPage from '@/pages/deliveryPartners/AdminDeliveryPartnerAnalyticsPage'
@@ -98,6 +99,14 @@ function AppRouter() {
           element={
             <ProtectedRoute requiredScope="admin" redirectTo="/">
               <AdminDeliveryPartnerAnalyticsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/teamify/reports"
+          element={
+            <ProtectedRoute requiredScope="admin" redirectTo="/">
+              <AdminReportsPage />
             </ProtectedRoute>
           }
         />
