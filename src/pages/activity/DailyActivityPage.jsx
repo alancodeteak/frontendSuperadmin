@@ -17,6 +17,72 @@ import { buildSidebarNav } from '@/components/layout/sidebarNavConfig'
 import { useTheme } from '@/context/useTheme'
 import { getDailyActivityOverview, getDailyActivityTrends, listDailyActivityShops } from '@/apis/dailyActivityApi'
 
+const SAMPLE_OVERVIEW = {
+  date: '2026-03-27',
+  kpis: {
+    total_orders: 128,
+    delivered_revenue: 46250,
+    active_shops: 23,
+  },
+  status_counts: {
+    Pending: 12,
+    Assigned: 20,
+    'Picked Up': 14,
+    'Out for Delivery': 9,
+    Delivered: 66,
+    cancelled: 5,
+    customer_not_available: 2,
+  },
+  sla: {
+    avg_assign_mins: 6.4,
+    avg_pickup_mins: 18.2,
+    avg_deliver_mins: 39.7,
+  },
+}
+
+const SAMPLE_TRENDS = [
+  { date: '2026-03-21', orders: 102, delivered_revenue: 31800 },
+  { date: '2026-03-22', orders: 96, delivered_revenue: 28900 },
+  { date: '2026-03-23', orders: 121, delivered_revenue: 40200 },
+  { date: '2026-03-24', orders: 110, delivered_revenue: 35100 },
+  { date: '2026-03-25', orders: 125, delivered_revenue: 43800 },
+  { date: '2026-03-26', orders: 119, delivered_revenue: 41750 },
+  { date: '2026-03-27', orders: 128, delivered_revenue: 46250 },
+]
+
+const SAMPLE_SHOPS = [
+  {
+    shop_id: 'SHOP-001',
+    shop_name: 'Neighborhood Store',
+    user_id: 959521,
+    total_orders: 19,
+    delivered_orders: 15,
+    cancelled_orders: 1,
+    delivered_revenue: 8650,
+    sla: { avg_deliver_mins: 33.2 },
+  },
+  {
+    shop_id: 'SHOP-002',
+    shop_name: 'Fresh Mart',
+    user_id: 959522,
+    total_orders: 16,
+    delivered_orders: 12,
+    cancelled_orders: 2,
+    delivered_revenue: 7240,
+    sla: { avg_deliver_mins: 36.1 },
+  },
+  {
+    shop_id: 'SHOP-003',
+    shop_name: 'Urban Basket',
+    user_id: 959523,
+    total_orders: 14,
+    delivered_orders: 11,
+    cancelled_orders: 1,
+    delivered_revenue: 6620,
+    sla: { avg_deliver_mins: 41.8 },
+  },
+]
+
 function toCurrency(value) {
   const n = Number(value ?? 0)
   if (Number.isNaN(n)) return String(value ?? '0')
@@ -29,6 +95,16 @@ function statusBadge(statusKey) {
   if (key.includes('cancel')) return 'bg-rose-100 text-rose-700 ring-rose-200 dark:bg-rose-500/20 dark:text-rose-200 dark:ring-rose-400/30'
   if (key.includes('pending')) return 'bg-amber-100 text-amber-700 ring-amber-200 dark:bg-amber-500/20 dark:text-amber-200 dark:ring-amber-400/30'
   return 'bg-slate-100 text-slate-700 ring-slate-200 dark:bg-slate-700/50 dark:text-slate-200 dark:ring-slate-600'
+}
+
+function Chip({ children, tone = 'slate' }) {
+  const tones = {
+    slate: 'bg-slate-100 text-slate-700 ring-slate-200 dark:bg-slate-700/50 dark:text-slate-200 dark:ring-slate-600',
+    indigo: 'bg-indigo-100 text-indigo-700 ring-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-200 dark:ring-indigo-400/30',
+    emerald: 'bg-emerald-100 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-200 dark:ring-emerald-400/30',
+  }
+  const cls = tones[tone] ?? tones.slate
+  return <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ring-1 ${cls}`}>{children}</span>
 }
 
 export default function DailyActivityPage({
@@ -51,6 +127,7 @@ export default function DailyActivityPage({
   const [trends, setTrends] = useState([])
   const [shops, setShops] = useState([])
   const [shopMeta, setShopMeta] = useState(null)
+  const [usingSampleData, setUsingSampleData] = useState(false)
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState('revenue_desc')
   const [page, setPage] = useState(1)
@@ -73,8 +150,16 @@ export default function DailyActivityPage({
         setTrends(Array.isArray(tr) ? tr : [])
         setShops(shopRes?.items ?? [])
         setShopMeta(shopRes?.meta ?? null)
+        setUsingSampleData(false)
       } catch (e) {
-        if (!cancelled) setError(e?.message ?? 'Failed to load daily activity')
+        if (!cancelled) {
+          setOverview(SAMPLE_OVERVIEW)
+          setTrends(SAMPLE_TRENDS)
+          setShops(SAMPLE_SHOPS)
+          setShopMeta({ page: 1, total: SAMPLE_SHOPS.length })
+          setUsingSampleData(true)
+          setError('')
+        }
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -139,6 +224,10 @@ export default function DailyActivityPage({
               <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
                 Orders, delivered revenue, shop performance, and SLA snapshots.
               </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Chip tone="emerald">Revenue: Delivered-only</Chip>
+                <Chip tone="indigo">SLA: mins from created_at → assigned/picked/delivered</Chip>
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <input
@@ -156,6 +245,11 @@ export default function DailyActivityPage({
 
         {loading ? <p className="mb-3 text-sm text-slate-500">Loading daily activity…</p> : null}
         {error ? <p className="mb-3 text-sm text-rose-500">{error}</p> : null}
+        {usingSampleData ? (
+          <p className="mb-3 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
+            Showing sample values while live API data is unavailable.
+          </p>
+        ) : null}
 
         <section className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3">
           <div className="rounded-3xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">

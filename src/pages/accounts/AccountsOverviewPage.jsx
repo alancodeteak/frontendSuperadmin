@@ -29,6 +29,16 @@ function toCurrency(value) {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(n)
 }
 
+function Chip({ children, tone = 'slate' }) {
+  const tones = {
+    slate: 'bg-slate-100 text-slate-700 ring-slate-200 dark:bg-slate-700/50 dark:text-slate-200 dark:ring-slate-600',
+    indigo: 'bg-indigo-100 text-indigo-700 ring-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-200 dark:ring-indigo-400/30',
+    amber: 'bg-amber-100 text-amber-700 ring-amber-200 dark:bg-amber-500/20 dark:text-amber-200 dark:ring-amber-400/30',
+  }
+  const cls = tones[tone] ?? tones.slate
+  return <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ring-1 ${cls}`}>{children}</span>
+}
+
 const SAMPLE = {
   window_days: 30,
   kpis: {
@@ -312,6 +322,12 @@ export default function AccountsOverviewPage({
               </p>
               <h1 className={`mt-1 text-2xl font-bold ${strong}`}>Overview</h1>
               <p className={`mt-1 text-sm ${subtle}`}>Collected vs pending/overdue, and risk shops.</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Chip tone="indigo">Revenue: Paid invoices</Chip>
+                <Chip tone="amber">To collect: Pending + Overdue</Chip>
+                {selectedMonth ? <Chip>Month filter: {selectedMonth}</Chip> : <Chip>Window: last {days} days</Chip>}
+                {shouldTreatIssuedAsPending ? <Chip>Rule: ISSUED → PENDING after 5th</Chip> : null}
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <select
