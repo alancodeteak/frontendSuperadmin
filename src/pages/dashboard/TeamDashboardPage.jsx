@@ -129,6 +129,10 @@ function TeamDashboardPage({
             reportsPath === null
               ? null
               : '/dashboard/teamify/activity/daily',
+          activitySalesPath:
+            reportsPath === null
+              ? null
+              : '/dashboard/teamify/activity/sales',
         },
       }),
     [navigate, reportsPath, shopsPagePath],

@@ -288,6 +288,8 @@ export default function AccountsOverviewPage({
           reportsPath: mode === 'admin' ? reportsPath : null,
           accountsInvoicesPath: invoicesPath,
           accountsOverviewPath: overviewPath,
+          activityDailyPath: mode === 'admin' ? '/dashboard/teamify/activity/daily' : null,
+          activitySalesPath: mode === 'admin' ? '/dashboard/teamify/activity/sales' : null,
         },
       }),
     [createShopPath, dashboardPath, invoicesPath, mode, navigate, overviewPath, reportsPath, shopsPath],

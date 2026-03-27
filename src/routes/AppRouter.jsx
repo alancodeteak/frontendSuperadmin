@@ -17,6 +17,7 @@ import AdminInvoiceDetailPage from '@/pages/accounts/AdminInvoiceDetailPage'
 import AdminInvoicesListPage from '@/pages/accounts/AdminInvoicesListPage'
 import AdminAccountsOverviewPage from '@/pages/accounts/AdminAccountsOverviewPage'
 import DailyActivityPage from '@/pages/activity/DailyActivityPage'
+import SalesActivityPage from '@/pages/activity/SalesActivityPage'
 import AdminDeliveryPartnersListingPage from '@/pages/deliveryPartners/AdminDeliveryPartnersListingPage'
 import AdminDeliveryPartnerDetailPage from '@/pages/deliveryPartners/AdminDeliveryPartnerDetailPage'
 import AdminDeliveryPartnerAnalyticsPage from '@/pages/deliveryPartners/AdminDeliveryPartnerAnalyticsPage'
@@ -118,10 +119,18 @@ function AppRouter() {
           }
         />
         <Route
-          path="/dashboard/teamify/activity/daily"
+          path="/dashboard/teamify/activity/daily/*"
           element={
             <ProtectedRoute requiredScope="admin" redirectTo="/">
               <DailyActivityPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/teamify/activity/sales/*"
+          element={
+            <ProtectedRoute requiredScope="admin" redirectTo="/">
+              <SalesActivityPage />
             </ProtectedRoute>
           }
         />

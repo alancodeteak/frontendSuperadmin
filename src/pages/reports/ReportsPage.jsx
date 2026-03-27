@@ -235,6 +235,7 @@ export default function ReportsPage() {
           accountsInvoicesPath: '/dashboard/teamify/accounts/invoices',
           accountsOverviewPath: '/dashboard/teamify/accounts/overview',
           activityDailyPath: '/dashboard/teamify/activity/daily',
+          activitySalesPath: '/dashboard/teamify/activity/sales',
         },
       }),
     [navigate],

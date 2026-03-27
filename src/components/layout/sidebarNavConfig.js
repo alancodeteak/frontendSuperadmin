@@ -8,6 +8,7 @@ export function buildSidebarNav({ navigate, activeKey, paths }) {
     accountsInvoicesPath,
     accountsOverviewPath,
     activityDailyPath,
+    activitySalesPath,
   } = paths ?? {}
 
   const isActive = (key) => key && activeKey === key
@@ -141,6 +142,15 @@ export function buildSidebarNav({ navigate, activeKey, paths }) {
                   onClick: () => navigate(activityDailyPath),
                 }
               : comingSoon('activity-daily', 'Daily'),
+            activitySalesPath
+              ? {
+                  id: 'activity-sales',
+                  label: 'Sales',
+                  iconName: 'activity',
+                  active: isActive('activity.sales'),
+                  onClick: () => navigate(activitySalesPath),
+                }
+              : comingSoon('activity-sales', 'Sales'),
             comingSoon('activity-activity', 'Activity'),
           ],
         },

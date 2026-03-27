@@ -168,6 +168,10 @@ function ShopListingPage({
             reportsPath === null
               ? null
               : '/dashboard/teamify/activity/daily',
+          activitySalesPath:
+            reportsPath === null
+              ? null
+              : '/dashboard/teamify/activity/sales',
         },
       }),
     [createPath, dashboardPath, navigate, reportsPath, shopsPath],
