@@ -37,8 +37,4 @@ store.subscribe(() => {
 
   if (!changed) return
   __lastAuthSnapshot = snapshot
-
-  // #region agent log
-  fetch('http://127.0.0.1:7540/ingest/3b199916-37e1-41e0-afdc-9e7dca648ca4',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c70081'},body:JSON.stringify({sessionId:'c70081',runId:'auth-refresh-1',hypothesisId:'A1',location:'store.js:subscribe',message:'Auth session snapshot',data:snapshot,timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
 })

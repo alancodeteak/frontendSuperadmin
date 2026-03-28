@@ -111,21 +111,6 @@ function ShopListingPage({
     dispatch(fetchSupermarketsAction(parsedParams))
   }, [dispatch, parsedParams])
 
-  useEffect(() => {
-    const sample = (listItems ?? [])[0] ?? null
-    const counts = (listItems ?? []).reduce(
-      (acc, it) => {
-        if (it?.photo_url) acc.photoUrl += 1
-        if (it?.photo) acc.photo += 1
-        return acc
-      },
-      { photoUrl: 0, photo: 0 },
-    )
-    // #region agent log
-    fetch('http://127.0.0.1:7540/ingest/3b199916-37e1-41e0-afdc-9e7dca648ca4',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c70081'},body:JSON.stringify({sessionId:'c70081',runId:'listing-images-1',hypothesisId:'H1',location:'ShopListingPage.jsx:shops-map',message:'List sample fields',data:{hasItems:Array.isArray(listItems)&&listItems.length>0,count:Array.isArray(listItems)?listItems.length:0,counts,keys:sample?Object.keys(sample).slice(0,20):null,photo_url:sample?.photo_url??null,photo:sample?.photo??null,protocol:typeof window!=='undefined'?window.location.protocol:null},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-  }, [listItems])
-
   const shops = useMemo(() => {
     return (listItems ?? []).map((it) => ({
       photo_url: it.photo_url || null,
@@ -304,10 +289,6 @@ function ShopListingPage({
                       shop.photo_url || (isHttpUrl(shop.photo) ? shop.photo : null)
                     const failed = failedImageIds.has(String(idKey))
 
-                    // #region agent log
-                    fetch('http://127.0.0.1:7540/ingest/3b199916-37e1-41e0-afdc-9e7dca648ca4',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c70081'},body:JSON.stringify({sessionId:'c70081',runId:'listing-images-1',hypothesisId:'H2',location:'ShopListingPage.jsx:card-img',message:'Computed image src',data:{hasPhotoUrl:!!shop.photo_url,hasPhoto:!!shop.photo,photoIsHttp:isHttpUrl(shop.photo),srcIsHttp:isHttpUrl(src),srcNull:!src,alreadyFailed:failed},timestamp:Date.now()})}).catch(()=>{});
-                    // #endregion
-
                     if (!src || failed) {
                       return (
                         <img
@@ -326,9 +307,6 @@ function ShopListingPage({
                         className="h-36 w-full object-cover transition duration-300 group-hover:scale-[1.03]"
                         loading="lazy"
                         onError={() => {
-                          // #region agent log
-                          fetch('http://127.0.0.1:7540/ingest/3b199916-37e1-41e0-afdc-9e7dca648ca4',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c70081'},body:JSON.stringify({sessionId:'c70081',runId:'listing-images-1',hypothesisId:'H3',location:'ShopListingPage.jsx:img-onError',message:'Image failed to load',data:{srcIsHttp:isHttpUrl(src),srcHost:typeof src==='string'?new URL(src, window.location.href).host:null,protocol:window.location.protocol},timestamp:Date.now()})}).catch(()=>{});
-                          // #endregion
                           setFailedImageIds((prev) => {
                             const next = new Set(prev)
                             next.add(String(idKey))
