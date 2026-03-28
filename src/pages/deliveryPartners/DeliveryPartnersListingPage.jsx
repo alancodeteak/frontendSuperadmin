@@ -101,6 +101,7 @@ function DeliveryPartnersListingPage({
         activeKey: 'partners.deliveryPartners',
         paths: {
           dashboardPath,
+          homeContactBookPath: '/dashboard/teamify/contact-book',
           shopsPath,
           createShopPath: shopsCreatePath,
           deliveryPartnersPath: '/dashboard/teamify/delivery-partners',

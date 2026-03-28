@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import AppSidebar from '@/components/layout/AppSidebar'
 import { buildSidebarNav } from '@/components/layout/sidebarNavConfig'
+import { buildTeamifyAdminSidebarPaths } from '@/components/layout/sidebarPaths'
 import { getRandomAvatarUrl } from '@/utils/avatarFallback'
 import { logoutLocal } from '@/redux/slices/authSlice'
 import { logoutAction } from '@/redux/thunks/authThunks'
@@ -150,29 +151,12 @@ function ShopListingPage({
       buildSidebarNav({
         navigate,
         activeKey: 'shops.view',
-        paths: {
+        paths: buildTeamifyAdminSidebarPaths({
           dashboardPath,
           shopsPath,
           createShopPath: createPath,
-          deliveryPartnersPath: '/dashboard/teamify/delivery-partners',
           reportsPath,
-          accountsInvoicesPath:
-            reportsPath === null
-              ? '/portal/dashboard/accounts/invoices'
-              : '/dashboard/teamify/accounts/invoices',
-          accountsOverviewPath:
-            reportsPath === null
-              ? '/portal/dashboard/accounts/overview'
-              : '/dashboard/teamify/accounts/overview',
-          activityDailyPath:
-            reportsPath === null
-              ? null
-              : '/dashboard/teamify/activity/daily',
-          activitySalesPath:
-            reportsPath === null
-              ? null
-              : '/dashboard/teamify/activity/sales',
-        },
+        }),
       }),
     [createPath, dashboardPath, navigate, reportsPath, shopsPath],
   )

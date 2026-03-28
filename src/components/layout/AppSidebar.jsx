@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { getRandomAvatarUrl } from '@/utils/avatarFallback'
 
+const SIDEBAR_COLLAPSED_KEY = 'yaadro_sidebar_collapsed_v1'
+
 function ChevronIcon({ open, className = '' }) {
   return (
     <svg
@@ -209,6 +211,29 @@ function DefaultIcon({ name, className = '' }) {
   }
 }
 
+function PanelToggleIcon({ collapsed }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
+      <path
+        d="M9 6 3 12l6 6"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        opacity={collapsed ? 1 : 0}
+      />
+      <path
+        d="M15 6 21 12l-6 6"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        opacity={collapsed ? 0 : 1}
+      />
+    </svg>
+  )
+}
+
 function AppSidebar({
   brandTitle,
   subTitle,
@@ -218,6 +243,7 @@ function AppSidebar({
   onToggleTheme,
   onLogout,
   isLoggingOut,
+  bottomSlot,
 }) {
   const [currentDateTime, setCurrentDateTime] = useState(() => new Date())
   const isDark = themeMode === 'dark'
@@ -265,6 +291,24 @@ function AppSidebar({
   }, [effectiveSections])
 
   const [openCategoryId, setOpenCategoryId] = useState(() => activeCategoryId ?? null)
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) : null
+      return raw === '1'
+    } catch {
+      return false
+    }
+  })
+
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? '1' : '0')
+      }
+    } catch {
+      // ignore
+    }
+  }, [collapsed])
 
   const showToast = (message) => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
@@ -282,12 +326,7 @@ function AppSidebar({
   }, [])
 
   useEffect(() => {
-    const el = typeof document !== 'undefined' ? document.querySelector('.teamify-side-panel') : null
-    if (!el) return
-    const s = window.getComputedStyle(el)
-    // #region agent log
-    fetch('http://127.0.0.1:7540/ingest/3b199916-37e1-41e0-afdc-9e7dca648ca4',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f18df4'},body:JSON.stringify({sessionId:'f18df4',runId:'fade-fonts-1',hypothesisId:'H5',location:'AppSidebar.jsx:panelStyle',message:'Sidebar panel computed style',data:{themeMode,isDark,backgroundImage:s.backgroundImage,backgroundColor:s.backgroundColor,filter:s.filter,opacity:s.opacity},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
+    // Intentionally empty: keep hook slot for future UI instrumentation.
   }, [isDark, themeMode])
 
   const rowBase =
@@ -304,8 +343,13 @@ function AppSidebar({
     ? 'grid h-8 w-8 place-items-center rounded-xl bg-slate-800 text-slate-200'
     : 'grid h-8 w-8 place-items-center rounded-xl bg-slate-100 text-slate-700'
 
+  const asideWidthClass = collapsed ? 'lg:w-[84px]' : 'lg:w-[260px]'
+
   return (
-    <aside className="teamify-side-panel teamify-surface mb-3 flex w-full flex-col rounded-3xl p-3 ring-1 ring-slate-200 transition duration-300 dark:ring-slate-700 sm:p-4 lg:mb-0 lg:h-[calc(100vh-2.5rem)] lg:w-[260px] lg:p-5 lg:sticky lg:top-5">
+    <aside
+      className={`teamify-side-panel teamify-surface mb-3 flex w-full flex-col rounded-3xl p-3 ring-1 ring-slate-200 transition duration-300 dark:ring-slate-700 sm:p-4 lg:mb-0 lg:h-[calc(100vh-2.5rem)] ${asideWidthClass} lg:p-5 lg:sticky lg:top-5`}
+      data-collapsed={collapsed ? '1' : '0'}
+    >
       {toast ? (
         <div
           className="pointer-events-none fixed bottom-6 left-1/2 z-50 max-w-[min(90vw,360px)] -translate-x-1/2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-center text-sm font-semibold text-black shadow-lg ring-1 ring-slate-200/80 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:ring-slate-700"
@@ -316,36 +360,56 @@ function AppSidebar({
         </div>
       ) : null}
 
-      <div className="mb-6 flex items-center gap-3 lg:mb-8">
-        <img
-          src={profileAvatar}
-          alt="Profile avatar"
-          className="h-10 w-10 rounded-xl object-cover ring-1 ring-slate-200 dark:ring-slate-700"
-          loading="lazy"
-        />
-        <div>
-          <h1 className="text-lg font-semibold tracking-tight text-black dark:text-slate-100">
-            {brandTitle}
-          </h1>
-          <p className="text-xs text-black dark:text-slate-300">{subTitle}</p>
+      <div className="mb-6 flex items-center justify-between gap-3 lg:mb-8">
+        <div className="flex min-w-0 items-center gap-3">
+          <img
+            src={profileAvatar}
+            alt="Profile avatar"
+            className="h-10 w-10 rounded-xl object-cover ring-1 ring-slate-200 dark:ring-slate-700"
+            loading="lazy"
+          />
+          {collapsed ? null : (
+            <div className="min-w-0">
+              <h1 className="truncate text-lg font-semibold tracking-tight text-black dark:text-slate-100">
+                {brandTitle}
+              </h1>
+              <p className="truncate text-xs text-black dark:text-slate-300">{subTitle}</p>
+            </div>
+          )}
         </div>
+
+        <button
+          type="button"
+          className={`shrink-0 rounded-xl border px-2.5 py-2 text-sm transition duration-200 ${
+            isDark
+              ? 'border-slate-700 text-slate-100 hover:bg-slate-800'
+              : 'border-slate-200 text-black hover:bg-slate-100'
+          }`}
+          onClick={() => setCollapsed((v) => !v)}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          <PanelToggleIcon collapsed={collapsed} />
+        </button>
       </div>
 
-      <div
-        className={`mb-5 rounded-xl px-3 py-2 text-xs ring-1 ${
-          isDark
-            ? 'bg-slate-800/70 text-slate-100 ring-slate-700'
-            : 'bg-white text-black ring-slate-200'
-        }`}
-      >
-        <p className="font-semibold">{formattedDate}</p>
-        <p className={isDark ? 'text-slate-200' : 'text-black'}>{formattedTime}</p>
-      </div>
+      {collapsed ? null : (
+        <div
+          className={`mb-5 rounded-xl px-3 py-2 text-xs ring-1 ${
+            isDark
+              ? 'bg-slate-800/70 text-slate-100 ring-slate-700'
+              : 'bg-white text-black ring-slate-200'
+          }`}
+        >
+          <p className="font-semibold">{formattedDate}</p>
+          <p className={isDark ? 'text-slate-200' : 'text-black'}>{formattedTime}</p>
+        </div>
+      )}
 
       <nav className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
         {effectiveSections.map((section) => (
             <div key={section.id} className="space-y-2">
-              {section.title ? (
+              {section.title && !collapsed ? (
                 <p className="px-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-indigo-600 dark:text-indigo-300">
                   {section.title}
                 </p>
@@ -355,6 +419,7 @@ function AppSidebar({
                   const isOpen = openCategoryId === item.id
                   const hasChildren = !!item.children?.length
                   const isCategoryActive = item.children?.some((c) => c?.active)
+                  const firstChild = item.children?.[0]
 
                   return (
                     <div
@@ -366,10 +431,13 @@ function AppSidebar({
                       <button
                         type="button"
                         onClick={() =>
-                          setOpenCategoryId((prev) => (prev === item.id ? null : item.id))
+                          collapsed && firstChild?.onClick
+                            ? firstChild.onClick()
+                            : setOpenCategoryId((prev) => (prev === item.id ? null : item.id))
                         }
-                        className={`${rowBase} ${isCategoryActive ? rowActive : rowInactive}`}
+                        className={`${rowBase} ${isCategoryActive ? rowActive : rowInactive} ${collapsed ? 'px-2' : ''}`}
                         aria-expanded={isOpen}
+                        title={collapsed ? String(item.label ?? '') : undefined}
                       >
                         <div className="flex items-center justify-between gap-3">
                           <div className="flex min-w-0 items-center gap-3">
@@ -380,25 +448,51 @@ function AppSidebar({
                                 <DefaultIcon name={item.iconName} className="h-4 w-4" />
                               )}
                             </span>
-                            <span className="truncate font-semibold">
-                              {String(item.label ?? '')}
-                            </span>
+                            {collapsed ? null : (
+                              <span className="truncate font-semibold">
+                                {String(item.label ?? '')}
+                              </span>
+                            )}
                           </div>
-                          <ChevronIcon open={isOpen} className={isCategoryActive ? 'text-white' : ''} />
+                          {collapsed ? null : (
+                            <ChevronIcon open={isOpen} className={isCategoryActive ? 'text-white' : ''} />
+                          )}
                         </div>
                       </button>
 
                       <div
-                        className={`pl-11 transition-all duration-1000 ease-out motion-reduce:transition-none ${
-                          isOpen && hasChildren
-                            ? 'max-h-96 opacity-100 translate-y-0'
-                            : 'max-h-0 opacity-0 -translate-y-1 pointer-events-none'
-                        } overflow-hidden`}
+                        className={
+                          collapsed
+                            ? `relative`
+                            : `pl-11 transition-all duration-1000 ease-out motion-reduce:transition-none ${
+                                isOpen && hasChildren
+                                  ? 'max-h-96 opacity-100 translate-y-0'
+                                  : 'max-h-0 opacity-0 -translate-y-1 pointer-events-none'
+                              } overflow-hidden`
+                        }
                       >
-                        <div className="relative space-y-1 pt-1">
+                        <div
+                          className={
+                            collapsed
+                              ? `absolute left-full top-0 z-40 w-56 rounded-2xl border p-2 shadow-xl ${
+                                  isOpen && hasChildren
+                                    ? 'opacity-100 translate-x-2 pointer-events-auto'
+                                    : 'opacity-0 translate-x-1 pointer-events-none'
+                                } transition-all duration-200 ${
+                                  isDark
+                                    ? 'border-slate-700 bg-slate-900 text-slate-100'
+                                    : 'border-slate-200 bg-white text-black'
+                                }`
+                              : 'relative space-y-1 pt-1'
+                          }
+                        >
                           <span
                             aria-hidden="true"
-                            className="pointer-events-none absolute bottom-1 top-2 left-2 w-px bg-current opacity-20"
+                            className={
+                              collapsed
+                                ? 'pointer-events-none absolute bottom-2 top-2 left-4 w-px bg-current opacity-15'
+                                : 'pointer-events-none absolute bottom-1 top-2 left-2 w-px bg-current opacity-20'
+                            }
                           />
                           {item.children.map((child) => {
                             const childActive = !!child.active
@@ -422,6 +516,7 @@ function AppSidebar({
                                       ? rowActive
                                       : rowInactive
                                 }`}
+                                title={collapsed ? String(child.label ?? '') : undefined}
                               >
                                 <div className="relative flex min-w-0 items-center gap-3">
                                   <span aria-hidden="true" className="relative w-4 shrink-0">
@@ -442,23 +537,32 @@ function AppSidebar({
           ))}
       </nav>
 
+      {bottomSlot && !collapsed ? (
+        <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950/40">
+          {bottomSlot}
+        </div>
+      ) : null}
+
       <div className="mt-auto space-y-3 pt-6">
         <button
           type="button"
           onClick={onToggleTheme}
           className="w-full rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-black transition duration-300 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-800"
         >
-          Switch to {themeMode === 'dark' ? 'Light' : 'Dark'} Mode
+          {collapsed ? (themeMode === 'dark' ? 'Light' : 'Dark') : `Switch to ${themeMode === 'dark' ? 'Light' : 'Dark'} Mode`}
         </button>
 
-        <button
-          type="button"
-          onClick={onLogout}
-          disabled={isLoggingOut}
-          className="w-full rounded-xl border border-red-500 px-4 py-2 text-sm font-medium text-red-600 transition duration-300 hover:bg-red-50 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-900/30"
-        >
-          {isLoggingOut ? 'Logging out...' : 'Logout'}
-        </button>
+        {onLogout ? (
+          <button
+            type="button"
+            onClick={onLogout}
+            disabled={isLoggingOut}
+            className="w-full rounded-xl border border-red-500 px-4 py-2 text-sm font-medium text-red-600 transition duration-300 hover:bg-red-50 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-900/30"
+            title={collapsed ? 'Logout' : undefined}
+          >
+            {isLoggingOut ? 'Logging out...' : collapsed ? 'Logout' : 'Logout'}
+          </button>
+        ) : null}
       </div>
     </aside>
   )

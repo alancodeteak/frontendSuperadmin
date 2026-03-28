@@ -102,6 +102,10 @@ function ShopAnalyticsPage({
         activeKey: 'shops.view',
         paths: {
           dashboardPath,
+          homeContactBookPath:
+            reportsPath === null
+              ? null
+              : '/dashboard/teamify/contact-book',
           shopsPath,
           createShopPath: createPath,
           deliveryPartnersPath: '/dashboard/teamify/delivery-partners',

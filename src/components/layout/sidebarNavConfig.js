@@ -1,6 +1,7 @@
 export function buildSidebarNav({ navigate, activeKey, paths }) {
   const {
     dashboardPath,
+    homeContactBookPath,
     shopsPath,
     createShopPath,
     deliveryPartnersPath,
@@ -39,6 +40,15 @@ export function buildSidebarNav({ navigate, activeKey, paths }) {
               disabled: !dashboardPath,
               disabledReason: dashboardPath ? undefined : 'Missing route',
             },
+            homeContactBookPath
+              ? {
+                  id: 'home-contact-book',
+                  label: 'Contact Book',
+                  iconName: 'users',
+                  active: isActive('home.contactBook'),
+                  onClick: () => navigate(homeContactBookPath),
+                }
+              : comingSoon('home-contact-book', 'Contact Book'),
           ],
         },
         {

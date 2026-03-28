@@ -374,6 +374,10 @@ function ShopCreatePage({
         activeKey: 'shops.create',
         paths: {
           dashboardPath: listingPath.replace('/shops', ''),
+          homeContactBookPath:
+            reportsPath === null
+              ? null
+              : '/dashboard/teamify/contact-book',
           shopsPath: listingPath,
           createShopPath: createPath,
           deliveryPartnersPath: '/dashboard/teamify/delivery-partners',

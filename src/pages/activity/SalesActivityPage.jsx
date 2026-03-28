@@ -149,13 +149,14 @@ export default function SalesActivityPage({
   const [forecast, setForecast] = useState(null)
   const [loading, setLoading] = useState(false)
 
-  const navConfig = useMemo(
+  const navSections = useMemo(
     () =>
       buildSidebarNav({
         navigate,
         activeKey: 'activity.sales',
         paths: {
           dashboardPath,
+          homeContactBookPath: '/dashboard/teamify/contact-book',
           shopsPath,
           createShopPath,
           deliveryPartnersPath: '/dashboard/teamify/delivery-partners',
@@ -219,10 +220,16 @@ export default function SalesActivityPage({
   const total = activated + never
 
   return (
-    <DashboardLayout
-      sidebar={<AppSidebar brandTitle={brandTitle} navConfig={navConfig} themeMode={themeMode} toggleTheme={toggleTheme} />}
-    >
-      <div className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6">
+    <DashboardLayout>
+      <AppSidebar
+        brandTitle={brandTitle}
+        subTitle="Team Dashboard"
+        navSections={navSections}
+        themeMode={themeMode}
+        onToggleTheme={toggleTheme}
+      />
+      <main className="relative flex-1 rounded-3xl bg-white p-4 dark:bg-slate-950/40">
+        <div className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <div className="text-2xl font-semibold text-slate-900 dark:text-white">Sales Activity</div>
@@ -413,7 +420,8 @@ export default function SalesActivityPage({
             </table>
           </div>
         </div>
-      </div>
+        </div>
+      </main>
     </DashboardLayout>
   )
 }

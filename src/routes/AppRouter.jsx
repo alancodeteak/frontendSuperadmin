@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import OtpLoginPage from '@/pages/auth/OtpLoginPage'
 import TeamDashboardPage from '@/pages/dashboard/TeamDashboardPage'
+import ContactBookPage from '@/pages/home/ContactBookPage'
 import PortalLoginPage from '@/pages/portal/PortalLoginPage'
 import PortalDashboardPage from '@/pages/portal/PortalDashboardPage'
 import AdminShopListingPage from '@/pages/shops/AdminShopListingPage'
@@ -51,6 +52,14 @@ function AppRouter() {
           element={
             <ProtectedRoute requiredScope="admin" redirectTo="/">
               <TeamDashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/teamify/contact-book"
+          element={
+            <ProtectedRoute requiredScope="admin" redirectTo="/">
+              <ContactBookPage />
             </ProtectedRoute>
           }
         />

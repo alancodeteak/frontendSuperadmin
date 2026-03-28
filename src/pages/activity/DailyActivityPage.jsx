@@ -177,6 +177,7 @@ export default function DailyActivityPage({
         activeKey: 'activity.daily',
         paths: {
           dashboardPath,
+          homeContactBookPath: '/dashboard/teamify/contact-book',
           shopsPath,
           createShopPath,
           deliveryPartnersPath: '/dashboard/teamify/delivery-partners',

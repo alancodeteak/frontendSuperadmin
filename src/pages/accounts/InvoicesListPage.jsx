@@ -161,6 +161,7 @@ function InvoicesListPage({
         activeKey: 'accounts.invoices',
         paths: {
           dashboardPath,
+          homeContactBookPath: mode === 'admin' ? '/dashboard/teamify/contact-book' : null,
           shopsPath,
           createShopPath,
           deliveryPartnersPath: mode === 'admin' ? '/dashboard/teamify/delivery-partners' : null,

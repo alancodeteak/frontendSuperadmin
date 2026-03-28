@@ -228,6 +228,7 @@ export default function ReportsPage() {
         activeKey: 'reports.main',
         paths: {
           dashboardPath: '/dashboard/teamify',
+          homeContactBookPath: '/dashboard/teamify/contact-book',
           shopsPath: '/dashboard/teamify/shops',
           createShopPath: '/dashboard/teamify/shops/create',
           deliveryPartnersPath: '/dashboard/teamify/delivery-partners',
