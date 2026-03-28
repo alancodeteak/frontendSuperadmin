@@ -163,8 +163,13 @@ export default function ReportsPage() {
 
   const [days, setDays] = useState(30)
   const [activeTab, setActiveTab] = useState('overview')
-  const [loading, setLoading] = useState(false)
+  /** First paint: KPIs + overview payload (totals tab + overview charts). */
+  const [totalsLoading, setTotalsLoading] = useState(false)
+  /** Batch 1: shops + delivery partners. Batch 2: funnel + finance. */
+  const [loadingBatch1, setLoadingBatch1] = useState(false)
+  const [loadingBatch2, setLoadingBatch2] = useState(false)
   const [error, setError] = useState('')
+  const [detailError, setDetailError] = useState('')
   const [overview, setOverview] = useState(null)
   const [shops, setShops] = useState([])
   const [partners, setPartners] = useState([])
@@ -176,25 +181,23 @@ export default function ReportsPage() {
     let cancelled = false
     const run = async () => {
       if (!accessToken) return
-      setLoading(true)
+      setTotalsLoading(true)
+      setLoadingBatch1(false)
+      setLoadingBatch2(false)
       setError('')
+      setDetailError('')
+      setOverview(null)
+      setShops([])
+      setPartners([])
+      setFunnel(null)
+      setFinance(null)
+
       try {
-        const [ov, sh, dp, fn, fi] = await Promise.all([
-          getReportsOverview({ days }, { accessToken }),
-          getReportsShops({ days, limit: 8 }, { accessToken }),
-          getReportsDeliveryPartners({ days, limit: 8 }, { accessToken }),
-          getReportsFunnel({ days }, { accessToken }),
-          getReportsFinance({ days }, { accessToken }),
-        ])
-        if (!cancelled) {
-          setOverview(ov)
-          setShops(Array.isArray(sh) ? sh : [])
-          setPartners(Array.isArray(dp) ? dp : [])
-          setFunnel(fn)
-          setFinance(fi)
-          setUsingSampleData(false)
-        }
-      } catch (e) {
+        const ov = await getReportsOverview({ days }, { accessToken })
+        if (cancelled) return
+        setOverview(ov)
+        setUsingSampleData(false)
+      } catch {
         if (!cancelled) {
           setOverview(SAMPLE_OVERVIEW)
           setShops([])
@@ -202,11 +205,60 @@ export default function ReportsPage() {
           setFunnel(SAMPLE_FUNNEL)
           setFinance(SAMPLE_FINANCE)
           setUsingSampleData(true)
-          setError('')
+          setTotalsLoading(false)
         }
+        return
       } finally {
-        if (!cancelled) setLoading(false)
+        if (!cancelled) setTotalsLoading(false)
       }
+
+      if (cancelled) return
+
+      setLoadingBatch1(true)
+      setLoadingBatch2(true)
+      const batch1 = await Promise.allSettled([
+        getReportsShops({ days, limit: 8 }, { accessToken }),
+        getReportsDeliveryPartners({ days, limit: 8 }, { accessToken }),
+      ])
+      if (cancelled) return
+
+      if (batch1[0].status === 'fulfilled') {
+        const sh = batch1[0].value
+        setShops(Array.isArray(sh) ? sh : [])
+      } else {
+        setShops([])
+      }
+      if (batch1[1].status === 'fulfilled') {
+        const dp = batch1[1].value
+        setPartners(Array.isArray(dp) ? dp : [])
+      } else {
+        setPartners([])
+      }
+      if (!cancelled) setLoadingBatch1(false)
+
+      const batch2 = await Promise.allSettled([
+        getReportsFunnel({ days }, { accessToken }),
+        getReportsFinance({ days }, { accessToken }),
+      ])
+      if (cancelled) return
+
+      if (batch2[0].status === 'fulfilled') {
+        setFunnel(batch2[0].value)
+      } else {
+        setFunnel(null)
+      }
+      if (batch2[1].status === 'fulfilled') {
+        setFinance(batch2[1].value)
+      } else {
+        setFinance(null)
+      }
+
+      const anyBatch1Fail = batch1.some((r) => r.status === 'rejected')
+      const anyBatch2Fail = batch2.some((r) => r.status === 'rejected')
+      if (!cancelled && (anyBatch1Fail || anyBatch2Fail)) {
+        setDetailError('Some breakdowns could not be loaded. Totals above are still valid.')
+      }
+      if (!cancelled) setLoadingBatch2(false)
     }
     run()
     return () => {
@@ -287,6 +339,12 @@ export default function ReportsPage() {
   const strong = isDark ? 'text-slate-100' : 'text-slate-900'
   const subtle = isDark ? 'text-slate-300' : 'text-slate-600'
 
+  const kpiNum = (key) => {
+    if (totalsLoading) return '…'
+    const v = overview?.kpis?.[key]
+    return v ?? 0
+  }
+
   return (
     <DashboardLayout>
       <AppSidebar
@@ -335,8 +393,17 @@ export default function ReportsPage() {
                 </button>
               ))}
             </div>
-            {loading ? <p className={`mt-2 text-sm ${subtle}`}>Loading reports...</p> : null}
+            {totalsLoading ? <p className={`mt-2 text-sm ${subtle}`}>Loading summary metrics…</p> : null}
+            {!totalsLoading && loadingBatch1 ? (
+              <p className={`mt-2 text-xs ${subtle}`}>Loading shops &amp; partners…</p>
+            ) : null}
+            {!totalsLoading && !loadingBatch1 && loadingBatch2 ? (
+              <p className={`mt-2 text-xs ${subtle}`}>Loading funnel &amp; finance…</p>
+            ) : null}
             {error ? <p className="mt-2 text-sm font-semibold text-red-600 dark:text-red-300">{error}</p> : null}
+            {detailError ? (
+              <p className="mt-2 text-xs font-medium text-amber-700 dark:text-amber-300">{detailError}</p>
+            ) : null}
             {usingSampleData ? (
               <p className="mt-2 text-xs font-semibold text-amber-700 dark:text-amber-300">
                 Temporary sample report data is shown.
@@ -345,13 +412,13 @@ export default function ReportsPage() {
           </section>
 
           <section className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-            <div className={card}><p className="text-xs text-slate-400">Orders</p><p className={`mt-1 text-lg font-semibold ${strong}`}>{overview?.kpis?.total_orders ?? 0}</p></div>
-            <div className={card}><p className="text-xs text-slate-400">Deliveries</p><p className={`mt-1 text-lg font-semibold ${strong}`}>{overview?.kpis?.total_deliveries ?? 0}</p></div>
-            <div className={card}><p className="text-xs text-slate-400">Amount</p><p className={`mt-1 text-lg font-semibold ${strong}`}>{overview?.kpis?.total_amount ?? 0}</p></div>
-            <div className={card}><p className="text-xs text-slate-400">Delivered %</p><p className={`mt-1 text-lg font-semibold ${strong}`}>{overview?.kpis?.delivered_rate ?? 0}%</p></div>
-            <div className={card}><p className="text-xs text-slate-400">Cancelled %</p><p className={`mt-1 text-lg font-semibold ${strong}`}>{overview?.kpis?.cancelled_rate ?? 0}%</p></div>
-            <div className={card}><p className="text-xs text-slate-400">Active Shops</p><p className={`mt-1 text-lg font-semibold ${strong}`}>{overview?.kpis?.active_shops ?? 0}</p></div>
-            <div className={card}><p className="text-xs text-slate-400">Active Partners</p><p className={`mt-1 text-lg font-semibold ${strong}`}>{overview?.kpis?.active_partners ?? 0}</p></div>
+            <div className={card}><p className="text-xs text-slate-400">Orders</p><p className={`mt-1 text-lg font-semibold ${strong}`}>{kpiNum('total_orders')}</p></div>
+            <div className={card}><p className="text-xs text-slate-400">Deliveries</p><p className={`mt-1 text-lg font-semibold ${strong}`}>{kpiNum('total_deliveries')}</p></div>
+            <div className={card}><p className="text-xs text-slate-400">Amount</p><p className={`mt-1 text-lg font-semibold ${strong}`}>{kpiNum('total_amount')}</p></div>
+            <div className={card}><p className="text-xs text-slate-400">Delivered %</p><p className={`mt-1 text-lg font-semibold ${strong}`}>{totalsLoading ? '…' : `${overview?.kpis?.delivered_rate ?? 0}%`}</p></div>
+            <div className={card}><p className="text-xs text-slate-400">Cancelled %</p><p className={`mt-1 text-lg font-semibold ${strong}`}>{totalsLoading ? '…' : `${overview?.kpis?.cancelled_rate ?? 0}%`}</p></div>
+            <div className={card}><p className="text-xs text-slate-400">Active Shops</p><p className={`mt-1 text-lg font-semibold ${strong}`}>{kpiNum('active_shops')}</p></div>
+            <div className={card}><p className="text-xs text-slate-400">Active Partners</p><p className={`mt-1 text-lg font-semibold ${strong}`}>{kpiNum('active_partners')}</p></div>
           </section>
 
           {activeTab === 'totals' ? (
@@ -361,29 +428,29 @@ export default function ReportsPage() {
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                   <div className={`rounded-xl border p-4 text-center ${isDark ? 'border-slate-700 bg-slate-800/40' : 'border-slate-200 bg-slate-50'}`}>
                     <p className="text-xs uppercase tracking-wider text-slate-400">Total Deliveries</p>
-                    <p className={`mt-2 text-2xl font-bold ${strong}`}>{overview?.kpis?.total_deliveries ?? 0}</p>
+                    <p className={`mt-2 text-2xl font-bold ${strong}`}>{kpiNum('total_deliveries')}</p>
                   </div>
                   <div className={`rounded-xl border p-4 text-center ${isDark ? 'border-slate-700 bg-slate-800/40' : 'border-slate-200 bg-slate-50'}`}>
                     <p className="text-xs uppercase tracking-wider text-slate-400">Total Amount</p>
-                    <p className={`mt-2 text-2xl font-bold ${strong}`}>{overview?.kpis?.total_amount ?? 0}</p>
+                    <p className={`mt-2 text-2xl font-bold ${strong}`}>{kpiNum('total_amount')}</p>
                   </div>
                   <div className={`rounded-xl border p-4 text-center ${isDark ? 'border-slate-700 bg-slate-800/40' : 'border-slate-200 bg-slate-50'}`}>
                     <p className="text-xs uppercase tracking-wider text-slate-400">Total Shops</p>
-                    <p className={`mt-2 text-2xl font-bold ${strong}`}>{overview?.kpis?.active_shops ?? 0}</p>
+                    <p className={`mt-2 text-2xl font-bold ${strong}`}>{kpiNum('active_shops')}</p>
                   </div>
                   <div className={`rounded-xl border p-4 text-center ${isDark ? 'border-slate-700 bg-slate-800/40' : 'border-slate-200 bg-slate-50'}`}>
                     <p className="text-xs uppercase tracking-wider text-slate-400">Total Partners</p>
-                    <p className={`mt-2 text-2xl font-bold ${strong}`}>{overview?.kpis?.active_partners ?? 0}</p>
+                    <p className={`mt-2 text-2xl font-bold ${strong}`}>{kpiNum('active_partners')}</p>
                   </div>
                 </div>
                 <div className="mt-4 h-72">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                       data={[
-                        { metric: 'Deliveries', value: Number(overview?.kpis?.total_deliveries ?? 0) },
-                        { metric: 'Amount', value: Number(overview?.kpis?.total_amount ?? 0) },
-                        { metric: 'Shops', value: Number(overview?.kpis?.active_shops ?? 0) },
-                        { metric: 'Partners', value: Number(overview?.kpis?.active_partners ?? 0) },
+                        { metric: 'Deliveries', value: Number(totalsLoading ? 0 : overview?.kpis?.total_deliveries ?? 0) },
+                        { metric: 'Amount', value: Number(totalsLoading ? 0 : overview?.kpis?.total_amount ?? 0) },
+                        { metric: 'Shops', value: Number(totalsLoading ? 0 : overview?.kpis?.active_shops ?? 0) },
+                        { metric: 'Partners', value: Number(totalsLoading ? 0 : overview?.kpis?.active_partners ?? 0) },
                       ]}
                     >
                       <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#334155' : '#e2e8f0'} />
@@ -402,9 +469,9 @@ export default function ReportsPage() {
                     <PieChart>
                       <Pie
                         data={[
-                          { name: 'Deliveries', value: Number(overview?.kpis?.total_deliveries ?? 0) },
-                          { name: 'Shops', value: Number(overview?.kpis?.active_shops ?? 0) },
-                          { name: 'Partners', value: Number(overview?.kpis?.active_partners ?? 0) },
+                          { name: 'Deliveries', value: Number(totalsLoading ? 0 : overview?.kpis?.total_deliveries ?? 0) },
+                          { name: 'Shops', value: Number(totalsLoading ? 0 : overview?.kpis?.active_shops ?? 0) },
+                          { name: 'Partners', value: Number(totalsLoading ? 0 : overview?.kpis?.active_partners ?? 0) },
                         ]}
                         dataKey="value"
                         nameKey="name"
@@ -522,6 +589,9 @@ export default function ReportsPage() {
 
           {activeTab === 'shops' ? (
             <section className={card}>
+              {loadingBatch1 ? (
+                <p className={`mb-3 text-xs ${subtle}`}>Loading shop rankings…</p>
+              ) : null}
               <div className="mb-3 flex items-center justify-between">
                 <p className={`text-sm font-semibold ${strong}`}>Top Shops</p>
                 <button
@@ -550,6 +620,9 @@ export default function ReportsPage() {
 
           {activeTab === 'partners' ? (
             <section className={card}>
+              {loadingBatch1 ? (
+                <p className={`mb-3 text-xs ${subtle}`}>Loading partner rankings…</p>
+              ) : null}
               <div className="mb-3 flex items-center justify-between">
                 <p className={`text-sm font-semibold ${strong}`}>Top Delivery Partners</p>
                 <button
@@ -578,6 +651,9 @@ export default function ReportsPage() {
 
           {activeTab === 'operations' ? (
             <section className={card}>
+              {loadingBatch2 ? (
+                <p className={`mb-3 text-xs ${subtle}`}>Loading funnel…</p>
+              ) : null}
               <p className={`mb-3 text-sm font-semibold ${strong}`}>Order Funnel</p>
               <div className="h-72">
                 <ResponsiveContainer width="100%" height="100%">
@@ -595,6 +671,9 @@ export default function ReportsPage() {
 
           {activeTab === 'finance' ? (
             <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              {loadingBatch2 ? (
+                <div className={`col-span-full text-xs ${subtle}`}>Loading finance…</div>
+              ) : null}
               <div className={card}>
                 <p className={`mb-2 text-sm font-semibold ${strong}`}>Finance Trend</p>
                 <div className="h-72">

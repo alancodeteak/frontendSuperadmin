@@ -127,7 +127,15 @@ export function buildSidebarNav({ navigate, activeKey, paths }) {
               onClick: () => navigate(accountsInvoicesPath),
             }
           : comingSoon('accounts-invoices', 'Invoices'),
-        comingSoon('accounts-billing', 'Billing'),
+        accountsInvoicesPath
+          ? {
+              id: 'accounts-billing',
+              label: 'Billing',
+              iconName: 'wallet',
+              active: isActive('accounts.billing'),
+              onClick: () => navigate(`${accountsInvoicesPath}?document_type=BILL`),
+            }
+          : comingSoon('accounts-billing', 'Billing'),
         accountsOverviewPath
           ? {
               id: 'accounts-overview',

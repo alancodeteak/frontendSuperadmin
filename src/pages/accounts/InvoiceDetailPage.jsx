@@ -1,14 +1,14 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSelector } from 'react-redux'
 import { useNavigate, useParams } from 'react-router-dom'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import AppSidebar from '@/components/layout/AppSidebar'
 import { buildSidebarNav } from '@/components/layout/sidebarNavConfig'
 import { useTheme } from '@/context/useTheme'
-import { listSupermarkets } from '@/apis/supermarketsApi'
+import { getSupermarket, listSupermarkets } from '@/apis/supermarketsApi'
+import SubscriptionInvoiceDocument from '@/components/invoice/SubscriptionInvoiceDocument'
+import { downloadInvoicePdfFromElement, safeInvoiceFilename } from '@/utils/invoicePdfDownload'
 import {
-  downloadAdminInvoice,
-  downloadPortalInvoice,
   getAdminInvoice,
   getPortalInvoice,
   retryAdminBill,
@@ -67,7 +67,10 @@ function InvoiceDetailPage({
   const [info, setInfo] = useState('')
   const [invoice, setInvoice] = useState(null)
   const [notesDraft, setNotesDraft] = useState('')
-  const [shopMeta, setShopMeta] = useState({ shopName: '', userId: '' })
+  const [shopMeta, setShopMeta] = useState({ shopName: '', userId: '', phone: null })
+  const [shopInvoiceContext, setShopInvoiceContext] = useState(null)
+  const [downloadingPdf, setDownloadingPdf] = useState(false)
+  const invoicePdfRef = useRef(null)
 
   useEffect(() => {
     let mounted = true
@@ -107,10 +110,24 @@ function InvoiceDetailPage({
           setShopMeta({
             shopName: item?.shop_name || invoice.shop_id,
             userId: item?.user_id != null ? String(item.user_id) : '—',
+            phone: item?.phone ?? null,
           })
         }
+        if (mounted && item?.user_id != null) {
+          try {
+            const detail = await getSupermarket({ user_id: item.user_id }, { accessToken })
+            if (mounted) setShopInvoiceContext(detail ?? null)
+          } catch {
+            if (mounted) setShopInvoiceContext(null)
+          }
+        } else if (mounted) {
+          setShopInvoiceContext(null)
+        }
       } catch {
-        if (mounted) setShopMeta({ shopName: invoice.shop_id, userId: '—' })
+        if (mounted) {
+          setShopMeta({ shopName: String(invoice.shop_id), userId: '—', phone: null })
+          setShopInvoiceContext(null)
+        }
       }
     }
     loadShopMeta()
@@ -119,11 +136,14 @@ function InvoiceDetailPage({
     }
   }, [accessToken, invoice?.shop_id])
 
+  const accountsSidebarKey =
+    String(invoice?.document_type ?? '').toUpperCase() === 'BILL' ? 'accounts.billing' : 'accounts.invoices'
+
   const navSections = useMemo(
     () =>
       buildSidebarNav({
         navigate,
-        activeKey: 'accounts.invoices',
+        activeKey: accountsSidebarKey,
         paths: {
           dashboardPath,
           homeContactBookPath:
@@ -138,7 +158,7 @@ function InvoiceDetailPage({
           activitySalesPath: mode === 'admin' ? '/dashboard/teamify/activity/sales' : null,
         },
       }),
-    [createShopPath, dashboardPath, invoicesPath, mode, navigate, overviewPath, reportsPath, shopsPath],
+    [accountsSidebarKey, createShopPath, dashboardPath, invoicesPath, mode, navigate, overviewPath, reportsPath, shopsPath],
   )
 
   const updateStatus = async (newStatus) => {
@@ -210,16 +230,24 @@ function InvoiceDetailPage({
     }
   }
 
-  const downloadPlaceholder = async () => {
-    if (!accessToken || !invoice?.invoice_id) return
+  const isBillDocument = String(invoice?.document_type ?? '').toUpperCase() === 'BILL'
+  const docKindLabel = isBillDocument ? 'Bill' : 'Invoice'
+
+  const downloadInvoicePdf = async () => {
+    if (!invoice?.invoice_id) return
     try {
-      const result =
-        mode === 'portal'
-          ? await downloadPortalInvoice(invoice.invoice_id, { accessToken })
-          : await downloadAdminInvoice(invoice.invoice_id, { accessToken })
-      setInfo(result?.message ?? result?.code ?? 'Download endpoint called')
+      setError('')
+      setInfo('')
+      setDownloadingPdf(true)
+      const el = invoicePdfRef.current
+      if (!el) throw new Error('Invoice preview is not ready')
+      const name = safeInvoiceFilename(invoice.invoice_number, invoice.invoice_id)
+      await downloadInvoicePdfFromElement(el, name)
+      setInfo(`${docKindLabel} PDF downloaded`)
     } catch (e) {
-      setError(e?.message ?? 'Failed to call download endpoint')
+      setError(e?.message ?? 'Failed to generate PDF')
+    } finally {
+      setDownloadingPdf(false)
     }
   }
 
@@ -290,6 +318,50 @@ function InvoiceDetailPage({
 
         {invoice ? (
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+            <section className={`${baseCardClass} p-4 xl:col-span-3`}>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-sm font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-300">
+                  {docKindLabel} preview (print layout)
+                </h2>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={downloadingPdf}
+                    className={`${actionBtnClass} border-slate-900 bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-700 dark:hover:bg-slate-600`}
+                    onClick={downloadInvoicePdf}
+                  >
+                    {downloadingPdf ? 'Preparing PDF…' : `Download ${docKindLabel}`}
+                  </button>
+                  <button
+                    type="button"
+                    className={`${actionBtnClass} border-slate-400 bg-slate-100 text-slate-800 hover:bg-slate-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700`}
+                    onClick={() => window.print()}
+                  >
+                    Print {docKindLabel.toLowerCase()}
+                  </button>
+                </div>
+              </div>
+              <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white dark:border-slate-700">
+                <SubscriptionInvoiceDocument
+                  ref={invoicePdfRef}
+                  invoice={invoice}
+                  shop={{
+                    shop_name: shopInvoiceContext?.shop_owner?.shop_name ?? shopMeta.shopName,
+                    user_id:
+                      shopInvoiceContext?.shop_owner?.user_id != null
+                        ? String(shopInvoiceContext.shop_owner.user_id)
+                        : shopMeta.userId !== '—'
+                          ? shopMeta.userId
+                          : undefined,
+                    email: shopInvoiceContext?.shop_owner?.email ?? undefined,
+                    phone: shopInvoiceContext?.shop_owner?.phone ?? shopMeta.phone ?? undefined,
+                  }}
+                  subscription={{ subscription_id: invoice.subscription_id }}
+                  address={shopInvoiceContext?.address ?? undefined}
+                />
+              </div>
+            </section>
+
             <section className={`${baseCardClass} p-4 xl:col-span-2`}>
               <h2 className="mb-3 text-sm font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-300">Invoice Information</h2>
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -369,10 +441,12 @@ function InvoiceDetailPage({
                   Follow-up
                 </button>
                 <button
-                  className={`${actionBtnClass} col-span-2 border-slate-400 bg-slate-900 text-white hover:bg-slate-800 dark:border-slate-500 dark:bg-slate-700 dark:hover:bg-slate-600`}
-                  onClick={downloadPlaceholder}
+                  type="button"
+                  disabled={downloadingPdf}
+                  className={`${actionBtnClass} col-span-2 border-slate-400 bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50 dark:border-slate-500 dark:bg-slate-700 dark:hover:bg-slate-600`}
+                  onClick={downloadInvoicePdf}
                 >
-                  Download
+                  {downloadingPdf ? 'Preparing PDF…' : `Download ${docKindLabel}`}
                 </button>
               </div>
 
