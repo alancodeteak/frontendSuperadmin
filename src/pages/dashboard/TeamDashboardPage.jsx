@@ -32,6 +32,7 @@ import { getAdminAccountsOverview, getPortalAccountsOverview } from '@/apis/invo
 import { useTheme } from '@/context/useTheme'
 import { buildOperationsSnapshot } from '@/utils/operationsSnapshot'
 import { getAvatarUrlForKey } from '@/utils/avatarFallback'
+import ShopsMapModal from '@/components/shops/ShopsMapModal'
 import '@/App.css'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000'
@@ -69,6 +70,75 @@ function buildPortalOperationsSnapshot(overview) {
     overdueInvoices: Number(k.overdue_invoices ?? 0),
     pendingInvoices: Number(k.pending_invoices ?? 0),
   }
+}
+
+/** Clamp to 0–100 for activity rings. */
+function clampPct(n) {
+  if (n == null || Number.isNaN(n) || !Number.isFinite(n)) return 0
+  return Math.max(0, Math.min(100, Math.round(n)))
+}
+
+/**
+ * Three independent ring values (outer → inner) from operations snapshot.
+ * Admin: delivery completion, fewer shops idle, fewer partners idle.
+ * Portal: collection share, invoice backlog pressure, shop overdue/pending pressure.
+ */
+function computeActivityRings(snapshot) {
+  if (!snapshot) return null
+  if (snapshot.kind === 'portal') {
+    const collected = Number(snapshot.collectedAmount ?? 0)
+    const toCollect = Number(snapshot.toCollectAmount ?? 0)
+    const denom = collected + toCollect
+    const outer = denom > 0 ? clampPct((100 * collected) / denom) : 100
+
+    const inv = Number(snapshot.pendingInvoices ?? 0) + Number(snapshot.overdueInvoices ?? 0)
+    const middle = clampPct(100 - Math.min(100, inv * 2))
+
+    const shops = Number(snapshot.pendingShops ?? 0) + Number(snapshot.overdueShops ?? 0)
+    const inner = clampPct(100 - Math.min(100, shops * 8))
+
+    return {
+      outer,
+      middle,
+      inner,
+      center: clampPct((outer + middle + inner) / 3),
+      labels: {
+        outer: 'Collection',
+        middle: 'Invoice clarity',
+        inner: 'Shop health',
+      },
+    }
+  }
+  if (snapshot.kind === 'admin') {
+    const td = Number(snapshot.totalDeliveries ?? 0)
+    const pend = snapshot.deliveriesPending != null ? Number(snapshot.deliveriesPending) : null
+    let outer = 100
+    if (pend != null && td + pend > 0) {
+      outer = clampPct((100 * td) / (td + pend))
+    }
+
+    const snu = Number(snapshot.shopsNotUsing ?? 0)
+    const middle = clampPct(100 - Math.min(100, snu * 2))
+
+    let inner = middle
+    if (snapshot.partnersNotUsing != null) {
+      const pnu = Number(snapshot.partnersNotUsing)
+      inner = clampPct(100 - Math.min(100, pnu * 2))
+    }
+
+    return {
+      outer,
+      middle,
+      inner,
+      center: clampPct((outer + middle + inner) / 3),
+      labels: {
+        outer: 'Delivery',
+        middle: 'Shop engagement',
+        inner: 'Partner engagement',
+      },
+    }
+  }
+  return null
 }
 
 const ranges = ['daily', 'weekly', 'monthly']
@@ -203,6 +273,7 @@ function TeamDashboardPage({
   const [reportMonthly, setReportMonthly] = useState(null)
   const [reportLoading, setReportLoading] = useState(false)
   const [reportError, setReportError] = useState('')
+  const [shopsMapOpen, setShopsMapOpen] = useState(false)
   const operationsCardRef = useRef(null)
   const [isLgLayout, setIsLgLayout] = useState(
     typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches,
@@ -388,11 +459,6 @@ function TeamDashboardPage({
     }
   }, [accessToken, reportsPath])
 
-  const utilization = useMemo(() => {
-    if (!members.length) return 0
-    const total = members.reduce((sum, member) => sum + member.progress, 0)
-    return Math.round(total / members.length)
-  }, [members])
   const mixedChartData = chartDataByRange[selectedRange]
   const axisTickColor = themeMode === 'dark' ? '#cbd5e1' : '#000000'
   const gridColor = themeMode === 'dark' ? '#334155' : '#d9deea'
@@ -406,10 +472,42 @@ function TeamDashboardPage({
         ? '0 8px 20px rgba(2,6,23,0.45)'
         : '0 8px 20px rgba(15,23,42,0.1)',
   }
-  const ringChartData = [
-    { name: 'Done', value: utilization, fill: '#34c759' },
-    { name: 'Remaining', value: 100 - utilization, fill: '#e5e7eb' },
-  ]
+
+  const ringMetrics = useMemo(() => {
+    const snapshot = selectedRange === 'daily' ? reportToday : reportMonthly
+    const computed = computeActivityRings(snapshot)
+    const track = themeMode === 'dark' ? '#334155' : '#e2e8f0'
+    if (computed) {
+      return { ...computed, track, fallback: false }
+    }
+    if (!members.length) {
+      return {
+        outer: 0,
+        middle: 0,
+        inner: 0,
+        center: 0,
+        labels: { outer: '—', middle: '—', inner: '—' },
+        track,
+        fallback: true,
+      }
+    }
+    const avg = Math.round(members.reduce((sum, m) => sum + m.progress, 0) / members.length)
+    return {
+      outer: avg,
+      middle: Math.max(avg - 8, 0),
+      inner: Math.max(avg - 16, 0),
+      center: avg,
+      labels: { outer: 'Team', middle: 'Team', inner: 'Team' },
+      track,
+      fallback: true,
+    }
+  }, [selectedRange, reportToday, reportMonthly, members, themeMode])
+
+  const ringPeriodLabel = selectedRange === 'daily' ? 'Today' : '30-day'
+  const ringBlurb =
+    reportsPath === null
+      ? 'Collection vs outstanding, invoice backlog, shop flags — '
+      : 'Deliveries vs pending pipeline, shops with orders, partners with orders — '
   const rangeContainerClass =
     themeMode === 'dark'
       ? 'relative inline-flex w-full max-w-full rounded-xl bg-slate-800 p-1 md:w-auto'
@@ -481,34 +579,48 @@ function TeamDashboardPage({
               </p>
             </div>
 
-            <div className={rangeContainerClass}>
-              <span
-                className={`absolute top-1 bottom-1 rounded-lg transition-all duration-300 ease-out ${
-                  themeMode === 'dark' ? 'bg-slate-700 shadow-sm' : 'bg-indigo-600 shadow-sm'
+            <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setShopsMapOpen(true)}
+                disabled={!accessToken}
+                className={`inline-flex shrink-0 items-center justify-center rounded-xl border px-4 py-2.5 text-sm font-semibold shadow-sm transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 ${
+                  themeMode === 'dark'
+                    ? 'border-indigo-500/50 bg-slate-900/60 text-indigo-200 hover:bg-slate-800'
+                    : 'border-indigo-200 bg-white text-indigo-800 hover:bg-indigo-50'
                 }`}
-                style={{
-                  width: 'calc((100% - 0.5rem) / 3)',
-                  transform: `translateX(calc(${ranges.indexOf(selectedRange)} * 100%))`,
-                }}
-              />
-              {ranges.map((range) => (
-                <button
-                  key={range}
-                  type="button"
-                  onClick={() => dispatch(setSelectedRange(range))}
-                  className={`relative z-10 flex-1 rounded-lg px-3 py-2 text-sm font-medium capitalize transition-all duration-300 ease-out hover:-translate-y-0.5 md:px-4 ${
-                    selectedRange === range
-                      ? themeMode === 'dark'
-                        ? 'text-slate-100'
-                        : 'text-white'
-                      : themeMode === 'dark'
-                        ? 'text-slate-300 hover:bg-slate-700/60'
-                        : 'text-black hover:bg-slate-100'
+              >
+                Shop locations
+              </button>
+              <div className={`min-w-0 flex-1 sm:max-w-md ${rangeContainerClass}`}>
+                <span
+                  className={`absolute top-1 bottom-1 rounded-lg transition-all duration-300 ease-out ${
+                    themeMode === 'dark' ? 'bg-slate-700 shadow-sm' : 'bg-indigo-600 shadow-sm'
                   }`}
-                >
-                  {range}
-                </button>
-              ))}
+                  style={{
+                    width: 'calc((100% - 0.5rem) / 3)',
+                    transform: `translateX(calc(${ranges.indexOf(selectedRange)} * 100%))`,
+                  }}
+                />
+                {ranges.map((range) => (
+                  <button
+                    key={range}
+                    type="button"
+                    onClick={() => dispatch(setSelectedRange(range))}
+                    className={`relative z-10 flex-1 rounded-lg px-3 py-2 text-sm font-medium capitalize transition-all duration-300 ease-out hover:-translate-y-0.5 md:px-4 ${
+                      selectedRange === range
+                        ? themeMode === 'dark'
+                          ? 'text-slate-100'
+                          : 'text-white'
+                        : themeMode === 'dark'
+                          ? 'text-slate-300 hover:bg-slate-700/60'
+                          : 'text-black hover:bg-slate-100'
+                    }`}
+                  >
+                    {range}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </header>
@@ -556,17 +668,47 @@ function TeamDashboardPage({
 
           <article className="teamify-surface rounded-3xl p-3 ring-1 ring-slate-200 dark:ring-slate-700 sm:p-4 md:p-5">
             <h3 className="text-lg font-semibold text-black dark:text-slate-100">
-              Utilization
+              Operations health
             </h3>
             <p className="mt-1 text-sm text-black dark:text-slate-300">
-              Apple Watch inspired activity ring
+              {ringBlurb}
+              <span className="font-medium text-slate-700 dark:text-slate-200">{ringPeriodLabel}</span>
+              {ringMetrics.fallback ? (
+                <span className="block pt-0.5 text-xs text-amber-700 dark:text-amber-300">
+                  {reportLoading
+                    ? 'Loading live metrics…'
+                    : members.length
+                      ? 'Live snapshot unavailable — using team progress demo.'
+                      : 'No live snapshot yet.'}
+                </span>
+              ) : null}
             </p>
+            <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-600 dark:text-slate-400">
+              <li>
+                <span className="font-semibold text-emerald-600 dark:text-emerald-400">●</span>{' '}
+                {ringMetrics.labels.outer}{' '}
+                <span className="tabular-nums text-slate-800 dark:text-slate-200">{ringMetrics.outer}%</span>
+              </li>
+              <li>
+                <span className="font-semibold text-sky-600 dark:text-sky-400">●</span>{' '}
+                {ringMetrics.labels.middle}{' '}
+                <span className="tabular-nums text-slate-800 dark:text-slate-200">{ringMetrics.middle}%</span>
+              </li>
+              <li>
+                <span className="font-semibold text-amber-600 dark:text-amber-400">●</span>{' '}
+                {ringMetrics.labels.inner}{' '}
+                <span className="tabular-nums text-slate-800 dark:text-slate-200">{ringMetrics.inner}%</span>
+              </li>
+            </ul>
 
             <div className="teamify-ring-wrap mt-3">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={ringChartData}
+                    data={[
+                      { name: 'Outer', value: ringMetrics.outer, fill: '#34c759' },
+                      { name: 'OuterRem', value: 100 - ringMetrics.outer, fill: ringMetrics.track },
+                    ]}
                     dataKey="value"
                     startAngle={90}
                     endAngle={-270}
@@ -576,8 +718,8 @@ function TeamDashboardPage({
                   />
                   <Pie
                     data={[
-                      { name: 'Outer', value: Math.max(utilization - 8, 0), fill: '#0ea5e9' },
-                      { name: 'OuterRem', value: 100 - Math.max(utilization - 8, 0), fill: '#e2e8f0' },
+                      { name: 'Mid', value: ringMetrics.middle, fill: '#0ea5e9' },
+                      { name: 'MidRem', value: 100 - ringMetrics.middle, fill: ringMetrics.track },
                     ]}
                     dataKey="value"
                     startAngle={100}
@@ -588,8 +730,8 @@ function TeamDashboardPage({
                   />
                   <Pie
                     data={[
-                      { name: 'Inner', value: Math.max(utilization - 16, 0), fill: '#f59e0b' },
-                      { name: 'InnerRem', value: 100 - Math.max(utilization - 16, 0), fill: '#e2e8f0' },
+                      { name: 'Inner', value: ringMetrics.inner, fill: '#f59e0b' },
+                      { name: 'InnerRem', value: 100 - ringMetrics.inner, fill: ringMetrics.track },
                     ]}
                     dataKey="value"
                     startAngle={110}
@@ -604,9 +746,11 @@ function TeamDashboardPage({
               <div className="teamify-ring-center">
                 <div className="teamify-ring-value">
                   <strong className="text-2xl font-semibold text-black dark:text-slate-100">
-                    {utilization}%
+                    {ringMetrics.center}%
                   </strong>
-                  <span className="text-xs text-black dark:text-slate-300">Current</span>
+                  <span className="text-xs text-black dark:text-slate-300">
+                    {ringMetrics.fallback ? 'Team avg' : 'Health'}
+                  </span>
                 </div>
               </div>
             </div>
@@ -949,6 +1093,14 @@ function TeamDashboardPage({
           </ul>
         </section>
       </main>
+
+      <ShopsMapModal
+        isOpen={shopsMapOpen}
+        onClose={() => setShopsMapOpen(false)}
+        accessToken={accessToken}
+        themeMode={themeMode}
+        shopsBasePath={shopsPagePath}
+      />
     </DashboardLayout>
   )
 }
