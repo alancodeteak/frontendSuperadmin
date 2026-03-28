@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title><%= typeof document_title !== 'undefined' ? document_title : 'Invoice' %> <%= invoice.invoice_number %></title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            background: #ffffff;
+            color: #000;
+            font-size: 10px;
+        }
+
+        .invoice-container {
+            width: 210mm;
+            margin: 0 auto;
+            padding: 12mm; /* Reduced margin */
+        }
+
+        /* ================= HEADER ================= */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 14px;
+        }
+
+        .header-left {
+            width: 45%;
+        }
+
+        .yaadro-logo {
+            max-width: 90px;
+            margin-bottom: 6px;
+        }
+
+        .brand-name {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 2px;
+        }
+
+        .brand-tagline {
+            font-size: 9px;
+            color: #555;
+            margin-bottom: 6px;
+        }
+
+        .codeteak-logo {
+            max-width: 90px;
+        }
+
+        .header-right {
+            width: 40%;
+            text-align: right;
+        }
+
+        .invoice-title {
+            font-size: 22px;
+            font-weight: bold;
+            margin-bottom: 6px;
+            letter-spacing: 0.5px;
+        }
+
+        .invoice-meta {
+            font-size: 10px;
+            margin-bottom: 8px;
+            line-height: 1.4;
+        }
+
+        .barcode img {
+            max-width: 130px;
+            margin: 6px 0 8px;
+        }
+
+        .qr-section {
+            text-align: right;
+        }
+
+        .qr-section img {
+            width: 90px;
+            height: 90px;
+            margin-bottom: 4px;
+        }
+
+        .qr-label {
+            font-size: 9px;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+
+        .qr-invoice-number {
+            font-size: 8px;
+        }
+
+        /* ================= INFO BOXES ================= */
+        .info-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .info-box {
+            border: 0.6px solid #000; /* Thinner border */
+            padding: 8px;
+        }
+
+        .info-box h3 {
+            font-size: 10px;
+            font-weight: bold;
+            margin-bottom: 6px;
+            border-bottom: 0.6px solid #000; /* Thinner */
+            padding-bottom: 3px;
+            text-transform: uppercase;
+        }
+
+        .info-box p {
+            margin-bottom: 3px;
+            line-height: 1.4;
+        }
+
+        /* ================= BILL FROM ================= */
+        .bill-from {
+            border: 0.6px solid #000; /* Thinner border */
+            padding: 8px;
+            margin-bottom: 12px;
+        }
+
+        .bill-from h3 {
+            font-size: 10px;
+            font-weight: bold;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+        }
+
+        /* ================= TABLE ================= */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 12px;
+            font-size: 9px;
+        }
+
+        th, td {
+            border: 0.6px solid #000; /* Thinner lines */
+            padding: 5px 4px;
+        }
+
+        th {
+            background: #f2f2f2;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        td {
+            text-align: center;
+        }
+
+        td.text-left {
+            text-align: left;
+        }
+
+        td.text-right {
+            text-align: right;
+        }
+
+        .description-cell {
+            text-align: left;
+            padding-left: 6px;
+        }
+
+        .total-row td {
+            font-weight: bold;
+        }
+
+        /* ================= DECLARATION (NO BOX) ================= */
+        .declaration {
+            font-size: 9px;
+            margin-bottom: 12px;
+            line-height: 1.4;
+        }
+
+        .declaration-title {
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+
+        /* ================= FOOTER ================= */
+        .footer {
+            font-size: 8px;
+            line-height: 1.4;
+            text-align: center;
+            margin-top: 12px;
+        }
+
+        .footer p {
+            margin-bottom: 3px;
+        }
+
+        .powered-by {
+            margin-top: 10px;
+            font-size: 8px;
+            text-align: center;
+        }
+
+        .powered-by img {
+            height: 18px;
+            vertical-align: middle;
+            margin: 0 5px;
+        }
+
+        @media print {
+            body {
+                background: #fff;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="invoice-container">
+
+    <!-- ================= HEADER ================= -->
+    <div class="header">
+        <div class="header-left">
+            <img src="<%= typeof yaadroLogoBase64 !== 'undefined' && yaadroLogoBase64 ? yaadroLogoBase64 : '/assets/yaadro-logo.svg' %>" alt="Yaadro Logo" class="yaadro-logo">
+            <div class="brand-name">Yaadro</div>
+            <div class="brand-tagline">Delivery Management Service</div>
+            <img src="<%= typeof codeteakLogoBase64 !== 'undefined' && codeteakLogoBase64 ? codeteakLogoBase64 : '/assets/codeteak-logo.jpg' %>" alt="CodeTeak Logo" class="codeteak-logo">
+        </div>
+
+        <div class="header-right">
+            <div class="invoice-title"><%= (typeof document_title !== 'undefined' ? document_title : 'Invoice').toUpperCase() %></div>
+            <div class="invoice-meta">
+                <p><strong><%= typeof document_number_label !== 'undefined' ? document_number_label : 'Invoice Number' %>:</strong> <%= invoice.invoice_number || 'N/A' %></p>
+                <p><strong><%= (typeof document_title !== 'undefined' ? document_title : 'Invoice') %> Date:</strong> 
+                    <% 
+                        let invoiceDate = 'N/A';
+                        if (invoice.created_at) {
+                            try {
+                                const d = invoice.created_at instanceof Date ? invoice.created_at : new Date(invoice.created_at);
+                                if (!isNaN(d.getTime())) {
+                                    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                                    invoiceDate = d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear();
+                                }
+                            } catch(e) {}
+                        }
+                    %>
+                    <%= invoiceDate %>
+                </p>
+            </div>
+
+            <div class="barcode">
+                <% if (typeof barcodeBase64 !== 'undefined' && barcodeBase64) { %>
+                    <img src="<%= barcodeBase64 %>" alt="Barcode">
+                <% } %>
+            </div>
+
+            <div class="qr-section">
+                <div class="qr-label"><%= (typeof document_title !== 'undefined' ? document_title : 'Invoice') %> QR Code</div>
+                <% if (typeof qrCodeBase64 !== 'undefined' && qrCodeBase64) { %>
+                    <img src="<%= qrCodeBase64 %>" alt="<%= (typeof document_title !== 'undefined' ? document_title : 'Invoice') %> QR Code">
+                <% } %>
+                <div class="qr-invoice-number"><%= (typeof document_title !== 'undefined' ? document_title : 'Invoice') %>: <%= invoice.invoice_number || 'N/A' %></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= DATE FORMATTERS ================= -->
+    <%
+        function formatDate(dateValue) {
+            if (!dateValue) return 'N/A';
+            try {
+                const d = dateValue instanceof Date ? dateValue : new Date(dateValue);
+                if (isNaN(d.getTime())) return 'N/A';
+                const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                return d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear();
+            } catch(e) {
+                return 'N/A';
+            }
+        }
+
+        const billingStart = formatDate(invoice.billing_period_start);
+        const billingEnd = formatDate(invoice.billing_period_end);
+    %>
+
+    <!-- ================= INFO SECTION ================= -->
+    <div class="info-section">
+        <div class="info-box">
+            <h3>BILL TO / SHIP TO:</h3>
+            <p><strong><%= shop && shop.shop_name ? shop.shop_name : 'Unknown Shop' %></strong></p>
+            <% if (address) { %>
+                <% if (address.street_address) { %>
+                    <p><%= address.street_address %></p>
+                <% } %>
+                <% if (!(address.city === 'Manual' && address.state === 'Manual' && address.pincode === '000000')) { %>
+                    <p>
+                        <%= address.city || '' %><%= address.city && (address.state || address.pincode) ? ', ' : '' %>
+                        <%= address.state || '' %><%= address.state && address.pincode ? ' - ' : '' %>
+                        <%= address.pincode || '' %>
+                    </p>
+                <% } %>
+            <% } %>
+            <p><strong>Customer Type:</strong> <%= (shop && shop.customer_type) ? shop.customer_type : (invoice.customer_type || 'Registered') %></p>
+            <% if (shop && shop.email) { %><p><strong>Email:</strong> <%= shop.email %></p><% } %>
+            <% if (shop && shop.phone) { %><p><strong>Phone:</strong> <%= shop.phone %></p><% } %>
+        </div>
+
+        <div class="info-box">
+            <h3>SUBSCRIPTION DETAILS:</h3>
+            <p><strong>Subscription ID:</strong> <%= (subscription && subscription.subscription_id) ? subscription.subscription_id : 'N/A' %></p>
+            <p><strong>User ID:</strong> <%= (shop && shop.user_id) ? shop.user_id : (invoice.user_id || 'N/A') %></p>
+            <p><strong>Billing Period:</strong></p>
+            <p><%= billingStart %> to <%= billingEnd %></p>
+            <p><strong>Status:</strong> <%= (invoice.status || 'PENDING').toUpperCase() %></p>
+        </div>
+    </div>
+
+    <!-- ================= BILL FROM ================= -->
+    <div class="bill-from">
+        <h3>BILL FROM:</h3>
+        <p><strong>CODETEAK TECHNOLOGIES</strong></p>
+        <p>Arine Amaryills, Akshaya Nagar Gardens,<br>
+           Akshayanagar West 560114,<br>
+           Bangalore, India</p>
+    </div>
+
+    <!-- ================= TABLE ================= -->
+    <%
+        function formatCurrency(value) {
+            const num = parseFloat(value) || 0;
+            return 'Rs. ' + num.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        }
+
+        const baseAmount = parseFloat(invoice.amount || 0);
+        const discount = parseFloat(invoice.discount || 0);
+        const otherCharges = parseFloat(invoice.other_charges || 0);
+        const vat = parseFloat(invoice.vat || 0);
+        const taxableAmount = baseAmount - discount + otherCharges;
+        const totalAmount = taxableAmount + vat;
+    %>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Description</th>
+                <th>Qty</th>
+                <th>Gross Amount</th>
+                <th>Discount</th>
+                <th>Other Charges</th>
+                <th>Taxable Amount</th>
+                <th>VAT</th>
+                <th>Total Amount</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="description-cell">
+                    <strong><%= invoice.description || 'Yaadro Monthly Subscription Fee' %></strong><br>
+                    <small>Period: <%= billingStart %> to <%= billingEnd %></small>
+                </td>
+                <td>1</td>
+                <td class="text-right"><%= formatCurrency(baseAmount) %></td>
+                <td class="text-right"><%= formatCurrency(discount) %></td>
+                <td class="text-right"><%= formatCurrency(otherCharges) %></td>
+                <td class="text-right"><%= formatCurrency(taxableAmount) %></td>
+                <td class="text-right"><%= formatCurrency(vat) %></td>
+                <td class="text-right"><strong><%= formatCurrency(totalAmount) %></strong></td>
+            </tr>
+            <tr class="total-row">
+                <td class="text-left">TOTAL</td>
+                <td>1</td>
+                <td class="text-right"><%= formatCurrency(baseAmount) %></td>
+                <td class="text-right"><%= formatCurrency(discount) %></td>
+                <td class="text-right"><%= formatCurrency(otherCharges) %></td>
+                <td class="text-right"><%= formatCurrency(taxableAmount) %></td>
+                <td class="text-right"><%= formatCurrency(vat) %></td>
+                <td class="text-right"><%= formatCurrency(totalAmount) %></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- ================= DECLARATION (NO BOX) ================= -->
+    <div class="declaration">
+        <div class="declaration-title">DECLARATION</div>
+        <p>The services provided as part of this <%= (typeof document_title !== 'undefined' ? document_title : 'Invoice').toLowerCase() %> are for subscription billing purposes. This <%= (typeof document_title !== 'undefined' ? document_title : 'Invoice').toLowerCase() %> is generated automatically by the system.</p>
+        <p><em>This is an auto generated <%= (typeof document_title !== 'undefined' ? document_title : 'Invoice').toLowerCase() %>.</em></p>
+    </div>
+
+    <!-- ================= FOOTER ================= -->
+    <div class="footer">
+        <p><strong>Registered Address:</strong> CodeTeak Technologies, Arine Amaryills, Akshaya Nagar Gardens, Akshayanagar West 560114, Bangalore, India</p>
+        <p><strong>For any queries, please contact:</strong></p>
+        <p>info@codeteak.com | +91 9995203149</p>
+
+        <div class="powered-by">
+            Powered by
+            <img src="<%= typeof codeteakLogoBase64 !== 'undefined' && codeteakLogoBase64 ? codeteakLogoBase64 : '/assets/codeteak-logo.jpg' %>" alt="CodeTeak Logo">
+            CodeTeak Technologies
+        </div>
+    </div>
+
+</div>
+</body>
+</html>

@@ -17,12 +17,19 @@ import DashboardLayout from '@/components/layout/DashboardLayout'
 import AppSidebar from '@/components/layout/AppSidebar'
 import { buildSidebarNav } from '@/components/layout/sidebarNavConfig'
 import { useTheme } from '@/context/useTheme'
+import { getAdminAccountsOverview } from '@/apis/invoicesApi'
+import {
+  getReportsDeliveryPartners,
+  getReportsFunnel,
+  getReportsOverview,
+} from '@/apis/reportsApi'
 import {
   getSalesActivityForecast,
   getSalesActivityMonthly,
   getSalesActivityOverview,
   getSalesActivityTopShops,
 } from '@/apis/salesActivityApi'
+import { buildOperationsSnapshot } from '@/utils/operationsSnapshot'
 
 const SAMPLE_OVERVIEW = {
   kpis: {
@@ -149,6 +156,11 @@ export default function SalesActivityPage({
   const [forecast, setForecast] = useState(null)
   const [loading, setLoading] = useState(false)
 
+  const [reportLoading, setReportLoading] = useState(false)
+  const [reportError, setReportError] = useState('')
+  const [reportToday, setReportToday] = useState(null)
+  const [reportMonthly, setReportMonthly] = useState(null)
+
   const navSections = useMemo(
     () =>
       buildSidebarNav({
@@ -179,6 +191,64 @@ export default function SalesActivityPage({
       activitySalesPath,
     ]
   )
+
+  useEffect(() => {
+    let cancelled = false
+    async function run() {
+      if (!accessToken) return
+      setReportLoading(true)
+      setReportError('')
+      try {
+        const settled = await Promise.allSettled([
+          getReportsOverview({ days: 1 }, { accessToken }),
+          getReportsOverview({ days: 30 }, { accessToken }),
+          getReportsFunnel({ days: 1 }, { accessToken }),
+          getReportsFunnel({ days: 30 }, { accessToken }),
+          getAdminAccountsOverview({ days: 30 }, { accessToken }),
+          getReportsDeliveryPartners({ days: 1, limit: 100 }, { accessToken }),
+          getReportsDeliveryPartners({ days: 30, limit: 100 }, { accessToken }),
+        ])
+        if (cancelled) return
+
+        const ov1 = settled[0].status === 'fulfilled' ? settled[0].value : null
+        const ov30 = settled[1].status === 'fulfilled' ? settled[1].value : null
+        const funnel1 = settled[2].status === 'fulfilled' ? settled[2].value : null
+        const funnel30 = settled[3].status === 'fulfilled' ? settled[3].value : null
+        const acct = settled[4].status === 'fulfilled' ? settled[4].value : null
+        const dp1 = settled[5].status === 'fulfilled' ? settled[5].value : null
+        const dp30 = settled[6].status === 'fulfilled' ? settled[6].value : null
+
+        const partial = settled.some((r) => r.status === 'rejected')
+        if (partial) {
+          setReportError('Some figures could not be loaded; numbers below may be incomplete.')
+        } else {
+          setReportError('')
+        }
+
+        if (!ov1 && !ov30) {
+          setReportToday(null)
+          setReportMonthly(null)
+          setReportError('Could not load analytics.')
+          return
+        }
+
+        setReportToday(ov1 ? buildOperationsSnapshot(ov1, funnel1, dp1, acct) : null)
+        setReportMonthly(ov30 ? buildOperationsSnapshot(ov30, funnel30, dp30, acct) : null)
+      } catch {
+        if (!cancelled) {
+          setReportToday(null)
+          setReportMonthly(null)
+          setReportError('Could not load reports. Check your connection and try again.')
+        }
+      } finally {
+        if (!cancelled) setReportLoading(false)
+      }
+    }
+    run()
+    return () => {
+      cancelled = true
+    }
+  }, [accessToken])
 
   useEffect(() => {
     let alive = true
@@ -271,6 +341,174 @@ export default function SalesActivityPage({
             </button>
           </div>
         </div>
+
+        <section className="teamify-surface rounded-3xl p-3 ring-1 ring-slate-200 dark:ring-slate-700 sm:p-4">
+          <div className="mb-2 shrink-0">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700 dark:text-amber-300">
+              Operations
+            </p>
+            <h2 className="mt-0.5 text-sm font-semibold text-black dark:text-slate-100">Today</h2>
+            <p className="mt-0.5 text-[11px] leading-snug text-slate-500 dark:text-slate-400">
+              Last 24 hours first; 30-day context below. Subscription backlog is current.
+            </p>
+          </div>
+          <div className="flex flex-col gap-3 pr-0.5">
+            {reportLoading ? (
+              <p className="text-xs text-slate-500 dark:text-slate-400">Loading report…</p>
+            ) : !reportToday && !reportMonthly && reportError ? (
+              <p className="text-xs text-amber-800 dark:text-amber-200">{reportError}</p>
+            ) : (
+              <>
+                {reportError ? (
+                  <p className="rounded-lg bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-900 ring-1 ring-amber-200 dark:bg-amber-950/40 dark:text-amber-100 dark:ring-amber-800">
+                    {reportError}
+                  </p>
+                ) : null}
+
+                {reportToday ? (
+                  <div className="space-y-1.5 rounded-xl bg-slate-50/80 p-2.5 ring-1 ring-slate-200 dark:bg-slate-900/30 dark:ring-slate-800">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-200">
+                      Today · last 24 hours
+                    </p>
+                    <p className="text-[11px] text-slate-600 dark:text-slate-400">
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">
+                        {reportToday.totalOrders.toLocaleString()}
+                      </span>{' '}
+                      orders ·{' '}
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">
+                        {reportToday.totalAmount.toLocaleString(undefined, {
+                          maximumFractionDigits: 0,
+                        })}
+                      </span>{' '}
+                      revenue ·{' '}
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">
+                        {reportToday.totalDeliveries.toLocaleString()}
+                      </span>{' '}
+                      marked delivered
+                    </p>
+                    <p className="text-[11px] leading-snug text-slate-800 dark:text-slate-200">
+                      <span className="font-semibold text-slate-900 dark:text-white">
+                        {reportToday.shopsNotUsing}
+                      </span>{' '}
+                      shops had no orders today.
+                    </p>
+                    {reportToday.shopsPaymentPending != null ? (
+                      <p className="text-[11px] leading-snug text-slate-800 dark:text-slate-200">
+                        <span className="font-semibold text-slate-900 dark:text-white">
+                          {reportToday.shopsPaymentPending}
+                        </span>{' '}
+                        shops — subscription payment pending or overdue (current).
+                      </p>
+                    ) : null}
+                    {reportToday.partnersNotUsing != null ? (
+                      <p className="text-[11px] leading-snug text-slate-800 dark:text-slate-200">
+                        <span className="font-semibold text-slate-900 dark:text-white">
+                          {reportToday.partnersNotUsing}
+                        </span>{' '}
+                        delivery partners had no orders today.
+                        {reportToday.partnerSampleCapped ? (
+                          <span className="block pt-0.5 text-[10px] text-slate-500">
+                            Partner counts may be approximate when many partners are active.
+                          </span>
+                        ) : null}
+                      </p>
+                    ) : null}
+                    {reportToday.deliveriesPending != null ? (
+                      <p className="text-[11px] leading-snug text-slate-800 dark:text-slate-200">
+                        <span className="font-semibold text-slate-900 dark:text-white">
+                          {reportToday.deliveriesPending}
+                        </span>{' '}
+                        deliveries pending (today&apos;s pipeline).
+                      </p>
+                    ) : null}
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Today&apos;s snapshot unavailable.</p>
+                )}
+
+                {reportMonthly ? (
+                  <div className="space-y-1.5 rounded-xl border border-dashed border-slate-200/90 p-2.5 dark:border-slate-600/80">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-500">
+                      30-day context
+                    </p>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-500">
+                      <span className="font-semibold text-slate-700 dark:text-slate-300">
+                        {reportMonthly.totalOrders.toLocaleString()}
+                      </span>{' '}
+                      orders ·{' '}
+                      <span className="font-semibold text-slate-700 dark:text-slate-300">
+                        {reportMonthly.totalAmount.toLocaleString(undefined, {
+                          maximumFractionDigits: 0,
+                        })}
+                      </span>{' '}
+                      revenue ·{' '}
+                      <span className="font-semibold text-slate-700 dark:text-slate-300">
+                        {reportMonthly.totalDeliveries.toLocaleString()}
+                      </span>{' '}
+                      delivered
+                      {reportMonthly.growth?.orders_pct_vs_prev_period != null ? (
+                        <span className="block pt-1 text-[10px] text-slate-500">
+                          vs prior 30 days: orders{' '}
+                          {reportMonthly.growth.orders_pct_vs_prev_period >= 0 ? '+' : ''}
+                          {reportMonthly.growth.orders_pct_vs_prev_period}% · amount{' '}
+                          {reportMonthly.growth.amount_pct_vs_prev_period != null
+                            ? `${reportMonthly.growth.amount_pct_vs_prev_period >= 0 ? '+' : ''}${reportMonthly.growth.amount_pct_vs_prev_period}%`
+                            : '—'}
+                        </span>
+                      ) : null}
+                    </p>
+                    <p className="text-[10px] leading-snug text-slate-600 dark:text-slate-400">
+                      <span className="font-semibold text-slate-800 dark:text-slate-300">
+                        {reportMonthly.shopsNotUsing}
+                      </span>{' '}
+                      shops with no orders in the last 30 days.
+                    </p>
+                    {reportMonthly.shopsPaymentPending != null ? (
+                      <p className="text-[10px] leading-snug text-slate-600 dark:text-slate-400">
+                        <span className="font-semibold text-slate-800 dark:text-slate-300">
+                          {reportMonthly.shopsPaymentPending}
+                        </span>{' '}
+                        shops — subscription pending/overdue (current).
+                      </p>
+                    ) : null}
+                    {reportMonthly.partnersNotUsing != null ? (
+                      <p className="text-[10px] leading-snug text-slate-600 dark:text-slate-400">
+                        <span className="font-semibold text-slate-800 dark:text-slate-300">
+                          {reportMonthly.partnersNotUsing}
+                        </span>{' '}
+                        partners idle (30 days).
+                        {reportMonthly.partnerSampleCapped ? (
+                          <span className="block pt-0.5 text-[9px] text-slate-500">
+                            Partner idle counts may be approximate when many partners are active.
+                          </span>
+                        ) : null}
+                      </p>
+                    ) : null}
+                    {reportMonthly.deliveriesPending != null ? (
+                      <p className="text-[10px] leading-snug text-slate-600 dark:text-slate-400">
+                        <span className="font-semibold text-slate-800 dark:text-slate-300">
+                          {reportMonthly.deliveriesPending}
+                        </span>{' '}
+                        deliveries pending (30-day pipeline).
+                      </p>
+                    ) : null}
+                  </div>
+                ) : (
+                  <p className="text-[10px] text-slate-500 dark:text-slate-500">30-day analytics unavailable.</p>
+                )}
+                {reportsPath ? (
+                  <button
+                    type="button"
+                    onClick={() => navigate(reportsPath)}
+                    className="w-full shrink-0 rounded-xl border border-slate-200 bg-white py-2 text-[11px] font-semibold text-slate-900 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-100 dark:hover:bg-slate-900/55"
+                  >
+                    Open full reports
+                  </button>
+                ) : null}
+              </>
+            )}
+          </div>
+        </section>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/40">
