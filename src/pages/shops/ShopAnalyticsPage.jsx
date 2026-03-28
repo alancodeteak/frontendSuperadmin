@@ -104,11 +104,12 @@ function ShopAnalyticsPage({
           dashboardPath,
           homeContactBookPath:
             reportsPath === null
-              ? null
+              ? '/portal/dashboard/contact-book'
               : '/dashboard/teamify/contact-book',
           shopsPath,
           createShopPath: createPath,
-          deliveryPartnersPath: '/dashboard/teamify/delivery-partners',
+          deliveryPartnersPath:
+            reportsPath === null ? null : '/dashboard/teamify/delivery-partners',
           reportsPath,
           accountsInvoicesPath:
             reportsPath === null
@@ -118,6 +119,10 @@ function ShopAnalyticsPage({
             reportsPath === null
               ? '/portal/dashboard/accounts/overview'
               : '/dashboard/teamify/accounts/overview',
+          activityDailyPath:
+            reportsPath === null ? null : '/dashboard/teamify/activity/daily',
+          activitySalesPath:
+            reportsPath === null ? null : '/dashboard/teamify/activity/sales',
         },
       }),
     [createPath, dashboardPath, navigate, reportsPath, shopsPath],

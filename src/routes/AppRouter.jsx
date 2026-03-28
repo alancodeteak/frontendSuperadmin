@@ -5,6 +5,7 @@ import TeamDashboardPage from '@/pages/dashboard/TeamDashboardPage'
 import ContactBookPage from '@/pages/home/ContactBookPage'
 import PortalLoginPage from '@/pages/portal/PortalLoginPage'
 import PortalDashboardPage from '@/pages/portal/PortalDashboardPage'
+import PortalContactBookPage from '@/pages/portal/PortalContactBookPage'
 import AdminShopListingPage from '@/pages/shops/AdminShopListingPage'
 import PortalShopListingPage from '@/pages/shops/PortalShopListingPage'
 import AdminShopCreatePage from '@/pages/shops/AdminShopCreatePage'
@@ -173,6 +174,14 @@ function AppRouter() {
           element={
             <ProtectedRoute requiredScope="portal" redirectTo="/portal/login">
               <PortalDashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/portal/dashboard/contact-book"
+          element={
+            <ProtectedRoute requiredScope="portal" redirectTo="/portal/login">
+              <PortalContactBookPage />
             </ProtectedRoute>
           }
         />

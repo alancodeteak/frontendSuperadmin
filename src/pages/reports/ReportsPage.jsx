@@ -92,13 +92,6 @@ const SAMPLE_OVERVIEW = {
   },
 }
 
-const SAMPLE_SHOPS = [
-  { shop_id: 'SHOP101', shop_name: 'Green Basket', orders: 64, amount: 12540, delivered_rate: 82.1, cancelled_rate: 6.2 },
-  { shop_id: 'SHOP102', shop_name: 'City Mart', orders: 58, amount: 11320, delivered_rate: 79.2, cancelled_rate: 7.1 },
-  { shop_id: 'SHOP103', shop_name: 'Fresh Point', orders: 51, amount: 9800, delivered_rate: 76.4, cancelled_rate: 8.4 },
-  { shop_id: 'SHOP104', shop_name: 'Urban Store', orders: 47, amount: 9050, delivered_rate: 74.6, cancelled_rate: 9.1 },
-]
-
 const SAMPLE_PARTNERS = [
   { delivery_partner_id: 'DP101', name: 'Arun K', orders: 44, earnings: 3120, delivered_rate: 85.4, cancelled_rate: 5.0, online_status: 'online' },
   { delivery_partner_id: 'DP102', name: 'Rahul S', orders: 39, earnings: 2810, delivered_rate: 81.2, cancelled_rate: 6.8, online_status: 'offline' },
@@ -204,7 +197,7 @@ export default function ReportsPage() {
       } catch (e) {
         if (!cancelled) {
           setOverview(SAMPLE_OVERVIEW)
-          setShops(SAMPLE_SHOPS)
+          setShops([])
           setPartners(SAMPLE_PARTNERS)
           setFunnel(SAMPLE_FUNNEL)
           setFinance(SAMPLE_FINANCE)

@@ -78,6 +78,7 @@ function ShopCreatePage({
   const isDark = themeMode === 'dark'
   const { logoutStatus } = useSelector((state) => state.auth)
   const isLoggingOut = logoutStatus === 'loading'
+  const isPortalMode = reportsPath === null
 
   const [stepIndex, setStepIndex] = useState(0)
   const [form, setForm] = useState(initialForm)
@@ -162,7 +163,9 @@ function ShopCreatePage({
 
   const errors = useMemo(() => {
     const next = {}
-    const allowedStatus = ['active', 'inactive', 'suspended', 'blocked']
+    const allowedStatus = isPortalMode
+      ? ['active', 'inactive']
+      : ['active', 'inactive', 'suspended', 'blocked']
 
     const required = (key, label) => {
       if (!String(form[key] ?? '').trim()) next[key] = `${label} is required`
@@ -198,7 +201,9 @@ function ShopCreatePage({
     if (String(form.status ?? '').trim()) {
       const normalized = String(form.status).trim()
       if (!allowedStatus.includes(normalized)) {
-        next.status = 'Status must be active, inactive, suspended, or blocked'
+        next.status = isPortalMode
+          ? 'Status must be active or inactive'
+          : 'Status must be active, inactive, suspended, or blocked'
       }
     }
 
@@ -216,7 +221,7 @@ function ShopCreatePage({
     }
 
     return next
-  }, [form, photoError])
+  }, [form, photoError, isPortalMode])
 
   const markTouched = (key) =>
     setTouched((prev) => (prev[key] ? prev : { ...prev, [key]: true }))
@@ -376,11 +381,12 @@ function ShopCreatePage({
           dashboardPath: listingPath.replace('/shops', ''),
           homeContactBookPath:
             reportsPath === null
-              ? null
+              ? '/portal/dashboard/contact-book'
               : '/dashboard/teamify/contact-book',
           shopsPath: listingPath,
           createShopPath: createPath,
-          deliveryPartnersPath: '/dashboard/teamify/delivery-partners',
+          deliveryPartnersPath:
+            reportsPath === null ? null : '/dashboard/teamify/delivery-partners',
           reportsPath,
           accountsInvoicesPath:
             reportsPath === null
@@ -390,6 +396,10 @@ function ShopCreatePage({
             reportsPath === null
               ? '/portal/dashboard/accounts/overview'
               : '/dashboard/teamify/accounts/overview',
+          activityDailyPath:
+            reportsPath === null ? null : '/dashboard/teamify/activity/daily',
+          activitySalesPath:
+            reportsPath === null ? null : '/dashboard/teamify/activity/sales',
         },
       }),
     [createPath, listingPath, navigate, reportsPath],
@@ -1229,8 +1239,12 @@ function ShopCreatePage({
                           >
                             <option value="active">active</option>
                             <option value="inactive">inactive</option>
-                            <option value="suspended">suspended</option>
-                            <option value="blocked">blocked</option>
+                            {isPortalMode ? null : (
+                              <>
+                                <option value="suspended">suspended</option>
+                                <option value="blocked">blocked</option>
+                              </>
+                            )}
                           </select>
                           {showFieldError('status') ? (
                             <p className="mt-1 text-xs font-medium text-red-700 dark:text-red-300">

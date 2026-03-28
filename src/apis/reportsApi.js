@@ -1,12 +1,5 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000'
-
-function buildUrl(path) {
-  return `${API_BASE_URL}${path}`
-}
-
-async function readJson(response) {
-  return response.json().catch(() => null)
-}
+import { cachedGetJson } from '@/apis/cachedGet'
+import { TTL_MS } from '@/utils/responseCache'
 
 function normalizeApiError(payload, fallbackMessage) {
   if (payload?.error) {
@@ -21,15 +14,13 @@ function normalizeApiError(payload, fallbackMessage) {
 }
 
 async function requestJson({ path, accessToken }) {
-  const response = await fetch(buildUrl(path), {
-    method: 'GET',
-    headers: {
-      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-    },
+  return cachedGetJson({
+    path,
+    accessToken,
+    ttlMs: TTL_MS.DEFAULT_GET,
+    onHttpError: (json) => normalizeApiError(json, 'Failed to load report'),
+    select: (j) => j?.data ?? null,
   })
-  const json = await readJson(response)
-  if (!response.ok) throw normalizeApiError(json, 'Failed to load report')
-  return json?.data ?? null
 }
 
 export async function getReportsOverview({ days = 30 }, { accessToken }) {

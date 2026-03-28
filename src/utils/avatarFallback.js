@@ -31,6 +31,22 @@ const AVATAR_URLS = [
   '/avathars/Select Avatar=Avatar 23.png',
 ]
 
+function hashString(s) {
+  let h = 0
+  for (let i = 0; i < s.length; i += 1) {
+    h = Math.imul(31, h) + s.charCodeAt(i)
+  }
+  return Math.abs(h)
+}
+
+/** Stable avatar from `/public/avathars` for a given id or label (same key → same image). */
+export function getAvatarUrlForKey(key) {
+  const s = String(key ?? 'default')
+  const i = hashString(s) % AVATAR_URLS.length
+  const raw = AVATAR_URLS[i] ?? AVATAR_URLS[0]
+  return raw ? encodeURI(raw) : raw
+}
+
 export function getRandomAvatarUrl() {
   const i = Math.floor(Math.random() * AVATAR_URLS.length)
   const raw = AVATAR_URLS[i] ?? AVATAR_URLS[0]

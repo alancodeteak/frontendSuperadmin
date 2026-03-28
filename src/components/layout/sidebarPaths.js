@@ -11,7 +11,11 @@ export function buildTeamifyAdminSidebarPaths({
 
   return {
     dashboardPath,
-    homeContactBookPath: includeContactBook && !isPortalLike ? '/dashboard/teamify/contact-book' : null,
+    homeContactBookPath: includeContactBook
+      ? isPortalLike
+        ? '/portal/dashboard/contact-book'
+        : '/dashboard/teamify/contact-book'
+      : null,
     shopsPath,
     createShopPath,
     deliveryPartnersPath: !isPortalLike ? '/dashboard/teamify/delivery-partners' : null,

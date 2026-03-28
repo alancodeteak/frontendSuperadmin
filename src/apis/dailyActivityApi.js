@@ -1,12 +1,5 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000'
-
-function buildUrl(path) {
-  return `${API_BASE_URL}${path}`
-}
-
-async function readJson(response) {
-  return response.json().catch(() => null)
-}
+import { cachedGetJson } from '@/apis/cachedGet'
+import { TTL_MS } from '@/utils/responseCache'
 
 function normalizeApiError(payload, fallbackMessage) {
   if (payload?.error) {
@@ -20,27 +13,27 @@ function normalizeApiError(payload, fallbackMessage) {
   return { code: 'INTERNAL_SERVER_ERROR', message: fallbackMessage, requestId: null, details: null }
 }
 
-async function requestJson({ path, accessToken }) {
-  const response = await fetch(buildUrl(path), {
-    method: 'GET',
-    headers: {
-      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-    },
-  })
-  const json = await readJson(response)
-  if (!response.ok) throw normalizeApiError(json, 'Daily activity request failed')
-  return json?.data ?? null
-}
-
 export async function getDailyActivityOverview({ targetDate }, { accessToken }) {
   const query = new URLSearchParams()
   if (targetDate) query.set('target_date', String(targetDate))
-  return requestJson({ path: `/api/v1/admin/daily-activity/overview?${query.toString()}`, accessToken })
+  return cachedGetJson({
+    path: `/api/v1/admin/daily-activity/overview?${query.toString()}`,
+    accessToken,
+    ttlMs: TTL_MS.DAILY_OVERVIEW,
+    onHttpError: (json) => normalizeApiError(json, 'Daily activity request failed'),
+    select: (j) => j?.data ?? null,
+  })
 }
 
 export async function getDailyActivityTrends({ days = 7 }, { accessToken }) {
   const query = new URLSearchParams({ days: String(days) })
-  return requestJson({ path: `/api/v1/admin/daily-activity/trends?${query.toString()}`, accessToken })
+  return cachedGetJson({
+    path: `/api/v1/admin/daily-activity/trends?${query.toString()}`,
+    accessToken,
+    ttlMs: TTL_MS.DAILY_TRENDS,
+    onHttpError: (json) => normalizeApiError(json, 'Daily activity request failed'),
+    select: (j) => j?.data ?? null,
+  })
 }
 
 export async function listDailyActivityShops(
@@ -54,14 +47,11 @@ export async function listDailyActivityShops(
   })
   if (targetDate) query.set('target_date', String(targetDate))
   if (search) query.set('search', String(search))
-  const response = await fetch(buildUrl(`/api/v1/admin/daily-activity/shops?${query.toString()}`), {
-    method: 'GET',
-    headers: {
-      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-    },
+  return cachedGetJson({
+    path: `/api/v1/admin/daily-activity/shops?${query.toString()}`,
+    accessToken,
+    ttlMs: TTL_MS.DAILY_SHOPS,
+    onHttpError: (json) => normalizeApiError(json, 'Failed to load shop activity'),
+    select: (j) => ({ items: j?.data ?? [], meta: j?.meta ?? null }),
   })
-  const json = await readJson(response)
-  if (!response.ok) throw normalizeApiError(json, 'Failed to load shop activity')
-  return { items: json?.data ?? [], meta: json?.meta ?? null }
 }
-

@@ -1,3 +1,6 @@
+import { cachedGetJson } from '@/apis/cachedGet'
+import { TTL_MS } from '@/utils/responseCache'
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000'
 const DELIVERY_PARTNERS_PATH =
   import.meta.env.VITE_DELIVERY_PARTNERS_PATH ?? '/delivery-partners/'
@@ -31,6 +34,16 @@ async function readJson(response) {
 }
 
 async function requestJson({ path, method = 'GET', accessToken, body }) {
+  if (method === 'GET' && body === undefined) {
+    return cachedGetJson({
+      path,
+      accessToken,
+      ttlMs: TTL_MS.DEFAULT_GET,
+      onHttpError: (json, response) => normalizeApiError(json, 'Request failed. Please try again.', response.status),
+      select: (j) => j,
+    })
+  }
+
   const response = await fetch(buildUrl(path), {
     method,
     headers: {

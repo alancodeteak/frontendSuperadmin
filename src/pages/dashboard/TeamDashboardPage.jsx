@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -28,8 +28,10 @@ import {
   getReportsFunnel,
   getReportsOverview,
 } from '@/apis/reportsApi'
-import { getAdminAccountsOverview } from '@/apis/invoicesApi'
+import { getAdminAccountsOverview, getPortalAccountsOverview } from '@/apis/invoicesApi'
 import { useTheme } from '@/context/useTheme'
+import { buildOperationsSnapshot } from '@/utils/operationsSnapshot'
+import { getAvatarUrlForKey } from '@/utils/avatarFallback'
 import '@/App.css'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000'
@@ -53,25 +55,19 @@ function contactInitials(value) {
   return parts.map((p) => p[0]?.toUpperCase()).join('')
 }
 
-function buildOperationsSnapshot(ov, funnel, dpRows, acct) {
-  if (!ov) return null
-  const kpis = ov.kpis ?? {}
-  const per = Array.isArray(ov.revenue?.per_shop) ? ov.revenue.per_shop : []
-  const activeShops = Number(kpis.active_shops ?? 0)
-  const activePartners = Number(kpis.active_partners ?? 0)
-  const partnersWithOrders = Array.isArray(dpRows) ? dpRows.length : 0
-  const pendingShops = Number(acct?.kpis?.pending_shops ?? 0)
-  const overdueShops = Number(acct?.kpis?.overdue_shops ?? 0)
+/** Portal dashboard: subscription invoice overview (JWT-scoped on the backend). */
+function buildPortalOperationsSnapshot(overview) {
+  if (!overview) return null
+  const k = overview.kpis ?? {}
   return {
-    shopsNotUsing: Math.max(0, activeShops - per.length),
-    shopsPaymentPending: acct ? pendingShops + overdueShops : null,
-    partnersNotUsing: Array.isArray(dpRows) ? Math.max(0, activePartners - partnersWithOrders) : null,
-    deliveriesPending: funnel != null ? Number(funnel.pending ?? 0) : null,
-    partnerSampleCapped: partnersWithOrders >= 100 && activePartners > 100,
-    totalOrders: Number(kpis.total_orders ?? 0),
-    totalAmount: Number(kpis.total_amount ?? 0),
-    totalDeliveries: Number(kpis.total_deliveries ?? 0),
-    growth: ov.growth ?? null,
+    kind: 'portal',
+    windowDays: Number(overview.window_days ?? 30),
+    collectedAmount: Number(k.collected_amount ?? 0),
+    toCollectAmount: Number(k.to_collect_amount ?? 0),
+    overdueShops: Number(k.overdue_shops ?? 0),
+    pendingShops: Number(k.pending_shops ?? 0),
+    overdueInvoices: Number(k.overdue_invoices ?? 0),
+    pendingInvoices: Number(k.pending_invoices ?? 0),
   }
 }
 
@@ -102,10 +98,92 @@ const chartDataByRange = {
   ],
 }
 
+function DashboardContactRow({ contact, rowIndex = 0 }) {
+  const [apiAvatarFailed, setApiAvatarFailed] = useState(false)
+  const [pooledAvatarFailed, setPooledAvatarFailed] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const avatarSrc = contact.avatar_src
+  const pooledAvatarUrl = useMemo(
+    () => getAvatarUrlForKey(String(contact.user_id ?? contact.shop_name ?? rowIndex)),
+    [contact.user_id, contact.shop_name, rowIndex],
+  )
+
+  useEffect(() => {
+    setApiAvatarFailed(false)
+    setPooledAvatarFailed(false)
+  }, [avatarSrc, pooledAvatarUrl])
+
+  const showApiPhoto = Boolean(avatarSrc) && !apiAvatarFailed
+  const showPooledPhoto = !showApiPhoto && !pooledAvatarFailed
+
+  const handleCopy = useCallback(async () => {
+    if (!contact.phone) return
+    try {
+      await navigator.clipboard.writeText(String(contact.phone))
+      setCopied(true)
+    } catch {
+      /* ignore */
+    }
+  }, [contact.phone])
+
+  useEffect(() => {
+    if (!copied) return undefined
+    const id = window.setTimeout(() => setCopied(false), 1600)
+    return () => window.clearTimeout(id)
+  }, [copied])
+
+  return (
+    <div className="flex items-center justify-between gap-2 rounded-lg bg-slate-50 px-2 py-1.5 ring-1 ring-slate-200 dark:bg-slate-900/40 dark:ring-slate-800">
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full bg-slate-200 ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700">
+          {showApiPhoto || showPooledPhoto ? (
+            <img
+              src={showApiPhoto ? avatarSrc : pooledAvatarUrl}
+              alt=""
+              className="h-full w-full object-cover"
+              loading="lazy"
+              onError={() => {
+                if (showApiPhoto) setApiAvatarFailed(true)
+                else setPooledAvatarFailed(true)
+              }}
+            />
+          ) : (
+            <div className="grid h-full w-full place-items-center text-[11px] font-bold text-slate-700 dark:text-slate-200">
+              {contactInitials(contact.shop_name)}
+            </div>
+          )}
+        </div>
+        <div className="min-w-0">
+          <div className="truncate text-sm font-semibold text-slate-900 dark:text-white">{contact.shop_name}</div>
+          <div className="truncate text-xs text-slate-600 dark:text-slate-300">
+            {contact.phone || 'No phone'}
+          </div>
+        </div>
+      </div>
+      {contact.phone ? (
+        <button
+          type="button"
+          onClick={() => void handleCopy()}
+          className={`shrink-0 rounded-lg border px-2 py-1 text-[11px] font-semibold transition-colors ${
+            copied
+              ? 'border-emerald-500/60 bg-emerald-50 text-emerald-800 dark:border-emerald-600/50 dark:bg-emerald-950/50 dark:text-emerald-200'
+              : 'border-slate-200 bg-white text-slate-800 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-100 dark:hover:bg-slate-900/55'
+          }`}
+          title={copied ? 'Copied' : 'Copy phone'}
+        >
+          {copied ? 'Copied!' : 'Copy'}
+        </button>
+      ) : null}
+    </div>
+  )
+}
+
 function TeamDashboardPage({
   brandTitle = 'Teamify',
   pageTitle = 'Team Dashboard',
   logoutRedirectTo = '/',
+  /** Sidebar "Home → Dashboard" target; must match portal vs admin routes. */
+  dashboardPath = '/dashboard/teamify',
   shopsPagePath = '/dashboard/teamify/shops',
   reportsPath = '/dashboard/teamify/reports',
   contactBookPath = '/dashboard/teamify/contact-book',
@@ -123,21 +201,67 @@ function TeamDashboardPage({
   const [contactsLoading, setContactsLoading] = useState(false)
   const [reportToday, setReportToday] = useState(null)
   const [reportMonthly, setReportMonthly] = useState(null)
-  const [dailySeries, setDailySeries] = useState([])
   const [reportLoading, setReportLoading] = useState(false)
   const [reportError, setReportError] = useState('')
-  const [copiedContactKey, setCopiedContactKey] = useState(null)
-  const copyPhoneResetRef = useRef(null)
+  const operationsCardRef = useRef(null)
+  const [isLgLayout, setIsLgLayout] = useState(
+    typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches,
+  )
+  const [operationsCardHeightPx, setOperationsCardHeightPx] = useState(null)
+
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)')
+    const onChange = () => setIsLgLayout(mq.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+
+  useLayoutEffect(() => {
+    if (!isLgLayout) {
+      setOperationsCardHeightPx(null)
+      return
+    }
+    const el = operationsCardRef.current
+    if (!el) return
+
+    const measure = () => {
+      const h = el.getBoundingClientRect().height
+      if (h > 0) setOperationsCardHeightPx(h)
+    }
+
+    const ro = new ResizeObserver(() => {
+      measure()
+    })
+    ro.observe(el)
+    measure()
+    const raf = requestAnimationFrame(() => measure())
+
+    return () => {
+      cancelAnimationFrame(raf)
+      ro.disconnect()
+    }
+  }, [
+    isLgLayout,
+    reportToday,
+    reportMonthly,
+    reportLoading,
+    reportError,
+    contactRows.length,
+  ])
+
+  const contactBookCardStyle =
+    isLgLayout && operationsCardHeightPx != null
+      ? {
+          height: operationsCardHeightPx,
+          maxHeight: operationsCardHeightPx,
+          minHeight: 0,
+          boxSizing: 'border-box',
+        }
+      : undefined
 
   useEffect(() => {
     dispatch(getDashboardData())
   }, [dispatch])
-
-  useEffect(() => {
-    return () => {
-      if (copyPhoneResetRef.current) clearTimeout(copyPhoneResetRef.current)
-    }
-  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -152,12 +276,12 @@ function TeamDashboardPage({
           items.map((r) => {
             const photoUrl = r?.photo_url ?? r?.photoUrl ?? null
             const photo = r?.photo ?? r?.shop_owner?.photo ?? r?.shopOwner?.photo ?? null
-            const avatarSrc = resolveContactImageUrl(photoUrl) || resolveContactImageUrl(photo)
+            const avatar_src = resolveContactImageUrl(photoUrl) || resolveContactImageUrl(photo)
             return {
               shop_name: r?.shop_name ?? r?.shop_owner?.shop_name ?? r?.shopOwner?.shop_name ?? '—',
               phone: r?.phone ?? r?.shop_owner?.phone ?? r?.shopOwner?.phone ?? '',
               user_id: r?.user_id ?? r?.shop_owner?.user_id ?? r?.shopOwner?.user_id ?? '',
-              avatar_src: avatarSrc,
+              avatar_src,
             }
           }),
         )
@@ -184,6 +308,31 @@ function TeamDashboardPage({
       setReportLoading(true)
       setReportError('')
       try {
+        if (reportsPath === null) {
+          const settled = await Promise.allSettled([
+            getPortalAccountsOverview({ days: 1 }, { accessToken }),
+            getPortalAccountsOverview({ days: 30 }, { accessToken }),
+          ])
+          if (cancelled) return
+          const d1 = settled[0].status === 'fulfilled' ? settled[0].value : null
+          const d30 = settled[1].status === 'fulfilled' ? settled[1].value : null
+          const partial = settled.some((r) => r.status === 'rejected')
+          if (partial) {
+            setReportError('Some figures could not be loaded; numbers below may be incomplete.')
+          } else {
+            setReportError('')
+          }
+          if (!d1 && !d30) {
+            setReportToday(null)
+            setReportMonthly(null)
+            setReportError('Could not load subscription overview.')
+            return
+          }
+          setReportToday(d1 ? buildPortalOperationsSnapshot(d1) : null)
+          setReportMonthly(d30 ? buildPortalOperationsSnapshot(d30) : null)
+          return
+        }
+
         const settled = await Promise.allSettled([
           getReportsOverview({ days: 1 }, { accessToken }),
           getReportsOverview({ days: 30 }, { accessToken }),
@@ -213,28 +362,21 @@ function TeamDashboardPage({
         if (!ov1 && !ov30) {
           setReportToday(null)
           setReportMonthly(null)
-          setDailySeries([])
           setReportError('Could not load analytics.')
           return
         }
 
-        setReportToday(
-          ov1 ? buildOperationsSnapshot(ov1, funnel1, dp1, acct) : null,
-        )
-        setReportMonthly(
-          ov30 ? buildOperationsSnapshot(ov30, funnel30, dp30, acct) : null,
-        )
-
-        const raw = Array.isArray(ov30?.series) ? ov30.series : []
-        setDailySeries(
-          [...raw].sort((a, b) => String(b.date ?? '').localeCompare(String(a.date ?? ''))),
-        )
+        setReportToday(ov1 ? buildOperationsSnapshot(ov1, funnel1, dp1, acct) : null)
+        setReportMonthly(ov30 ? buildOperationsSnapshot(ov30, funnel30, dp30, acct) : null)
       } catch {
         if (!cancelled) {
           setReportToday(null)
           setReportMonthly(null)
-          setDailySeries([])
-          setReportError('Could not load reports. Check your connection and try again.')
+          setReportError(
+            reportsPath === null
+              ? 'Could not load subscription overview.'
+              : 'Could not load reports. Check your connection and try again.',
+          )
         }
       } finally {
         if (!cancelled) setReportLoading(false)
@@ -244,7 +386,7 @@ function TeamDashboardPage({
     return () => {
       cancelled = true
     }
-  }, [accessToken])
+  }, [accessToken, reportsPath])
 
   const utilization = useMemo(() => {
     if (!members.length) return 0
@@ -281,29 +423,18 @@ function TeamDashboardPage({
     navigate(logoutRedirectTo, { replace: true })
   }
 
-  const copyContactPhone = (rowKey, phone) => {
-    if (!phone) return
-    navigator.clipboard?.writeText(String(phone)).then(() => {
-      setCopiedContactKey(rowKey)
-      if (copyPhoneResetRef.current) clearTimeout(copyPhoneResetRef.current)
-      copyPhoneResetRef.current = setTimeout(() => {
-        setCopiedContactKey(null)
-        copyPhoneResetRef.current = null
-      }, 2000)
-    }).catch(() => {})
-  }
-
   const navSections = useMemo(
     () =>
       buildSidebarNav({
         navigate,
         activeKey: 'home.dashboard',
         paths: {
-          dashboardPath: '/dashboard/teamify',
+          dashboardPath,
           homeContactBookPath: contactBookPath,
           shopsPath: shopsPagePath,
           createShopPath: `${shopsPagePath}/create`,
-          deliveryPartnersPath: '/dashboard/teamify/delivery-partners',
+          deliveryPartnersPath:
+            reportsPath === null ? null : '/dashboard/teamify/delivery-partners',
           reportsPath,
           accountsInvoicesPath:
             reportsPath === null
@@ -323,7 +454,7 @@ function TeamDashboardPage({
               : '/dashboard/teamify/activity/sales',
         },
       }),
-    [contactBookPath, navigate, reportsPath, shopsPagePath],
+    [contactBookPath, dashboardPath, navigate, reportsPath, shopsPagePath],
   )
 
   return (
@@ -338,7 +469,7 @@ function TeamDashboardPage({
         isLoggingOut={isLoggingOut}
       />
 
-      <main className="flex-1 rounded-3xl bg-white p-1 dark:bg-slate-950/40 sm:p-2">
+      <main className="min-h-0 flex-1 rounded-3xl bg-white p-1 dark:bg-slate-950/40 sm:p-2">
         <header className="teamify-surface mb-3 rounded-3xl p-3 ring-1 ring-slate-200 dark:ring-slate-700 sm:p-4 md:mb-4 md:p-5">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
@@ -482,8 +613,11 @@ function TeamDashboardPage({
           </article>
         </section>
 
-        <section className="mb-3 mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3 lg:items-stretch lg:gap-4 md:mb-4 md:mt-4">
-          <div className="teamify-surface flex min-h-0 flex-col rounded-3xl p-3 ring-1 ring-slate-200 dark:ring-slate-700 sm:p-3 md:p-4 lg:col-span-1 lg:min-h-[min(70vh,520px)]">
+        <section className="mb-3 mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3 lg:items-stretch lg:gap-4 md:mb-4 md:mt-4 lg:min-h-0">
+          <div
+            className="teamify-surface flex min-h-0 w-full flex-col overflow-hidden rounded-3xl p-3 ring-1 ring-slate-200 dark:ring-slate-700 sm:p-3 md:p-4 lg:col-span-1"
+            style={contactBookCardStyle}
+          >
             <div className="mb-2 shrink-0">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-600 dark:text-indigo-300">
                 Home
@@ -505,52 +639,35 @@ function TeamDashboardPage({
               </p>
             </div>
             <div
-              className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1"
-              style={{ maxHeight: 'min(26vh, 200px)' }}
+              className={`min-h-0 space-y-1.5 overflow-y-auto overflow-x-hidden pr-1 ${contactBookCardStyle ? 'flex-1' : ''} ${isLgLayout && !contactBookCardStyle ? 'max-h-[min(12rem,32vh)]' : ''}`}
             >
               {contactsLoading ? (
                 <p className="text-sm text-slate-500 dark:text-slate-400">Loading contacts…</p>
               ) : (
                 contactRows.map((c, idx) => (
-                  <div
-                    key={`${c.user_id ?? 'u'}-${idx}`}
-                    className="flex items-center justify-between gap-2 rounded-lg bg-slate-50 px-2 py-1.5 ring-1 ring-slate-200 dark:bg-slate-900/40 dark:ring-slate-800"
-                  >
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-semibold text-slate-900 dark:text-white">{c.shop_name}</div>
-                      <div className="truncate text-xs text-slate-600 dark:text-slate-300">
-                        {c.phone || 'No phone'}
-                        {c.user_id ? ` · UID ${c.user_id}` : ''}
-                      </div>
-                    </div>
-                    {c.phone ? (
-                      <button
-                        type="button"
-                        onClick={() => navigator.clipboard?.writeText(String(c.phone)).catch(() => {})}
-                        className="shrink-0 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-800 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-100 dark:hover:bg-slate-900/55"
-                        title="Copy phone"
-                      >
-                        Copy
-                      </button>
-                    ) : null}
-                  </div>
+                  <DashboardContactRow key={`${c.user_id ?? 'u'}-${idx}`} contact={c} rowIndex={idx} />
                 ))
               )}
               {!contactsLoading && !contactRows.length ? (
                 <p className="text-sm text-slate-500 dark:text-slate-400">No shops to show.</p>
               ) : null}
             </div>
-            <button
-              type="button"
-              onClick={() => navigate(contactBookPath)}
-              className="mt-2 w-full shrink-0 rounded-xl border border-slate-200 bg-white py-1.5 text-xs font-semibold text-slate-900 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-100 dark:hover:bg-slate-900/55"
-            >
-              Open full contact book
-            </button>
+            {contactBookPath ? (
+              <button
+                type="button"
+                onClick={() => navigate(contactBookPath)}
+                className="mt-2 w-full shrink-0 rounded-xl border border-slate-200 bg-white py-1.5 text-xs font-semibold text-slate-900 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-100 dark:hover:bg-slate-900/55"
+              >
+                Open full contact book
+              </button>
+            ) : null}
           </div>
 
-          <div className="teamify-surface flex min-h-0 flex-col rounded-3xl p-3 ring-1 ring-slate-200 dark:ring-slate-700 sm:p-3 md:p-4 lg:col-span-2">
-            <div className="mb-2">
+          <div
+            ref={operationsCardRef}
+            className="teamify-surface flex w-full flex-col rounded-3xl p-3 ring-1 ring-slate-200 dark:ring-slate-700 sm:p-3 md:p-4 lg:col-span-2 lg:min-h-0 lg:self-start"
+          >
+            <div className="mb-2 shrink-0">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700 dark:text-amber-300">
                 Operations
               </p>
@@ -558,10 +675,12 @@ function TeamDashboardPage({
                 Today
               </h3>
               <p className="mt-0.5 text-[11px] leading-snug text-slate-500 dark:text-slate-400">
-                Last 24 hours first; 30-day context and daily breakdown follow. Subscription backlog is current.
+                {reportsPath === null
+                  ? 'Subscription invoices for your shop: short window vs last 30 days. Pending and overdue counts are current.'
+                  : 'Last 24 hours first; 30-day context below. Subscription backlog is current.'}
               </p>
             </div>
-            <div className="flex max-h-[min(70vh,520px)] flex-col gap-3 overflow-y-auto pr-0.5">
+            <div className="flex flex-col gap-3 pr-0.5">
               {reportLoading ? (
                 <p className="text-xs text-slate-500 dark:text-slate-400">Loading report…</p>
               ) : !reportToday && !reportMonthly && reportError ? (
@@ -574,7 +693,50 @@ function TeamDashboardPage({
                     </p>
                   ) : null}
 
-                  {reportToday ? (
+                  {reportToday?.kind === 'portal' ? (
+                    <div className="space-y-1.5 rounded-xl bg-slate-50/80 p-2.5 ring-1 ring-slate-200 dark:bg-slate-900/30 dark:ring-slate-800">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-200">
+                        Last {reportToday.windowDays} day{reportToday.windowDays === 1 ? '' : 's'}
+                      </p>
+                      <p className="text-[11px] text-slate-600 dark:text-slate-400">
+                        <span className="font-semibold text-slate-800 dark:text-slate-200">
+                          {reportToday.collectedAmount.toLocaleString(undefined, {
+                            maximumFractionDigits: 0,
+                          })}
+                        </span>{' '}
+                        collected ·{' '}
+                        <span className="font-semibold text-slate-800 dark:text-slate-200">
+                          {reportToday.toCollectAmount.toLocaleString(undefined, {
+                            maximumFractionDigits: 0,
+                          })}
+                        </span>{' '}
+                        outstanding (pending + overdue)
+                      </p>
+                      <p className="text-[11px] leading-snug text-slate-800 dark:text-slate-200">
+                        <span className="font-semibold text-slate-900 dark:text-white">
+                          {reportToday.pendingInvoices.toLocaleString()}
+                        </span>{' '}
+                        pending invoices ·{' '}
+                        <span className="font-semibold text-slate-900 dark:text-white">
+                          {reportToday.overdueInvoices.toLocaleString()}
+                        </span>{' '}
+                        overdue
+                      </p>
+                      {(reportToday.pendingShops > 0 || reportToday.overdueShops > 0) && (
+                        <p className="text-[11px] leading-snug text-slate-800 dark:text-slate-200">
+                          <span className="font-semibold text-slate-900 dark:text-white">
+                            {reportToday.pendingShops > 0
+                              ? `${reportToday.pendingShops} pending shop(s)`
+                              : null}
+                            {reportToday.pendingShops > 0 && reportToday.overdueShops > 0 ? ' · ' : null}
+                            {reportToday.overdueShops > 0
+                              ? `${reportToday.overdueShops} overdue shop(s)`
+                              : null}
+                          </span>
+                        </p>
+                      )}
+                    </div>
+                  ) : reportToday ? (
                     <div className="space-y-1.5 rounded-xl bg-slate-50/80 p-2.5 ring-1 ring-slate-200 dark:bg-slate-900/30 dark:ring-slate-800">
                       <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-200">
                         Today · last 24 hours
@@ -637,7 +799,52 @@ function TeamDashboardPage({
                     </p>
                   )}
 
-                  {reportMonthly ? (
+                  {reportMonthly?.kind === 'portal' ? (
+                    <div className="space-y-1.5 rounded-xl border border-dashed border-slate-200/90 p-2.5 dark:border-slate-600/80">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-500">
+                        Last {reportMonthly.windowDays} days
+                      </p>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-500">
+                        <span className="font-semibold text-slate-700 dark:text-slate-300">
+                          {reportMonthly.collectedAmount.toLocaleString(undefined, {
+                            maximumFractionDigits: 0,
+                          })}
+                        </span>{' '}
+                        collected ·{' '}
+                        <span className="font-semibold text-slate-700 dark:text-slate-300">
+                          {reportMonthly.toCollectAmount.toLocaleString(undefined, {
+                            maximumFractionDigits: 0,
+                          })}
+                        </span>{' '}
+                        outstanding (pending + overdue)
+                      </p>
+                      <p className="text-[10px] leading-snug text-slate-600 dark:text-slate-400">
+                        <span className="font-semibold text-slate-800 dark:text-slate-300">
+                          {reportMonthly.pendingInvoices.toLocaleString()}
+                        </span>{' '}
+                        pending invoices ·{' '}
+                        <span className="font-semibold text-slate-800 dark:text-slate-300">
+                          {reportMonthly.overdueInvoices.toLocaleString()}
+                        </span>{' '}
+                        overdue
+                      </p>
+                      {(reportMonthly.pendingShops > 0 || reportMonthly.overdueShops > 0) && (
+                        <p className="text-[10px] leading-snug text-slate-600 dark:text-slate-400">
+                          <span className="font-semibold text-slate-800 dark:text-slate-300">
+                            {reportMonthly.pendingShops > 0
+                              ? `${reportMonthly.pendingShops} pending shop(s)`
+                              : null}
+                            {reportMonthly.pendingShops > 0 && reportMonthly.overdueShops > 0
+                              ? ' · '
+                              : null}
+                            {reportMonthly.overdueShops > 0
+                              ? `${reportMonthly.overdueShops} overdue shop(s)`
+                              : null}
+                          </span>
+                        </p>
+                      )}
+                    </div>
+                  ) : reportMonthly ? (
                     <div className="space-y-1.5 rounded-xl border border-dashed border-slate-200/90 p-2.5 dark:border-slate-600/80">
                       <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-500">
                         30-day context
@@ -709,54 +916,16 @@ function TeamDashboardPage({
                       30-day analytics unavailable.
                     </p>
                   )}
-
-                  <div>
-                    <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-500">
-                      Daily breakdown · 30-day window
-                    </p>
-                    <div
-                      className="overflow-x-auto overflow-y-auto rounded-lg ring-1 ring-slate-200 dark:ring-slate-800"
-                      style={{ maxHeight: 'min(22vh, 200px)' }}
+                  {reportsPath === null &&
+                  (reportToday?.kind === 'portal' || reportMonthly?.kind === 'portal') ? (
+                    <button
+                      type="button"
+                      onClick={() => navigate('/portal/dashboard/accounts/overview')}
+                      className="w-full shrink-0 rounded-xl border border-amber-200/80 bg-amber-50/80 py-2 text-[11px] font-semibold text-amber-900 shadow-sm hover:bg-amber-100/90 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-100 dark:hover:bg-amber-950/60"
                     >
-                      <table className="w-full border-collapse text-left text-[10px]">
-                        <thead>
-                          <tr className="sticky top-0 bg-slate-100 text-slate-600 dark:bg-slate-900 dark:text-slate-400">
-                            <th className="px-2 py-1.5 font-semibold">Date</th>
-                            <th className="px-2 py-1.5 font-semibold">Orders</th>
-                            <th className="px-2 py-1.5 font-semibold text-right">Amount</th>
-                          </tr>
-                        </thead>
-                        <tbody className="text-slate-800 dark:text-slate-200">
-                          {dailySeries.length ? (
-                            dailySeries.map((row) => (
-                              <tr
-                                key={String(row.date)}
-                                className="border-t border-slate-100 dark:border-slate-800"
-                              >
-                                <td className="whitespace-nowrap px-2 py-1 tabular-nums">{row.date}</td>
-                                <td className="px-2 py-1 tabular-nums">
-                                  {row.orders != null ? Number(row.orders).toLocaleString() : '—'}
-                                </td>
-                                <td className="px-2 py-1 text-right tabular-nums">
-                                  {row.amount != null
-                                    ? Number(row.amount).toLocaleString(undefined, {
-                                        maximumFractionDigits: 0,
-                                      })
-                                    : '—'}
-                                </td>
-                              </tr>
-                            ))
-                          ) : (
-                            <tr>
-                              <td colSpan={3} className="px-2 py-2 text-slate-500 dark:text-slate-400">
-                                No daily rows yet.
-                              </td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
+                      Open full accounts overview
+                    </button>
+                  ) : null}
                 </>
               )}
             </div>

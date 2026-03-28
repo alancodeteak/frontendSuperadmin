@@ -3,6 +3,7 @@ import dashboardReducer from '@/redux/slices/dashboardSlice'
 import authReducer from '@/redux/slices/authSlice'
 import supermarketsReducer from '@/redux/slices/supermarketsSlice'
 import deliveryPartnersReducer from '@/redux/slices/deliveryPartnersSlice'
+import { cacheClearAll } from '@/utils/responseCache'
 
 export const store = configureStore({
   reducer: {
@@ -14,6 +15,7 @@ export const store = configureStore({
 })
 
 let __lastAuthSnapshot = null
+let __prevHadAccessToken = Boolean(store.getState().auth.session.accessToken)
 store.subscribe(() => {
   const s = store.getState()
   const session = s?.auth?.session ?? {}
@@ -22,6 +24,11 @@ store.subscribe(() => {
     expiresAt: session.expiresAt ?? null,
     scope: session.scope ?? null,
   }
+  if (__prevHadAccessToken && !snapshot.hasAccessToken) {
+    cacheClearAll()
+  }
+  __prevHadAccessToken = snapshot.hasAccessToken
+
   const changed =
     !__lastAuthSnapshot ||
     __lastAuthSnapshot.hasAccessToken !== snapshot.hasAccessToken ||

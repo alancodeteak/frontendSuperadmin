@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { getRandomAvatarUrl } from '@/utils/avatarFallback'
+import { getAvatarUrlForKey } from '@/utils/avatarFallback'
+
+function sidebarProfileInitials(brandTitle, subTitle) {
+  const s = String(subTitle || brandTitle || 'Admin').trim()
+  const parts = s.split(/\s+/).filter(Boolean).slice(0, 2)
+  if (!parts.length) return 'A'
+  return parts.map((p) => p[0]?.toUpperCase()).join('') || 'A'
+}
 
 const SIDEBAR_COLLAPSED_KEY = 'yaadro_sidebar_collapsed_v1'
 
@@ -244,10 +251,24 @@ function AppSidebar({
   onLogout,
   isLoggingOut,
   bottomSlot,
+  /** Optional profile photo URL (e.g. from user/session). Falls back to initials. */
+  profileAvatarUrl = null,
 }) {
   const [currentDateTime, setCurrentDateTime] = useState(() => new Date())
   const isDark = themeMode === 'dark'
-  const profileAvatar = useMemo(() => getRandomAvatarUrl(), [])
+  const profileInitials = useMemo(
+    () => sidebarProfileInitials(brandTitle, subTitle),
+    [brandTitle, subTitle],
+  )
+  const pooledProfileAvatarUrl = useMemo(
+    () => getAvatarUrlForKey(String(subTitle || brandTitle || 'sidebar-profile')),
+    [brandTitle, subTitle],
+  )
+  const [profileApiPhotoFailed, setProfileApiPhotoFailed] = useState(false)
+  const [profilePooledPhotoFailed, setProfilePooledPhotoFailed] = useState(false)
+  const showProfileApiPhoto = Boolean(profileAvatarUrl) && !profileApiPhotoFailed
+  const showProfilePooledPhoto = !showProfileApiPhoto && !profilePooledPhotoFailed
+  const showProfileImage = showProfileApiPhoto || showProfilePooledPhoto
   const [toast, setToast] = useState(null)
   const toastTimerRef = useRef(null)
 
@@ -326,6 +347,11 @@ function AppSidebar({
   }, [])
 
   useEffect(() => {
+    setProfileApiPhotoFailed(false)
+    setProfilePooledPhotoFailed(false)
+  }, [profileAvatarUrl, pooledProfileAvatarUrl])
+
+  useEffect(() => {
     // Intentionally empty: keep hook slot for future UI instrumentation.
   }, [isDark, themeMode])
 
@@ -362,12 +388,30 @@ function AppSidebar({
 
       <div className="mb-6 flex items-center justify-between gap-3 lg:mb-8">
         <div className="flex min-w-0 items-center gap-3">
-          <img
-            src={profileAvatar}
-            alt="Profile avatar"
-            className="h-10 w-10 rounded-xl object-cover ring-1 ring-slate-200 dark:ring-slate-700"
-            loading="lazy"
-          />
+          <div
+            className={`relative h-10 w-10 shrink-0 overflow-hidden rounded-xl ring-1 ring-slate-200 dark:ring-slate-700 ${
+              showProfileImage ? '' : 'bg-gradient-to-br from-indigo-500 to-indigo-700'
+            }`}
+            role="img"
+            aria-label={subTitle || brandTitle || 'Profile'}
+          >
+            {showProfileImage ? (
+              <img
+                src={showProfileApiPhoto ? profileAvatarUrl : pooledProfileAvatarUrl}
+                alt=""
+                className="h-full w-full object-cover"
+                loading="lazy"
+                onError={() => {
+                  if (showProfileApiPhoto) setProfileApiPhotoFailed(true)
+                  else setProfilePooledPhotoFailed(true)
+                }}
+              />
+            ) : (
+              <div className="grid h-full w-full place-items-center text-sm font-bold tracking-tight text-white">
+                {profileInitials}
+              </div>
+            )}
+          </div>
           {collapsed ? null : (
             <div className="min-w-0">
               <h1 className="truncate text-lg font-semibold tracking-tight text-black dark:text-slate-100">

@@ -317,11 +317,12 @@ function ShopDetailPage({
           dashboardPath,
           homeContactBookPath:
             reportsPath === null
-              ? null
+              ? '/portal/dashboard/contact-book'
               : '/dashboard/teamify/contact-book',
           shopsPath,
           createShopPath: createPath,
-          deliveryPartnersPath: '/dashboard/teamify/delivery-partners',
+          deliveryPartnersPath:
+            reportsPath === null ? null : '/dashboard/teamify/delivery-partners',
           reportsPath,
           accountsInvoicesPath:
             reportsPath === null

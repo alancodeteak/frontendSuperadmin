@@ -1,3 +1,6 @@
+import { cachedGetJson } from '@/apis/cachedGet'
+import { TTL_MS } from '@/utils/responseCache'
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000'
 
 function buildUrl(path) {
@@ -21,6 +24,17 @@ function normalizeApiError(payload, fallbackMessage) {
 }
 
 async function requestJson({ path, method = 'GET', accessToken, body }) {
+  if (method === 'GET' && body === undefined) {
+    return cachedGetJson({
+      path,
+      accessToken,
+      ttlMs: TTL_MS.DEFAULT_GET,
+      headers: { 'Content-Type': 'application/json' },
+      onHttpError: (json) => normalizeApiError(json, 'Invoice API request failed'),
+      select: (j) => j?.data ?? null,
+    })
+  }
+
   const response = await fetch(buildUrl(path), {
     method,
     headers: {
@@ -35,6 +49,17 @@ async function requestJson({ path, method = 'GET', accessToken, body }) {
 }
 
 async function requestEnvelope({ path, method = 'GET', accessToken, body }) {
+  if (method === 'GET' && body === undefined) {
+    return cachedGetJson({
+      path,
+      accessToken,
+      ttlMs: TTL_MS.DEFAULT_GET,
+      headers: { 'Content-Type': 'application/json' },
+      onHttpError: (json) => normalizeApiError(json, 'Invoice API request failed'),
+      select: (j) => ({ data: j?.data ?? null, meta: j?.meta ?? null }),
+    })
+  }
+
   const response = await fetch(buildUrl(path), {
     method,
     headers: {

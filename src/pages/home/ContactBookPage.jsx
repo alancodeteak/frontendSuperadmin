@@ -31,6 +31,33 @@ function initials(value) {
   return parts.map((p) => p[0]?.toUpperCase()).join('')
 }
 
+function ShopContactAvatar({ shopName, avatarSrc }) {
+  const [imgFailed, setImgFailed] = useState(false)
+  const showPhoto = Boolean(avatarSrc) && !imgFailed
+
+  useEffect(() => {
+    setImgFailed(false)
+  }, [avatarSrc])
+
+  return (
+    <div className="h-12 w-12 shrink-0 overflow-hidden rounded-full ring-1 ring-slate-200 dark:ring-slate-800">
+      {showPhoto ? (
+        <img
+          src={avatarSrc}
+          alt=""
+          className="h-full w-full object-cover"
+          loading="lazy"
+          onError={() => setImgFailed(true)}
+        />
+      ) : (
+        <div className="grid h-full w-full place-items-center bg-slate-100 text-sm font-bold text-slate-700 dark:bg-slate-900 dark:text-slate-200">
+          {initials(shopName)}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function ContactBookPage({
   brandTitle = 'Teamify',
   dashboardPath = '/dashboard/teamify',
@@ -40,6 +67,10 @@ export default function ContactBookPage({
   invoicesPath = '/dashboard/teamify/accounts/invoices',
   overviewPath = '/dashboard/teamify/accounts/overview',
   contactBookPath = '/dashboard/teamify/contact-book',
+  deliveryPartnersPath = '/dashboard/teamify/delivery-partners',
+  activityDailyPath = '/dashboard/teamify/activity/daily',
+  activitySalesPath = '/dashboard/teamify/activity/sales',
+  logoutRedirectTo = '/',
 }) {
   const dispatch = useDispatch()
   const navigate = useNavigate()
@@ -140,18 +171,21 @@ export default function ContactBookPage({
           homeContactBookPath: contactBookPath,
           shopsPath,
           createShopPath,
-          deliveryPartnersPath: '/dashboard/teamify/delivery-partners',
+          deliveryPartnersPath,
           reportsPath,
           accountsInvoicesPath: invoicesPath,
           accountsOverviewPath: overviewPath,
-          activityDailyPath: '/dashboard/teamify/activity/daily',
-          activitySalesPath: '/dashboard/teamify/activity/sales',
+          activityDailyPath,
+          activitySalesPath,
         },
       }),
     [
+      activityDailyPath,
+      activitySalesPath,
       contactBookPath,
       createShopPath,
       dashboardPath,
+      deliveryPartnersPath,
       invoicesPath,
       navigate,
       overviewPath,
@@ -164,7 +198,7 @@ export default function ContactBookPage({
     if (isLoggingOut) return
     await dispatch(logoutAction())
     dispatch(logoutLocal())
-    navigate('/', { replace: true })
+    navigate(logoutRedirectTo, { replace: true })
   }
 
   return (
@@ -206,15 +240,7 @@ export default function ContactBookPage({
                   className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 dark:bg-slate-950/40"
                 >
                   <div className="flex items-start gap-3">
-                    <div className="h-12 w-12 shrink-0 overflow-hidden rounded-full ring-1 ring-slate-200 dark:ring-slate-800">
-                      {r.avatar_src ? (
-                        <img src={r.avatar_src} alt={r.shop_name} className="h-full w-full object-cover" loading="lazy" />
-                      ) : (
-                        <div className="grid h-full w-full place-items-center bg-slate-100 text-sm font-bold text-slate-700 dark:bg-slate-900 dark:text-slate-200">
-                          {initials(r.shop_name)}
-                        </div>
-                      )}
-                    </div>
+                    <ShopContactAvatar shopName={r.shop_name} avatarSrc={r.avatar_src} />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
                         <div className="truncate text-sm font-semibold text-slate-900 dark:text-white">
