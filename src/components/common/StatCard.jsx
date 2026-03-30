@@ -1,11 +1,25 @@
-function StatCard({ label, value, delta }) {
+function StatCard({ label, value, delta, compact = false }) {
   return (
-    <article className="teamify-surface rounded-2xl p-5 shadow-sm ring-1 ring-slate-200 transition duration-300 hover:-translate-y-1 hover:shadow-lg dark:ring-slate-700">
-      <p className="text-sm text-black dark:text-slate-300">{label}</p>
-      <p className="mt-3 text-3xl font-semibold tracking-tight text-black dark:text-slate-100">
+    <article
+      className={`teamify-surface rounded-2xl shadow-sm ring-1 ring-slate-200 transition duration-300 hover:-translate-y-1 hover:shadow-lg dark:ring-slate-700 ${
+        compact ? 'p-3 sm:p-3.5' : 'p-5'
+      }`}
+    >
+      <p className={`${compact ? 'text-xs' : 'text-sm'} text-black dark:text-slate-300`}>{label}</p>
+      <p
+        className={`mt-2 font-semibold tracking-tight text-black dark:text-slate-100 ${
+          compact ? 'text-xl sm:text-2xl' : 'text-3xl'
+        }`}
+      >
         {value}
       </p>
-      <p className="mt-2 text-sm font-medium text-black dark:text-emerald-400">{delta} this month</p>
+      <p
+        className={`mt-1 font-medium text-black dark:text-emerald-400 ${
+          compact ? 'text-xs sm:text-sm' : 'text-sm'
+        }`}
+      >
+        {delta} this month
+      </p>
     </article>
   )
 }
