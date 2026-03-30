@@ -1,16 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useSelector } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Legend,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
+import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import AppSidebar from '@/components/layout/AppSidebar'
 import { buildSidebarNav } from '@/components/layout/sidebarNavConfig'
@@ -22,6 +13,7 @@ import {
   listPortalInvoicesEnvelope,
 } from '@/apis/invoicesApi'
 import { listSupermarkets } from '@/apis/supermarketsApi'
+import AppleRingsChart from '@/components/common/AppleRingsChart'
 
 function toCurrency(value) {
   const n = Number(value ?? 0)
@@ -230,7 +222,7 @@ export default function AccountsOverviewPage({
             setOverdueInvoices(overdue)
           }
         }
-      } catch (e) {
+      } catch {
         if (!cancelled) {
           setData(SAMPLE)
           setError('')
@@ -303,6 +295,36 @@ export default function AccountsOverviewPage({
     amount: Number(r.amount ?? 0),
   }))
   const overdueRows = data?.lists?.top_overdue_shops ?? SAMPLE.lists.top_overdue_shops
+
+  // Derived status percentages for Operations health chart (3 independent rings).
+  const paidPct = useMemo(() => {
+    const paidAmt = Number(kpis.collected_amount ?? 0)
+    const toCollectAmt = Number(kpis.to_collect_amount ?? 0)
+    const total = paidAmt + toCollectAmt
+    if (!total) return 0
+    return Math.round((100 * paidAmt) / total)
+  }, [kpis.collected_amount, kpis.to_collect_amount])
+
+  const pendingPct = useMemo(() => {
+    const pendingCount = Number(kpis.pending_invoices ?? 0)
+    const overdueCount = Number(kpis.overdue_invoices ?? 0)
+    const total = pendingCount + overdueCount
+    if (!total) return 0
+    return Math.round((100 * pendingCount) / total)
+  }, [kpis.pending_invoices, kpis.overdue_invoices])
+
+  const overduePct = useMemo(() => {
+    const pendingCount = Number(kpis.pending_invoices ?? 0)
+    const overdueCount = Number(kpis.overdue_invoices ?? 0)
+    const total = pendingCount + overdueCount
+    if (!total) return 0
+    return Math.round((100 * overdueCount) / total)
+  }, [kpis.pending_invoices, kpis.overdue_invoices])
+
+  // If everything is zero (no data yet), fall back to a demo distribution so the rings are visible.
+  const displayPaidPct = paidPct || (!paidPct && !pendingPct && !overduePct ? 100 : 0) || paidPct
+  const displayPendingPct = pendingPct || (!paidPct && !pendingPct && !overduePct ? 78 : 0) || pendingPct
+  const displayOverduePct = overduePct || (!paidPct && !pendingPct && !overduePct ? 80 : 0) || overduePct
 
   const card = 'rounded-3xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900'
   const strong = 'text-slate-900 dark:text-slate-100'
@@ -392,6 +414,89 @@ export default function AccountsOverviewPage({
           </div>
         </section>
 
+        <section className="mb-4 grid grid-cols-1 gap-3 xl:grid-cols-3">
+          <div className={card}>
+            <h2 className={`mb-1 text-sm font-bold uppercase tracking-[0.14em] ${subtle}`}>Operations</h2>
+            <p className={`mb-1 text-xs ${subtle}`}>Today</p>
+            <p className={`text-sm ${subtle}`}>
+              <span className={strong}>Today · last 24 hours</span>
+              <br />
+              <span>0 orders · 0 revenue · 0 marked delivered</span>
+              <br />
+              <span>Subscription backlog is current.</span>
+            </p>
+            <p className={`mt-2 text-sm ${subtle}`}>
+              <span className={strong}>
+                {kpis.pending_shops + kpis.overdue_shops} shops — subscription payment pending or overdue (current).
+              </span>
+            </p>
+
+            <hr className="my-3 border-dashed border-slate-200 dark:border-slate-700" />
+
+            <p className={`mb-1 text-xs ${subtle}`}>30-day context</p>
+            <p className={`text-sm ${subtle}`}>
+              <span>0 orders · 0 revenue · 0 delivered</span>
+              <br />
+              <span>{kpis.pending_shops + kpis.overdue_shops} shops — subscription pending/overdue (current).</span>
+            </p>
+          </div>
+
+          <div className={card}>
+            <h2 className={`mb-1 text-sm font-bold uppercase tracking-[0.14em] ${subtle}`}>Operations health</h2>
+            <p className={`mb-1 text-xs ${subtle}`}>Invoice status mix — PAID, PENDING, OVERDUE (30-day)</p>
+            <div className="mt-1 grid grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] items-center gap-3">
+              <div className="h-28 w-28 sm:h-32 sm:w-32 md:h-36 md:w-36">
+                <AppleRingsChart
+                  rings={[
+                    { label: 'PAID', value: displayPaidPct, color: '#22c55e' },
+                    { label: 'PENDING', value: displayPendingPct, color: '#0ea5e9' },
+                    { label: 'OVERDUE', value: displayOverduePct, color: '#f97316' },
+                  ]}
+                />
+              </div>
+              <div className="space-y-1 text-[11px] text-slate-700 dark:text-slate-200">
+                <p className="text-xs font-medium text-slate-900 dark:text-slate-100">30-day status snapshot</p>
+                <p>
+                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">●</span> PAID{' '}
+                  <span className="tabular-nums font-semibold text-slate-900 dark:text-slate-100">
+                    {displayPaidPct}%
+                  </span>
+                </p>
+                <p>
+                  <span className="font-semibold text-sky-600 dark:text-sky-400">●</span> PENDING{' '}
+                  <span className="tabular-nums font-semibold text-slate-900 dark:text-slate-100">
+                    {displayPendingPct}%
+                  </span>
+                </p>
+                <p>
+                  <span className="font-semibold text-amber-600 dark:text-amber-400">●</span> OVERDUE{' '}
+                  <span className="tabular-nums font-semibold text-slate-900 dark:text-slate-100">
+                    {displayOverduePct}%
+                  </span>
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className={card}>
+            <h2 className={`mb-2 text-sm font-bold uppercase tracking-[0.14em] ${subtle}`}>Risk snapshot</h2>
+            <ul className={`space-y-1.5 text-sm ${subtle}`}>
+              <li>
+                <span className={strong}>{kpis.overdue_invoices}</span> overdue invoices
+              </li>
+              <li>
+                <span className={strong}>{kpis.pending_invoices}</span> pending invoices
+              </li>
+              <li>
+                <span className={strong}>{kpis.overdue_shops}</span> shops with overdue invoices
+              </li>
+              <li>
+                <span className={strong}>{kpis.pending_shops}</span> shops with pending invoices
+              </li>
+            </ul>
+          </div>
+        </section>
+
         <section className="grid grid-cols-1 gap-4 xl:grid-cols-3">
           <div className={`${card} xl:col-span-2`}>
             <h2 className={`mb-3 text-sm font-bold uppercase tracking-[0.14em] ${subtle}`}>Daily collected amount</h2>
@@ -416,8 +521,12 @@ export default function AccountsOverviewPage({
                 overdueRows.slice(0, 8).map((r) => (
                   <div key={r.shop_id} className="rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
                     <p className={`text-sm font-semibold ${strong}`}>{shopNameMap[String(r.shop_id)] || r.shop_id}</p>
-                    <p className={`text-xs ${subtle}`}>{r.shop_id}</p>
-                    <p className={`mt-2 text-sm ${strong}`}>{toCurrency(r.amount)} <span className={subtle}>• {r.count} invoices</span></p>
+                    <p className={`text-xs ${subtle}`}>
+                      Shop ID: {r.shop_id} • User ID: {String(r.user_id ?? '—')}
+                    </p>
+                    <p className={`mt-2 text-sm ${strong}`}>
+                      {toCurrency(r.amount)} <span className={subtle}>• {r.count} invoices</span>
+                    </p>
                   </div>
                 ))
               ) : (

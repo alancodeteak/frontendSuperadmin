@@ -46,6 +46,58 @@ Create a `.env` in this directory (optional; defaults match local dev):
 
 JWT via OTP (`/login/*`, `/portal/*`). Tokens are stored in `localStorage` under the key configured in `authSlice` and sent as `Authorization: Bearer <token>`.
 
+## Security implementation (frontend)
+
+This section documents the security-focused features implemented in this frontend codebase. Infrastructure items (TLS certificates, Cloudflare/Nginx headers) are documented in `../../SECURITY_DEPLOYMENT.md`.
+
+### Secure requests (HTTPS + timeouts)
+
+- **Shared HTTP client**: `src/apis/httpClient.js`
+  - Adds request timeouts (AbortController).
+  - Enforces **HTTPS-only in production** (or any environment when `VITE_REQUIRE_HTTPS=true`).
+- **Cached GET hardening**: `src/apis/cachedGet.js`
+  - Enforces HTTPS-only for cached GET requests in production.
+  - Triggers the same global unauthorized handling on `401`.
+
+### Global unauthorized handling (401)
+
+- When any API call returns **401 Unauthorized**, the app:
+  - clears the local session, and
+  - redirects to the correct login screen (admin `/` or portal `/portal/login`).
+- Implemented via:
+  - an event emitted by `httpClient` (`UNAUTHORIZED_EVENT`), and
+  - a listener component in `src/routes/AppRouter.jsx` (`UnauthorizedBridge`).
+
+### Input validation & sanitization (client-side)
+
+- **Zod validation layer**
+  - Helpers: `src/validation/validate.js`
+  - Schemas:
+    - `src/validation/schemas/authSchemas.js` (email, OTP)
+    - `src/validation/schemas/invoiceSchemas.js` (invoice status, transaction reference, notes, delete-note command, search)
+- Validation is applied in key flows:
+  - OTP login (`src/pages/auth/OtpLoginPage.jsx`)
+  - Invoice status change + notes timeline (`src/pages/accounts/InvoiceDetailPage.jsx`)
+  - Invoice search normalization (`src/pages/accounts/InvoicesListPage.jsx`)
+- Notes sanitization policy (client-side):
+  - trims whitespace, enforces length limits,
+  - rejects obvious HTML tags in notes text.
+
+### Auth storage options (reduce persistence)
+
+`src/redux/slices/authSlice.js` supports configurable session persistence:
+
+- `VITE_AUTH_STORAGE=local` (default): store session in `localStorage`
+- `VITE_AUTH_STORAGE=session`: store session in `sessionStorage`
+- `VITE_AUTH_STORAGE=none`: do not persist session (in-memory only)
+
+### Environment variables (security-related)
+
+Add these to your `.env` (optional):
+
+- `VITE_REQUIRE_HTTPS=true` to force HTTPS API base URL checks outside production too.
+- `VITE_AUTH_STORAGE=session` or `VITE_AUTH_STORAGE=none` to reduce token persistence.
+
 ## Maps
 
 Shop location modal uses **react-leaflet** + icons under `public/shopIcon/`. Ensure shops have latitude/longitude in the API for pins to appear.

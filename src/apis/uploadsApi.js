@@ -1,30 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000'
-
-function buildUrl(path) {
-  return `${API_BASE_URL}${path}`
-}
-
-async function readJson(response) {
-  return response.json().catch(() => null)
-}
-
-function normalizeApiError(payload, fallbackMessage) {
-  if (payload?.error) {
-    return {
-      code: payload.error.code ?? 'INTERNAL_SERVER_ERROR',
-      message: payload.error.message ?? fallbackMessage,
-      requestId: payload.error.request_id ?? null,
-      details: payload.error.details ?? null,
-    }
-  }
-
-  return {
-    code: 'INTERNAL_SERVER_ERROR',
-    message: fallbackMessage,
-    requestId: null,
-    details: null,
-  }
-}
+import { normalizeApiError, requestRaw } from '@/apis/httpClient'
 
 /**
  * @typedef {'shop_owner'} UploadPurpose
@@ -50,19 +24,13 @@ function normalizeApiError(payload, fallbackMessage) {
  * @returns {Promise<PresignResponse>}
  */
 export async function presignUpload(payload, { accessToken }) {
-  const response = await fetch(buildUrl('/uploads/presign'), {
+  const json = await requestRaw({
+    path: '/uploads/presign',
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-    },
-    body: JSON.stringify(payload),
+    accessToken,
+    body: payload,
+    onHttpError: (j) => normalizeApiError(j, 'Could not create upload URL. Please try again.'),
   })
-
-  const json = await readJson(response)
-  if (!response.ok) {
-    throw normalizeApiError(json, 'Could not create upload URL. Please try again.')
-  }
 
   const data = json?.data ?? json
   const upload_url = data?.upload_url ?? data?.url ?? data?.uploadUrl

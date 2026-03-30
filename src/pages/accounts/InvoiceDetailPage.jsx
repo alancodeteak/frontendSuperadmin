@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useSelector } from 'react-redux'
+import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate, useParams } from 'react-router-dom'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import StatCard from '@/components/common/StatCard'
 import AppSidebar from '@/components/layout/AppSidebar'
 import { buildSidebarNav } from '@/components/layout/sidebarNavConfig'
 import { useTheme } from '@/context/useTheme'
+import { logoutLocal } from '@/redux/slices/authSlice'
+import { logoutAction } from '@/redux/thunks/authThunks'
 import { getSupermarket, listSupermarkets } from '@/apis/supermarketsApi'
 import SubscriptionInvoiceDocument from '@/components/invoice/SubscriptionInvoiceDocument'
 import { downloadInvoicePdfFromElement, safeInvoiceFilename } from '@/utils/invoicePdfDownload'
@@ -30,6 +32,13 @@ import {
   updatePortalInvoice,
   updatePortalInvoiceStatus,
 } from '@/apis/invoicesApi'
+import {
+  deleteNoteCommandSchema,
+  invoiceNoteMessageSchema,
+  invoiceStatusSchema,
+  transactionReferenceSchema,
+} from '@/validation/schemas/invoiceSchemas'
+import { firstIssueMessage } from '@/validation/validate'
 
 function toCurrency(value) {
   const n = Number(value ?? 0)
@@ -136,9 +145,12 @@ function InvoiceDetailPage({
   overviewPath = '/dashboard/teamify/accounts/overview',
 }) {
   const { invoiceId } = useParams()
+  const dispatch = useDispatch()
   const navigate = useNavigate()
   const { themeMode, toggleTheme } = useTheme()
   const accessToken = useSelector((state) => state.auth.session.accessToken)
+  const { logoutStatus } = useSelector((state) => state.auth)
+  const isLoggingOut = logoutStatus === 'loading'
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
@@ -256,9 +268,21 @@ function InvoiceDetailPage({
     try {
       setError('')
       setInfo('')
+      const statusResult = invoiceStatusSchema.safeParse(String(newStatus || '').toUpperCase())
+      if (!statusResult.success) {
+        setError(firstIssueMessage(statusResult.error, 'Invalid status'))
+        return
+      }
+      const resolvedStatus = statusResult.data
       const payload = { new_status: newStatus }
-      if (newStatus === 'PAID') {
-        payload.transaction_reference = (txRef && String(txRef).trim()) || `MANUAL-${Date.now()}`
+      if (resolvedStatus === 'PAID') {
+        const trimmedTx = (txRef && String(txRef).trim()) || `MANUAL-${Date.now()}`
+        const txResult = transactionReferenceSchema.safeParse(trimmedTx)
+        if (!txResult.success) {
+          setError(firstIssueMessage(txResult.error, 'Invalid transaction reference'))
+          return
+        }
+        payload.transaction_reference = txResult.data
         if (paidAtIso) payload.paid_at = paidAtIso
       }
       const updated =
@@ -266,7 +290,7 @@ function InvoiceDetailPage({
           ? await updatePortalInvoiceStatus(invoice.invoice_id, payload, { accessToken })
           : await updateAdminInvoiceStatus(invoice.invoice_id, payload, { accessToken })
       setInvoice(updated)
-      setInfo(`Status updated to ${newStatus}`)
+      setInfo(`Status updated to ${resolvedStatus}`)
     } catch (e) {
       setError(e?.message ?? 'Failed to update status')
     }
@@ -274,14 +298,18 @@ function InvoiceDetailPage({
 
   const saveNotes = async () => {
     if (!accessToken || !invoice?.invoice_id) return
-    if (!notesDraft.trim()) return
+    const noteResult = invoiceNoteMessageSchema.safeParse(notesDraft)
+    if (!noteResult.success) {
+      setError(firstIssueMessage(noteResult.error, 'Invalid note'))
+      return
+    }
     try {
       setError('')
       setInfo('')
       const updated =
         mode === 'portal'
-          ? await updatePortalInvoice(invoice.invoice_id, { notes: notesDraft }, { accessToken })
-          : await updateAdminInvoice(invoice.invoice_id, { notes: notesDraft }, { accessToken })
+          ? await updatePortalInvoice(invoice.invoice_id, { notes: noteResult.data }, { accessToken })
+          : await updateAdminInvoice(invoice.invoice_id, { notes: noteResult.data }, { accessToken })
       setInvoice(updated)
       setNotesDraft('')
       setInfo('Note added to invoice')
@@ -349,6 +377,13 @@ function InvoiceDetailPage({
   const actionBtnClass =
     'rounded-2xl border px-3 py-2 text-xs font-semibold transition hover:-translate-y-0.5 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-white/10 dark:focus:ring-white/10'
 
+  const handleLogout = async () => {
+    if (isLoggingOut) return
+    await dispatch(logoutAction())
+    dispatch(logoutLocal())
+    navigate(mode === 'portal' ? '/portal/login' : '/', { replace: true })
+  }
+
   return (
     <DashboardLayout>
       <AppSidebar
@@ -357,6 +392,8 @@ function InvoiceDetailPage({
         navSections={navSections}
         themeMode={themeMode}
         onToggleTheme={toggleTheme}
+        onLogout={handleLogout}
+        isLoggingOut={isLoggingOut}
       />
       <main className="relative flex-1 rounded-3xl bg-white p-4 dark:bg-slate-950/40">
         <div className={`${baseCardClass} mb-4 overflow-hidden`}>
@@ -662,7 +699,13 @@ function InvoiceDetailPage({
                                     try {
                                       setError('')
                                       setInfo('')
-                                      const payload = { notes: `__DELETE_NOTE_ID__:${entry.id}` }
+                                      const cmd = `__DELETE_NOTE_ID__:${entry.id}`
+                                      const cmdResult = deleteNoteCommandSchema.safeParse(cmd)
+                                      if (!cmdResult.success) {
+                                        setError(firstIssueMessage(cmdResult.error, 'Invalid delete request'))
+                                        return
+                                      }
+                                      const payload = { notes: cmdResult.data }
                                       const updated =
                                         mode === 'portal'
                                           ? await updatePortalInvoice(invoice.invoice_id, payload, { accessToken })

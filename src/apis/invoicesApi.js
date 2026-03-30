@@ -1,52 +1,6 @@
 import { cachedGetJson } from '@/apis/cachedGet'
 import { TTL_MS } from '@/utils/responseCache'
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000'
-
-function buildUrl(path) {
-  return `${API_BASE_URL}${path}`
-}
-
-async function readJson(response) {
-  return response.json().catch(() => null)
-}
-
-function normalizeApiError(payload, fallbackMessage) {
-  if (payload?.error) {
-    return {
-      code: payload.error.code ?? 'INTERNAL_SERVER_ERROR',
-      message: payload.error.message ?? fallbackMessage,
-      requestId: payload.error.request_id ?? null,
-      details: payload.error.details ?? null,
-    }
-  }
-  return { code: 'INTERNAL_SERVER_ERROR', message: fallbackMessage, requestId: null, details: null }
-}
-
-async function requestJson({ path, method = 'GET', accessToken, body }) {
-  if (method === 'GET' && body === undefined) {
-    return cachedGetJson({
-      path,
-      accessToken,
-      ttlMs: TTL_MS.DEFAULT_GET,
-      headers: { 'Content-Type': 'application/json' },
-      onHttpError: (json) => normalizeApiError(json, 'Invoice API request failed'),
-      select: (j) => j?.data ?? null,
-    })
-  }
-
-  const response = await fetch(buildUrl(path), {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-    },
-    ...(body ? { body: JSON.stringify(body) } : {}),
-  })
-  const json = await readJson(response)
-  if (!response.ok) throw normalizeApiError(json, 'Invoice API request failed')
-  return json?.data ?? null
-}
+import { normalizeApiError, requestJson, requestRaw } from '@/apis/httpClient'
 
 async function requestEnvelope({ path, method = 'GET', accessToken, body }) {
   if (method === 'GET' && body === undefined) {
@@ -59,17 +13,13 @@ async function requestEnvelope({ path, method = 'GET', accessToken, body }) {
       select: (j) => ({ data: j?.data ?? null, meta: j?.meta ?? null }),
     })
   }
-
-  const response = await fetch(buildUrl(path), {
+  const json = await requestRaw({
+    path,
     method,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-    },
-    ...(body ? { body: JSON.stringify(body) } : {}),
+    accessToken,
+    body,
+    onHttpError: (j) => normalizeApiError(j, 'Invoice API request failed'),
   })
-  const json = await readJson(response)
-  if (!response.ok) throw normalizeApiError(json, 'Invoice API request failed')
   return { data: json?.data ?? null, meta: json?.meta ?? null }
 }
 

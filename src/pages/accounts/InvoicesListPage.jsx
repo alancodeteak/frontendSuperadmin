@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useSelector } from 'react-redux'
+import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import AppSidebar from '@/components/layout/AppSidebar'
 import { buildSidebarNav } from '@/components/layout/sidebarNavConfig'
 import SubscriptionInvoiceDocument from '@/components/invoice/SubscriptionInvoiceDocument'
 import { useTheme } from '@/context/useTheme'
+import { logoutLocal } from '@/redux/slices/authSlice'
+import { logoutAction } from '@/redux/thunks/authThunks'
 import {
   createAdminInvoice,
   getAdminInvoice,
@@ -15,6 +17,7 @@ import {
 } from '@/apis/invoicesApi'
 import { getSupermarket, listSupermarkets } from '@/apis/supermarketsApi'
 import { downloadInvoicePdfFromElement, safeInvoiceFilename } from '@/utils/invoicePdfDownload'
+import { invoiceSearchSchema } from '@/validation/schemas/invoiceSchemas'
 
 function getStatusBadgeClass(status) {
   switch (String(status || '').toUpperCase()) {
@@ -46,10 +49,16 @@ function InvoicesListPage({
   reportsPath = '/dashboard/teamify/reports',
   overviewPath = '/dashboard/teamify/accounts/overview',
 }) {
+  const dispatch = useDispatch()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const { themeMode, toggleTheme } = useTheme()
   const accessToken = useSelector((state) => state.auth.session.accessToken)
+  const { logoutStatus } = useSelector((state) => state.auth)
+  const isLoggingOut = logoutStatus === 'loading'
+  // #region agent log
+  fetch('http://127.0.0.1:7607/ingest/885d2d87-6874-454c-88ac-5377dbfdd091',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'46071a'},body:JSON.stringify({sessionId:'46071a',runId:'pre-fix',hypothesisId:'H2',location:'InvoicesListPage.jsx:render',message:'InvoicesListPage render',data:{mode:String(mode),hasAccessToken:Boolean(accessToken),documentTypeParam:String((searchParams.get('document_type')||''))},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion agent log
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [rows, setRows] = useState([])
@@ -77,6 +86,13 @@ function InvoicesListPage({
   const [previewLoading, setPreviewLoading] = useState(false)
   const [previewError, setPreviewError] = useState('')
   const [previewInvoice, setPreviewInvoice] = useState(null)
+
+  const handleLogout = async () => {
+    if (isLoggingOut) return
+    await dispatch(logoutAction())
+    dispatch(logoutLocal())
+    navigate(mode === 'portal' ? '/portal/login' : '/', { replace: true })
+  }
   const [previewShopDetail, setPreviewShopDetail] = useState(null)
   const [previewMeta, setPreviewMeta] = useState({ shopName: '', userId: '—', phone: null })
   const [previewDownloadingPdf, setPreviewDownloadingPdf] = useState(false)
@@ -189,15 +205,24 @@ function InvoicesListPage({
           ...(status ? { status } : {}),
           ...(documentType ? { document_type: documentType } : {}),
         }
+        // #region agent log
+        fetch('http://127.0.0.1:7607/ingest/885d2d87-6874-454c-88ac-5377dbfdd091',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'46071a'},body:JSON.stringify({sessionId:'46071a',runId:'pre-fix',hypothesisId:'H3',location:'InvoicesListPage.jsx:fetchInvoices',message:'Fetching invoices list',data:{mode,documentType:String(documentType??''),status:String(status??''),page:Number(page)},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion agent log
         const data =
           mode === 'portal'
             ? await listPortalInvoices(params, { accessToken })
             : await listAdminInvoices(params, { accessToken })
         if (mounted) {
           const list = Array.isArray(data) ? data : []
+          // #region agent log
+          fetch('http://127.0.0.1:7607/ingest/885d2d87-6874-454c-88ac-5377dbfdd091',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'46071a'},body:JSON.stringify({sessionId:'46071a',runId:'pre-fix',hypothesisId:'H1',location:'InvoicesListPage.jsx:fetchInvoices',message:'Invoices list loaded',data:{mode,count:list.length,hasMeta:Array.isArray(list)&&list.length?{invoice_id:!!list[0]?.invoice_id,shop_id:!!list[0]?.shop_id,document_type:String(list[0]?.document_type??'')}:{},},timestamp:Date.now()})}).catch(()=>{});
+          // #endregion agent log
           setRawRows(list)
         }
       } catch (e) {
+        // #region agent log
+        fetch('http://127.0.0.1:7607/ingest/885d2d87-6874-454c-88ac-5377dbfdd091',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'46071a'},body:JSON.stringify({sessionId:'46071a',runId:'pre-fix',hypothesisId:'H4',location:'InvoicesListPage.jsx:fetchInvoices',message:'Invoices list error',data:{mode,message:String(e?.message??'')},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion agent log
         if (mounted) setError(e?.message ?? 'Failed to load invoices')
       } finally {
         if (mounted) setLoading(false)
@@ -338,6 +363,8 @@ function InvoicesListPage({
         navSections={navSections}
         themeMode={themeMode}
         onToggleTheme={toggleTheme}
+        onLogout={handleLogout}
+        isLoggingOut={isLoggingOut}
       />
       <main className="relative flex-1 rounded-3xl bg-white p-4 dark:bg-slate-950/40">
         <header className="teamify-surface mb-4 rounded-3xl p-4 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
@@ -349,7 +376,16 @@ function InvoicesListPage({
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <input
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => {
+                const raw = e.target.value
+                const parsed = invoiceSearchSchema.safeParse(raw)
+                // Keep typing responsive: only hard-block if it's too long.
+                if (!parsed.success) {
+                  if (String(raw).length <= 80) setQuery(raw)
+                  return
+                }
+                setQuery(parsed.data)
+              }}
               placeholder="Search invoice #, shop name, shop id"
               
               className="w-full max-w-[420px] rounded-xl border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"

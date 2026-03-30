@@ -30,6 +30,7 @@ import {
   getReportsOverview,
   getReportsShops,
 } from '@/apis/reportsApi'
+import { buildOperationsSnapshot } from '@/utils/operationsSnapshot'
 
 const RANGE_OPTIONS = [7, 30, 60, 90]
 const TABS = ['overview', 'shops', 'partners', 'operations', 'finance']
@@ -176,6 +177,7 @@ export default function ReportsPage() {
   const [funnel, setFunnel] = useState(null)
   const [finance, setFinance] = useState(null)
   const [usingSampleData, setUsingSampleData] = useState(false)
+  const [operationsToday, setOperationsToday] = useState(null)
 
   useEffect(() => {
     let cancelled = false
@@ -251,6 +253,12 @@ export default function ReportsPage() {
         setFinance(batch2[1].value)
       } else {
         setFinance(null)
+      }
+
+      if (!cancelled) {
+        const acctLike = overview?.accounts ?? null
+        const snap = buildOperationsSnapshot(overview ?? SAMPLE_OVERVIEW, funnel ?? SAMPLE_FUNNEL, partners ?? SAMPLE_PARTNERS, acctLike)
+        setOperationsToday(snap)
       }
 
       const anyBatch1Fail = batch1.some((r) => r.status === 'rejected')
@@ -650,23 +658,68 @@ export default function ReportsPage() {
           ) : null}
 
           {activeTab === 'operations' ? (
-            <section className={card}>
-              {loadingBatch2 ? (
-                <p className={`mb-3 text-xs ${subtle}`}>Loading funnel…</p>
-              ) : null}
-              <p className={`mb-3 text-sm font-semibold ${strong}`}>Order Funnel</p>
-              <div className="h-72">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={funnelData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#334155' : '#e2e8f0'} />
-                    <XAxis dataKey="stage" tick={{ fill: isDark ? '#cbd5e1' : '#334155', fontSize: 11 }} />
-                    <YAxis tick={{ fill: isDark ? '#cbd5e1' : '#334155', fontSize: 11 }} />
-                    <Tooltip />
-                    <Bar dataKey="value" fill="#f59e0b" barSize={18} radius={[8, 8, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </section>
+            <>
+              <section className={card}>
+                <h2 className={`mb-1 text-sm font-semibold ${strong}`}>Operations</h2>
+                <p className={`mb-3 text-xs ${subtle}`}>Today</p>
+                <p className={`text-sm ${subtle}`}>
+                  <span className={strong}>Today · last 24 hours</span>
+                  <br />
+                  <span>
+                    {operationsToday?.totalOrders ?? 0} orders · ₹
+                    {(operationsToday?.totalAmount ?? 0).toLocaleString('en-IN', {
+                      maximumFractionDigits: 0,
+                    })}{' '}
+                    revenue · {operationsToday?.totalDeliveries ?? 0} marked delivered
+                  </span>
+                </p>
+                <p className={`mt-2 text-sm ${subtle}`}>
+                  <span>
+                    {operationsToday?.shopsNotUsing ?? 0} shops had no orders in this window.
+                  </span>
+                  <br />
+                  <span>
+                    {operationsToday?.shopsPaymentPending ?? 0} shops — subscription payment pending or overdue (current).
+                  </span>
+                  <br />
+                  <span>
+                    {operationsToday?.partnersNotUsing ?? 0} delivery partners had no orders.
+                  </span>
+                  <br />
+                  <span>
+                    {operationsToday?.deliveriesPending ?? 0} deliveries pending (pipeline).
+                  </span>
+                </p>
+
+                <hr className="my-3 border-dashed border-slate-200 dark:border-slate-700" />
+
+                <p className={`mb-1 text-xs ${subtle}`}>30-day context</p>
+                <p className={`text-sm ${subtle}`}>
+                  <span>
+                    This panel reflects the selected <strong>{days}-day</strong> window; switch to 30 days to see the full
+                    30-day context.
+                  </span>
+                </p>
+              </section>
+
+              <section className={card}>
+                {loadingBatch2 ? (
+                  <p className={`mb-3 text-xs ${subtle}`}>Loading funnel…</p>
+                ) : null}
+                <p className={`mb-3 text-sm font-semibold ${strong}`}>Order Funnel</p>
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={funnelData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#334155' : '#e2e8f0'} />
+                      <XAxis dataKey="stage" tick={{ fill: isDark ? '#cbd5e1' : '#334155', fontSize: 11 }} />
+                      <YAxis tick={{ fill: isDark ? '#cbd5e1' : '#334155', fontSize: 11 }} />
+                      <Tooltip />
+                      <Bar dataKey="value" fill="#f59e0b" barSize={18} radius={[8, 8, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </section>
+            </>
           ) : null}
 
           {activeTab === 'finance' ? (

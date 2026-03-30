@@ -1,5 +1,6 @@
 import { cachedGetJson } from '@/apis/cachedGet'
 import { TTL_MS } from '@/utils/responseCache'
+import { requestRaw, normalizeApiError as normalizeClientError } from '@/apis/httpClient'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000'
 
@@ -32,10 +33,6 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000
  * @property {string=} subscription.status
  */
 
-function buildUrl(path) {
-  return `${API_BASE_URL}${path}`
-}
-
 function normalizeApiError(payload, fallbackMessage) {
   if (payload?.error) {
     return {
@@ -54,10 +51,6 @@ function normalizeApiError(payload, fallbackMessage) {
   }
 }
 
-async function readJson(response) {
-  return response.json().catch(() => null)
-}
-
 async function requestJson({ path, method = 'GET', accessToken, body }) {
   if (method === 'GET' && body === undefined) {
     return cachedGetJson({
@@ -68,22 +61,15 @@ async function requestJson({ path, method = 'GET', accessToken, body }) {
       select: (j) => j,
     })
   }
-
-  const response = await fetch(buildUrl(path), {
+  // Use shared HTTP client for HTTPS enforcement + timeouts.
+  return requestRaw({
+    path,
     method,
-    headers: {
-      ...(body ? { 'Content-Type': 'application/json' } : {}),
-      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-    },
-    body: body ? JSON.stringify(body) : undefined,
+    accessToken,
+    body,
+    headers: body ? { 'Content-Type': 'application/json' } : {},
+    onHttpError: (json) => normalizeClientError(json, 'Request failed. Please try again.'),
   })
-
-  const json = await readJson(response)
-  if (!response.ok) {
-    throw normalizeApiError(json, 'Request failed. Please try again.')
-  }
-
-  return json
 }
 
 function buildQuery(params) {
@@ -95,7 +81,7 @@ function buildQuery(params) {
 }
 
 export async function listSupermarkets(
-  { page = 1, limit = 20, name, user_id: userId, shop_id: shopId, phone } = {},
+  { page = 1, limit = 20, name, user_id: userId, shop_id: shopId, phone, sort } = {},
   { accessToken },
 ) {
   // Backend: list limit max is 100 (FastAPI Query le=100)
@@ -107,6 +93,7 @@ export async function listSupermarkets(
     user_id: userId,
     shop_id: shopId,
     phone,
+    sort,
   })
   const response = await requestJson({
     path: `/supermarkets/${query}`,

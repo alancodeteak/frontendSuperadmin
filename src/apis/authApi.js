@@ -1,65 +1,12 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000'
-
-function buildUrl(path) {
-  return `${API_BASE_URL}${path}`
-}
-
-function normalizeApiError(payload, fallbackMessage) {
-  if (payload?.error) {
-    return {
-      code: payload.error.code ?? 'INTERNAL_SERVER_ERROR',
-      message: payload.error.message ?? fallbackMessage,
-      requestId: payload.error.request_id ?? null,
-      details: payload.error.details ?? null,
-    }
-  }
-
-  return {
-    code: 'INTERNAL_SERVER_ERROR',
-    message: fallbackMessage,
-    requestId: null,
-    details: null,
-  }
-}
-
-async function request(path, body) {
-  const response = await fetch(buildUrl(path), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  })
-
-  const json = await response.json().catch(() => null)
-
-  if (!response.ok) {
-    throw normalizeApiError(json, 'Request failed. Please try again.')
-  }
-
-  return json
-}
-
-async function requestWithAuth(path, token) {
-  const response = await fetch(buildUrl(path), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-  })
-
-  const json = await response.json().catch(() => null)
-
-  if (!response.ok) {
-    throw normalizeApiError(json, 'Request failed. Please try again.')
-  }
-
-  return json
-}
+import { normalizeApiError, requestRaw } from '@/apis/httpClient'
 
 export async function sendOtp({ email, scope }) {
-  const response = await request('/login/send-otp', { email, scope })
+  const response = await requestRaw({
+    path: '/login/send-otp',
+    method: 'POST',
+    body: { email, scope },
+    onHttpError: (json) => normalizeApiError(json, 'Request failed. Please try again.'),
+  })
   return {
     message: response?.data?.message ?? 'OTP sent successfully',
     code: response?.data?.code ?? 'OTP_SENT',
@@ -67,10 +14,11 @@ export async function sendOtp({ email, scope }) {
 }
 
 export async function verifyOtp({ email, scope, otp_code: otpCode }) {
-  const response = await request('/login/verify-otp', {
-    email,
-    scope,
-    otp_code: otpCode,
+  const response = await requestRaw({
+    path: '/login/verify-otp',
+    method: 'POST',
+    body: { email, scope, otp_code: otpCode },
+    onHttpError: (json) => normalizeApiError(json, 'Request failed. Please try again.'),
   })
 
   return response?.data
@@ -81,7 +29,12 @@ export async function logoutAdmin({ accessToken }) {
     return { message: 'Already logged out' }
   }
 
-  return requestWithAuth('/auth/logout', accessToken)
+  return requestRaw({
+    path: '/auth/logout',
+    method: 'POST',
+    accessToken,
+    onHttpError: (json) => normalizeApiError(json, 'Request failed. Please try again.'),
+  })
 }
 
 export async function sendPortalOtp({ email }) {
@@ -97,7 +50,12 @@ export async function logoutPortal({ accessToken }) {
     return { message: 'Already logged out' }
   }
 
-  return requestWithAuth('/portal/logout', accessToken)
+  return requestRaw({
+    path: '/portal/logout',
+    method: 'POST',
+    accessToken,
+    onHttpError: (json) => normalizeApiError(json, 'Request failed. Please try again.'),
+  })
 }
 
 export async function logoutByScope({ accessToken, scope }) {

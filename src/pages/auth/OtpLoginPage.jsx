@@ -9,6 +9,8 @@ import {
   sendOtpAction,
   verifyOtpAction,
 } from '@/redux/thunks/authThunks'
+import { emailSchema, otpSchema } from '@/validation/schemas/authSchemas'
+import { firstIssueMessage } from '@/validation/validate'
 import './OtpLoginPage.css'
 
 const RESEND_SECONDS = 30
@@ -56,6 +58,7 @@ function OtpLoginPage({
   const [otpSent, setOtpSent] = useState(false)
   const [secondsLeft, setSecondsLeft] = useState(0)
   const [otpDigits, setOtpDigits] = useState(() => Array(OTP_LENGTH).fill(''))
+  const [clientError, setClientError] = useState('')
   const otpInputRefs = useRef([])
   const isSubmitting =
     sendOtpStatus === 'loading' || verifyOtpStatus === 'loading'
@@ -88,11 +91,18 @@ function OtpLoginPage({
   const handleSendOtp = async () => {
     dispatch(clearAuthError())
     dispatch(clearStatusMessage())
+    setClientError('')
+
+    const emailResult = emailSchema.safeParse(loginEmail)
+    if (!emailResult.success) {
+      setClientError(firstIssueMessage(emailResult.error, 'Invalid email'))
+      return
+    }
 
     const result = await dispatch(
       sendOtpThunk({
         scope,
-        email: loginEmail,
+        email: emailResult.data,
       }),
     )
 
@@ -109,11 +119,18 @@ function OtpLoginPage({
 
     dispatch(clearAuthError())
     dispatch(clearStatusMessage())
+    setClientError('')
+
+    const emailResult = emailSchema.safeParse(loginEmail)
+    if (!emailResult.success) {
+      setClientError(firstIssueMessage(emailResult.error, 'Invalid email'))
+      return
+    }
 
     const result = await dispatch(
       sendOtpThunk({
         scope,
-        email: loginEmail,
+        email: emailResult.data,
       }),
     )
 
@@ -159,15 +176,26 @@ function OtpLoginPage({
   }
 
   const handleVerifyOtp = async () => {
-    if (otpCode.length !== OTP_LENGTH) return
+    setClientError('')
+
+    const emailResult = emailSchema.safeParse(loginEmail)
+    if (!emailResult.success) {
+      setClientError(firstIssueMessage(emailResult.error, 'Invalid email'))
+      return
+    }
+    const otpResult = otpSchema.safeParse(otpCode)
+    if (!otpResult.success) {
+      setClientError(firstIssueMessage(otpResult.error, 'Invalid OTP'))
+      return
+    }
 
     dispatch(clearAuthError())
 
     const result = await dispatch(
       verifyOtpThunk({
         scope,
-        email: loginEmail,
-        otp_code: otpCode,
+        email: emailResult.data,
+        otp_code: otpResult.data,
       }),
     )
 
@@ -200,6 +228,7 @@ function OtpLoginPage({
             Welcome back! Logging you in...
           </p>
         )}
+        {clientError && <p className="otp-error-message">{clientError}</p>}
         {errorMessage && <p className="otp-error-message">{errorMessage}</p>}
 
         <button

@@ -6,6 +6,7 @@ const initialState = {
   error: null,
   stats: [],
   members: [],
+  performanceSeries: [],
   activeTab: 'overview',
   selectedRange: 'weekly',
 }
@@ -31,6 +32,7 @@ const dashboardSlice = createSlice({
         state.loading = false
         state.stats = action.payload.stats
         state.members = action.payload.members
+        state.performanceSeries = action.payload.performanceSeries ?? []
       })
       .addCase(getDashboardData.rejected, (state, action) => {
         state.loading = false

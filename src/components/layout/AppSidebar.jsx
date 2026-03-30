@@ -247,7 +247,6 @@ function AppSidebar({
   navItems,
   navSections,
   themeMode,
-  onToggleTheme,
   onLogout,
   isLoggingOut,
   bottomSlot,
@@ -588,14 +587,6 @@ function AppSidebar({
       ) : null}
 
       <div className="mt-auto space-y-3 pt-6">
-        <button
-          type="button"
-          onClick={onToggleTheme}
-          className="w-full rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-black transition duration-300 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-800"
-        >
-          {collapsed ? (themeMode === 'dark' ? 'Light' : 'Dark') : `Switch to ${themeMode === 'dark' ? 'Light' : 'Dark'} Mode`}
-        </button>
-
         {onLogout ? (
           <button
             type="button"

@@ -6,8 +6,6 @@ import {
   Bar,
   CartesianGrid,
   ComposedChart,
-  Pie,
-  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -23,6 +21,7 @@ import { logoutLocal } from '@/redux/slices/authSlice'
 import { getDashboardData } from '@/redux/thunks/dashboardThunks'
 import { logoutAction } from '@/redux/thunks/authThunks'
 import { listSupermarkets } from '@/apis/supermarketsApi'
+import { getRecentAdminActivity } from '@/apis/activityApi'
 import {
   getReportsDeliveryPartners,
   getReportsFunnel,
@@ -31,6 +30,7 @@ import {
 import { getAdminAccountsOverview, getPortalAccountsOverview } from '@/apis/invoicesApi'
 import { useTheme } from '@/context/useTheme'
 import { buildOperationsSnapshot } from '@/utils/operationsSnapshot'
+import AppleRingsChart from '@/components/common/AppleRingsChart'
 import { getAvatarUrlForKey } from '@/utils/avatarFallback'
 import ShopsMapModal from '@/components/shops/ShopsMapModal'
 import '@/App.css'
@@ -76,6 +76,148 @@ function buildPortalOperationsSnapshot(overview) {
 function clampPct(n) {
   if (n == null || Number.isNaN(n) || !Number.isFinite(n)) return 0
   return Math.max(0, Math.min(100, Math.round(n)))
+}
+
+function toCurrency(value) {
+  const n = Number(value ?? 0)
+  if (Number.isNaN(n)) return String(value ?? '0')
+  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(n)
+}
+
+function toDateTime(value) {
+  if (!value) return '—'
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return String(value)
+
+  const hours = d.getHours()
+  const minutes = d.getMinutes().toString().padStart(2, '0')
+  const ampm = hours >= 12 ? 'pm' : 'am'
+  const hour12 = hours % 12 === 0 ? 12 : hours % 12
+
+  const monthNames = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ]
+  const day = d.getDate()
+  const month = monthNames[d.getMonth()] ?? ''
+  const year = d.getFullYear()
+
+  const j = day % 10
+  const k = day % 100
+  let suffix = 'th'
+  if (j === 1 && k !== 11) suffix = 'st'
+  else if (j === 2 && k !== 12) suffix = 'nd'
+  else if (j === 3 && k !== 13) suffix = 'rd'
+
+  return `${hour12}:${minutes} ${ampm} ${month} ${day}${suffix} ${year}`
+}
+
+function ActivityBadge({ type }) {
+  const t = String(type ?? '').toUpperCase()
+  const cfg = (() => {
+    if (t === 'INVOICE_PAID') {
+      return { label: 'Invoice', tone: 'emerald' }
+    }
+    if (t === 'INVOICE_CREATED') {
+      return { label: 'Invoice', tone: 'amber' }
+    }
+    if (t === 'SHOP_LOGIN') {
+      return { label: 'Shop', tone: 'sky' }
+    }
+    if (t === 'ORDER_CREATED') {
+      return { label: 'Delivery', tone: 'indigo' }
+    }
+    return { label: 'Activity', tone: 'slate' }
+  })()
+
+  const tones = {
+    emerald: 'bg-emerald-50 text-emerald-800 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-100 dark:ring-emerald-500/30',
+    amber: 'bg-amber-50 text-amber-900 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-100 dark:ring-amber-400/30',
+    sky: 'bg-sky-50 text-sky-900 ring-sky-200 dark:bg-sky-500/15 dark:text-sky-100 dark:ring-sky-400/30',
+    indigo: 'bg-indigo-50 text-indigo-900 ring-indigo-200 dark:bg-indigo-500/15 dark:text-indigo-100 dark:ring-indigo-400/30',
+    slate: 'bg-slate-100 text-slate-700 ring-slate-200 dark:bg-slate-900/50 dark:text-slate-200 dark:ring-slate-800',
+  }
+
+  const icon = (() => {
+    // Keep icons tiny + consistent (16x16).
+    if (cfg.label === 'Invoice') {
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
+          <path
+            d="M7 3h7l3 3v15a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinejoin="round"
+          />
+          <path d="M14 3v4h4" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+          <path
+            d="M8.5 12h7M8.5 15.5h7"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+          />
+        </svg>
+      )
+    }
+    if (cfg.label === 'Shop') {
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
+          <path
+            d="M4 9V7a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v2"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M4 9h16l-1 11a1 1 0 0 1-1 .9H6a1 1 0 0 1-1-.9L4 9Z"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinejoin="round"
+          />
+          <path d="M9 12v7m6-7v7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+      )
+    }
+    // Delivery-style
+    return (
+      <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
+        <path
+          d="M3 7h11v10H3V7Z"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M14 10h4l3 3v4h-7v-7Z"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M7 19a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3ZM18 19a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"
+          stroke="currentColor"
+          strokeWidth="1.8"
+        />
+      </svg>
+    )
+  })()
+
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[10px] font-semibold ring-1 ${tones[cfg.tone]}`}>
+      {icon}
+      <span>{cfg.label}</span>
+    </span>
+  )
 }
 
 /**
@@ -166,6 +308,14 @@ const chartDataByRange = {
     { name: 'May', tasks: 846, productivity: 79 },
     { name: 'Jun', tasks: 882, productivity: 83 },
   ],
+}
+
+function formatAxisDateLabel(value) {
+  const raw = String(value ?? '')
+  if (!raw) return '—'
+  // Prefer 'MM-DD' for compact ticks if ISO date
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(5, 10)
+  return raw
 }
 
 function DashboardContactRow({ contact, rowIndex = 0 }) {
@@ -260,15 +410,19 @@ function TeamDashboardPage({
 }) {
   const dispatch = useDispatch()
   const navigate = useNavigate()
-  const { stats, members, loading, selectedRange } = useSelector(
+  const { stats, members, loading, selectedRange, performanceSeries } = useSelector(
     (state) => state.dashboard,
   )
   const { logoutStatus } = useSelector((state) => state.auth)
   const accessToken = useSelector((state) => state.auth.session.accessToken)
-  const { themeMode, toggleTheme } = useTheme()
+  const { themeMode } = useTheme()
   const [contactRows, setContactRows] = useState([])
   const [contactsMeta, setContactsMeta] = useState(null)
   const [contactsLoading, setContactsLoading] = useState(false)
+  const [shopsRows, setShopsRows] = useState([])
+  const [shopsLoading, setShopsLoading] = useState(false)
+  const [activityRows, setActivityRows] = useState([])
+  const [activityLoading, setActivityLoading] = useState(false)
   const [reportToday, setReportToday] = useState(null)
   const [reportMonthly, setReportMonthly] = useState(null)
   const [reportLoading, setReportLoading] = useState(false)
@@ -331,8 +485,8 @@ function TeamDashboardPage({
       : undefined
 
   useEffect(() => {
-    dispatch(getDashboardData())
-  }, [dispatch])
+    dispatch(getDashboardData({ mode: reportsPath === null ? 'portal' : 'admin' }))
+  }, [dispatch, accessToken, selectedRange])
 
   useEffect(() => {
     let cancelled = false
@@ -371,6 +525,52 @@ function TeamDashboardPage({
       cancelled = true
     }
   }, [accessToken])
+
+  useEffect(() => {
+    let cancelled = false
+    async function run() {
+      if (!accessToken) return
+      setShopsLoading(true)
+      try {
+        const res = await listSupermarkets({ page: 1, limit: 10, sort: 'last_login_desc' }, { accessToken })
+        if (cancelled) return
+        setShopsRows(Array.isArray(res?.items) ? res.items : [])
+      } catch {
+        if (!cancelled) setShopsRows([])
+      } finally {
+        if (!cancelled) setShopsLoading(false)
+      }
+    }
+    run()
+    return () => {
+      cancelled = true
+    }
+  }, [accessToken])
+
+  useEffect(() => {
+    let cancelled = false
+    async function run() {
+      if (!accessToken) return
+      if (reportsPath === null) {
+        setActivityRows([])
+        return
+      }
+      setActivityLoading(true)
+      try {
+        const items = await getRecentAdminActivity({ limit: 25 }, { accessToken })
+        if (cancelled) return
+        setActivityRows(Array.isArray(items) ? items : [])
+      } catch {
+        if (!cancelled) setActivityRows([])
+      } finally {
+        if (!cancelled) setActivityLoading(false)
+      }
+    }
+    run()
+    return () => {
+      cancelled = true
+    }
+  }, [accessToken, reportsPath])
 
   useEffect(() => {
     let cancelled = false
@@ -459,7 +659,16 @@ function TeamDashboardPage({
     }
   }, [accessToken, reportsPath])
 
-  const mixedChartData = chartDataByRange[selectedRange]
+  const mixedChartData = useMemo(() => {
+    if (Array.isArray(performanceSeries) && performanceSeries.length) {
+      return performanceSeries.map((r) => ({
+        name: formatAxisDateLabel(r.date),
+        orders: Number(r.orders ?? 0),
+        revenue: Number(r.revenue ?? 0),
+      }))
+    }
+    return chartDataByRange[selectedRange]
+  }, [performanceSeries, selectedRange])
   const axisTickColor = themeMode === 'dark' ? '#cbd5e1' : '#000000'
   const gridColor = themeMode === 'dark' ? '#334155' : '#d9deea'
   const tooltipStyle = {
@@ -562,7 +771,6 @@ function TeamDashboardPage({
         subTitle={pageTitle}
         navSections={navSections}
         themeMode={themeMode}
-        onToggleTheme={toggleTheme}
         onLogout={handleLogout}
         isLoggingOut={isLoggingOut}
       />
@@ -647,14 +855,46 @@ function TeamDashboardPage({
                 <ComposedChart data={mixedChartData} margin={{ top: 10, right: 8, left: -16, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
                   <XAxis dataKey="name" tick={{ fill: axisTickColor, fontSize: 12 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: axisTickColor, fontSize: 12 }} axisLine={false} tickLine={false} width={36} />
+                  <YAxis
+                    yAxisId="orders"
+                    tick={{ fill: axisTickColor, fontSize: 12 }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={36}
+                  />
+                  <YAxis
+                    yAxisId="revenue"
+                    orientation="right"
+                    tick={{ fill: axisTickColor, fontSize: 12 }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={60}
+                    tickFormatter={(v) => {
+                      const n = Number(v ?? 0)
+                      if (!Number.isFinite(n)) return ''
+                      if (Math.abs(n) >= 100000) return `${Math.round(n / 1000)}k`
+                      return String(Math.round(n))
+                    }}
+                  />
                   <Tooltip
                     cursor={{ fill: 'rgba(99,102,241,0.08)' }}
+                    formatter={(value, name) => {
+                      if (name === 'revenue') return [toCurrency(value), 'Revenue']
+                      if (name === 'orders') return [value, 'Orders']
+                      return [value, name]
+                    }}
                     contentStyle={tooltipStyle}
                   />
-                  <Bar dataKey="tasks" barSize={selectedRange === 'monthly' ? 18 : 20} fill="#818cf8" radius={[8, 8, 0, 0]} />
+                  <Bar
+                    dataKey="orders"
+                    yAxisId="orders"
+                    barSize={selectedRange === 'monthly' ? 18 : 20}
+                    fill="#818cf8"
+                    radius={[8, 8, 0, 0]}
+                  />
                   <Area
-                    dataKey="productivity"
+                    dataKey="revenue"
+                    yAxisId="revenue"
                     type="monotone"
                     stroke="#0ea5e9"
                     strokeWidth={2.5}
@@ -702,46 +942,14 @@ function TeamDashboardPage({
             </ul>
 
             <div className="teamify-ring-wrap mt-3">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={[
-                      { name: 'Outer', value: ringMetrics.outer, fill: '#34c759' },
-                      { name: 'OuterRem', value: 100 - ringMetrics.outer, fill: ringMetrics.track },
-                    ]}
-                    dataKey="value"
-                    startAngle={90}
-                    endAngle={-270}
-                    innerRadius="66%"
-                    outerRadius="88%"
-                    strokeWidth={0}
-                  />
-                  <Pie
-                    data={[
-                      { name: 'Mid', value: ringMetrics.middle, fill: '#0ea5e9' },
-                      { name: 'MidRem', value: 100 - ringMetrics.middle, fill: ringMetrics.track },
-                    ]}
-                    dataKey="value"
-                    startAngle={100}
-                    endAngle={-260}
-                    innerRadius="48%"
-                    outerRadius="61%"
-                    strokeWidth={0}
-                  />
-                  <Pie
-                    data={[
-                      { name: 'Inner', value: ringMetrics.inner, fill: '#f59e0b' },
-                      { name: 'InnerRem', value: 100 - ringMetrics.inner, fill: ringMetrics.track },
-                    ]}
-                    dataKey="value"
-                    startAngle={110}
-                    endAngle={-250}
-                    innerRadius="32%"
-                    outerRadius="43%"
-                    strokeWidth={0}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+              <AppleRingsChart
+                rings={[
+                  { label: ringMetrics.labels.outer, value: ringMetrics.outer, color: '#34c759' },
+                  { label: ringMetrics.labels.middle, value: ringMetrics.middle, color: '#0ea5e9' },
+                  { label: ringMetrics.labels.inner, value: ringMetrics.inner, color: '#f59e0b' },
+                ]}
+                trackColor={ringMetrics.track}
+              />
 
               <div className="teamify-ring-center">
                 <div className="teamify-ring-value">
@@ -1076,21 +1284,119 @@ function TeamDashboardPage({
           </div>
         </section>
 
-        <section className="teamify-surface mt-3 rounded-3xl p-3 ring-1 ring-slate-200 dark:ring-slate-700 sm:p-4 md:mt-4 md:p-5">
-          <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <h3 className="text-lg font-semibold text-black dark:text-slate-100">
-              Team Members
-            </h3>
-            <span className="text-sm text-black dark:text-slate-300">
-              {loading ? 'Loading...' : `${members.length} members`}
-            </span>
-          </div>
+        <section className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-2">
+          <article className="teamify-surface rounded-3xl p-3 ring-1 ring-slate-200 dark:ring-slate-700 sm:p-4 md:p-5">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h3 className="text-lg font-semibold text-black dark:text-slate-100">Recent activity</h3>
+              <span className="text-xs text-slate-600 dark:text-slate-400">
+                {activityLoading ? 'Loading…' : `${activityRows.length} items`}
+              </span>
+            </div>
 
-          <ul className="space-y-1">
-            {members.map((member) => (
-              <TeamMemberRow key={member.id} member={member} />
-            ))}
-          </ul>
+            {reportsPath === null ? (
+              <p className="text-sm text-slate-600 dark:text-slate-300">Recent activity is available for admin dashboards.</p>
+            ) : (
+              <div className="max-h-[320px] overflow-auto pr-1">
+                {activityRows.length ? (
+                  <ul className="space-y-2">
+                    {activityRows.map((it) => (
+                      <li
+                        key={it.id}
+                        className="rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm dark:border-slate-800 dark:bg-slate-950/40"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+                              {it.title ?? 'Activity'}
+                            </div>
+                            <div className="mt-0.5 text-xs text-slate-600 dark:text-slate-300">
+                              {toDateTime(it.occurred_at)}
+                              {it.shop?.shop_name ? ` · ${it.shop.shop_name}` : it.shop?.shop_id ? ` · ${it.shop.shop_id}` : ''}
+                            </div>
+                          </div>
+                          <ActivityBadge type={it.type} />
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-slate-600 dark:text-slate-300">
+                    {activityLoading ? 'Loading recent activity…' : 'No recent activity yet.'}
+                  </p>
+                )}
+              </div>
+            )}
+          </article>
+
+          <article className="teamify-surface rounded-3xl p-3 ring-1 ring-slate-200 dark:ring-slate-700 sm:p-4 md:p-5">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h3 className="text-lg font-semibold text-black dark:text-slate-100">Shops</h3>
+              <span className="text-xs text-slate-600 dark:text-slate-400">
+                {shopsLoading ? 'Loading…' : 'Top 10'}
+              </span>
+            </div>
+
+            <div className="max-h-[320px] overflow-auto pr-1">
+              {shopsRows.length ? (
+                <ul className="space-y-2">
+                  {shopsRows.map((r, idx) => (
+                    <li
+                      key={`${r.user_id ?? r.shop_name ?? 'row'}-${idx}`}
+                      className="rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm dark:border-slate-800 dark:bg-slate-950/40"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex min-w-0 items-start gap-2">
+                          <div className="relative mt-0.5 h-9 w-9 shrink-0 overflow-hidden rounded-full bg-slate-200 ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700">
+                            {r.photo_url || r.photo ? (
+                              <img
+                                src={r.photo_url || r.photo}
+                                alt=""
+                                className="h-full w-full object-cover"
+                                loading="lazy"
+                                onError={(e) => {
+                                  // Swap to pooled avatar if photo fails.
+                                  // eslint-disable-next-line no-param-reassign
+                                  e.currentTarget.src = getAvatarUrlForKey(String(r.user_id ?? r.shop_name ?? idx))
+                                }}
+                              />
+                            ) : (
+                              <img
+                                src={getAvatarUrlForKey(String(r.user_id ?? r.shop_name ?? idx))}
+                                alt=""
+                                className="h-full w-full object-cover"
+                                loading="lazy"
+                              />
+                            )}
+                          </div>
+
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+                              {r.shop_name ?? '—'}
+                            </div>
+                            <div className="mt-0.5 text-xs text-slate-600 dark:text-slate-300">
+                              Last login: {toDateTime(r.last_login_at)}
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => navigate(`${shopsPagePath}/${encodeURIComponent(String(r.user_id ?? ''))}`)}
+                          disabled={!r.user_id}
+                          className="shrink-0 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-100 dark:hover:bg-slate-900/55"
+                        >
+                          Open
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-slate-600 dark:text-slate-300">
+                  {shopsLoading ? 'Loading shops…' : 'No shops found.'}
+                </p>
+              )}
+            </div>
+          </article>
         </section>
       </main>
 

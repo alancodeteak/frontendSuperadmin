@@ -1,13 +1,9 @@
 import { cachedGetJson } from '@/apis/cachedGet'
 import { TTL_MS } from '@/utils/responseCache'
+import { normalizeApiError as normalizeClientError, requestRaw } from '@/apis/httpClient'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000'
 const DELIVERY_PARTNERS_PATH =
   import.meta.env.VITE_DELIVERY_PARTNERS_PATH ?? '/delivery-partners/'
-
-function buildUrl(path) {
-  return `${API_BASE_URL}${path}`
-}
 
 function normalizeApiError(payload, fallbackMessage, httpStatus = null) {
   if (payload?.error) {
@@ -29,10 +25,6 @@ function normalizeApiError(payload, fallbackMessage, httpStatus = null) {
   }
 }
 
-async function readJson(response) {
-  return response.json().catch(() => null)
-}
-
 async function requestJson({ path, method = 'GET', accessToken, body }) {
   if (method === 'GET' && body === undefined) {
     return cachedGetJson({
@@ -43,21 +35,15 @@ async function requestJson({ path, method = 'GET', accessToken, body }) {
       select: (j) => j,
     })
   }
-
-  const response = await fetch(buildUrl(path), {
+  // Use shared HTTP client for HTTPS enforcement + timeouts.
+  return requestRaw({
+    path,
     method,
-    headers: {
-      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-      ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
-    },
-    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+    accessToken,
+    body,
+    headers: body !== undefined ? { 'Content-Type': 'application/json' } : {},
+    onHttpError: (json) => normalizeClientError(json, 'Request failed. Please try again.'),
   })
-
-  const json = await readJson(response)
-  if (!response.ok) {
-    throw normalizeApiError(json, 'Request failed. Please try again.', response.status)
-  }
-  return json
 }
 
 function buildQuery(params) {

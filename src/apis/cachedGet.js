@@ -1,7 +1,22 @@
 import { authCachePart } from '@/utils/authCacheKey'
 import { TTL_MS, cacheGet, cacheSet } from '@/utils/responseCache'
+import { UNAUTHORIZED_EVENT } from '@/apis/httpClient'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000'
+const REQUIRE_HTTPS = String(import.meta.env.VITE_REQUIRE_HTTPS ?? '').toLowerCase() === 'true'
+
+function shouldRequireHttps() {
+  if (REQUIRE_HTTPS) return true
+  return String(import.meta.env.MODE).toLowerCase() === 'production'
+}
+
+function assertHttpsIfNeeded(url) {
+  if (!shouldRequireHttps()) return
+  const u = new URL(url)
+  if (u.protocol !== 'https:') {
+    throw new Error('Insecure API base URL (HTTPS required in production)')
+  }
+}
 
 async function readJson(response) {
   return response.json().catch(() => null)
@@ -31,13 +46,19 @@ export async function cachedGetJson({
   const hit = cacheGet(key)
   if (hit !== undefined) return hit
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const url = `${API_BASE_URL}${path}`
+  assertHttpsIfNeeded(url)
+
+  const response = await fetch(url, {
     method: 'GET',
     headers: {
       ...headers,
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
     },
   })
+  if (response.status === 401 && typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(UNAUTHORIZED_EVENT, { detail: { path, url } }))
+  }
   const json = await readJson(response)
   if (!response.ok) {
     throw onHttpError(json, response)

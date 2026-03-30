@@ -10,6 +10,7 @@ export function buildSidebarNav({ navigate, activeKey, paths }) {
     accountsOverviewPath,
     activityDailyPath,
     activitySalesPath,
+    settingsPath,
   } = paths ?? {}
 
   const isActive = (key) => key && activeKey === key
@@ -23,6 +24,11 @@ export function buildSidebarNav({ navigate, activeKey, paths }) {
 
   const showPartners = Boolean(deliveryPartnersPath)
   const showActivity = Boolean(activityDailyPath || activitySalesPath)
+  const resolvedSettingsPath =
+    settingsPath ??
+    (dashboardPath && String(dashboardPath).startsWith('/portal')
+      ? '/portal/dashboard/settings'
+      : '/dashboard/teamify/settings')
 
   const mainNavItems = [
     {
@@ -181,7 +187,17 @@ export function buildSidebarNav({ navigate, activeKey, paths }) {
       id: 'settings',
       label: 'Settings',
       iconName: 'settings',
-      children: [comingSoon('settings-main', 'Settings')],
+      children: [
+        resolvedSettingsPath
+          ? {
+              id: 'settings-main',
+              label: 'General settings',
+              iconName: 'settings',
+              active: isActive('settings.main'),
+              onClick: () => navigate(resolvedSettingsPath),
+            }
+          : comingSoon('settings-main', 'Settings'),
+      ],
     },
   ]
 

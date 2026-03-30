@@ -108,6 +108,9 @@ function ShopListingPage({
   }, [debouncedQuery, limit, page])
 
   useEffect(() => {
+    // #region agent log
+    fetch('http://127.0.0.1:7607/ingest/885d2d87-6874-454c-88ac-5377dbfdd091',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'46071a'},body:JSON.stringify({sessionId:'46071a',runId:'pre-fix',hypothesisId:'H1',location:'ShopListingPage.jsx:fetchSupermarketsAction',message:'Dispatch fetchSupermarketsAction',data:{page:Number(page),limit:Number(limit),hasQuery:Boolean(debouncedQuery)},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion agent log
     dispatch(fetchSupermarketsAction(parsedParams))
   }, [dispatch, parsedParams])
 

@@ -3,9 +3,13 @@ import { fetchDashboardData } from '@/apis/dashboardApi'
 
 export const getDashboardData = createAsyncThunk(
   'dashboard/getDashboardData',
-  async (_, { rejectWithValue }) => {
+  async (args, { getState, rejectWithValue }) => {
     try {
-      return await fetchDashboardData()
+      const state = getState()
+      const accessToken = state?.auth?.session?.accessToken ?? null
+      const range = state?.dashboard?.selectedRange ?? 'weekly'
+      const mode = args?.mode ?? 'admin'
+      return await fetchDashboardData({ accessToken, range, mode })
     } catch (error) {
       return rejectWithValue(error?.message)
     }

@@ -15,9 +15,22 @@ function isExpiredTimestamp(expiresAt) {
 
 const STORAGE_KEY = 'yaadro_auth_session_v1'
 
+function resolveSessionStorage() {
+  // local: persists across browser restarts (highest XSS blast radius)
+  // session: clears on tab/window close (lower persistence)
+  // none: do not persist to Web Storage at all (in-memory only)
+  const mode = String(import.meta.env.VITE_AUTH_STORAGE ?? 'local').toLowerCase()
+  if (typeof window === 'undefined') return null
+  if (mode === 'none') return null
+  if (mode === 'session') return window.sessionStorage
+  return window.localStorage
+}
+
 function loadSessionFromStorage() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    const storage = resolveSessionStorage()
+    if (!storage) return null
+    const raw = storage.getItem(STORAGE_KEY)
     if (!raw) return null
     const parsed = JSON.parse(raw)
     if (!parsed || typeof parsed !== 'object') return null
@@ -38,11 +51,13 @@ function loadSessionFromStorage() {
 
 function persistSessionToStorage(session) {
   try {
+    const storage = resolveSessionStorage()
+    if (!storage) return
     if (!session?.accessToken) {
-      localStorage.removeItem(STORAGE_KEY)
+      storage.removeItem(STORAGE_KEY)
       return
     }
-    localStorage.setItem(
+    storage.setItem(
       STORAGE_KEY,
       JSON.stringify({
         accessToken: session.accessToken,

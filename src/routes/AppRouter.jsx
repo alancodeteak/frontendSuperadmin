@@ -1,5 +1,6 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
-import { useSelector } from 'react-redux'
+import { useEffect } from 'react'
+import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
+import { useDispatch, useSelector } from 'react-redux'
 import OtpLoginPage from '@/pages/auth/OtpLoginPage'
 import TeamDashboardPage from '@/pages/dashboard/TeamDashboardPage'
 import ContactBookPage from '@/pages/home/ContactBookPage'
@@ -26,15 +27,43 @@ import AdminDeliveryPartnerAnalyticsPage from '@/pages/deliveryPartners/AdminDel
 import PortalInvoiceDetailPage from '@/pages/accounts/PortalInvoiceDetailPage'
 import PortalInvoicesListPage from '@/pages/accounts/PortalInvoicesListPage'
 import PortalAccountsOverviewPage from '@/pages/accounts/PortalAccountsOverviewPage'
+import SettingsPage from '@/pages/settings/SettingsPage'
 import {
   selectAuthScope,
   selectIsAuthenticated,
 } from '@/redux/slices/authSlice'
+import { logoutLocal } from '@/redux/slices/authSlice'
+import { UNAUTHORIZED_EVENT } from '@/apis/httpClient'
+
+function UnauthorizedBridge() {
+  const dispatch = useDispatch()
+  const navigate = useNavigate()
+  const scope = useSelector(selectAuthScope)
+
+  // Listen for global 401 events from the HTTP client.
+  // If a token is expired/revoked, we clear session and redirect to login.
+  // This is UX hardening, not a security boundary (backend still enforces auth).
+  useEffect(() => {
+    const handler = () => {
+      dispatch(logoutLocal())
+      if (scope === 'portal') navigate('/portal/login', { replace: true })
+      else navigate('/', { replace: true })
+    }
+    window.addEventListener(UNAUTHORIZED_EVENT, handler)
+    return () => window.removeEventListener(UNAUTHORIZED_EVENT, handler)
+  }, [dispatch, navigate, scope])
+
+  return null
+}
 
 function ProtectedRoute({ children, requiredScope, redirectTo }) {
   const isAuthenticated = useSelector(selectIsAuthenticated)
   const authScope = useSelector(selectAuthScope)
   const shouldRedirect = !isAuthenticated || authScope !== requiredScope
+
+  // #region agent log
+  fetch('http://127.0.0.1:7607/ingest/885d2d87-6874-454c-88ac-5377dbfdd091',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'46071a'},body:JSON.stringify({sessionId:'46071a',runId:'pre-fix',hypothesisId:'H2',location:'AppRouter.jsx:ProtectedRoute',message:'ProtectedRoute check',data:{requiredScope:String(requiredScope??''),authScope:String(authScope??''),isAuthenticated:Boolean(isAuthenticated),shouldRedirect:Boolean(shouldRedirect)},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion agent log
 
   if (shouldRedirect) {
     return <Navigate to={redirectTo} replace />
@@ -46,6 +75,7 @@ function ProtectedRoute({ children, requiredScope, redirectTo }) {
 function AppRouter() {
   return (
     <BrowserRouter>
+      <UnauthorizedBridge />
       <Routes>
         <Route path="/" element={<OtpLoginPage />} />
         <Route
@@ -168,6 +198,14 @@ function AppRouter() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/dashboard/teamify/settings"
+          element={
+            <ProtectedRoute requiredScope="admin" redirectTo="/">
+              <SettingsPage />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/portal/login" element={<PortalLoginPage />} />
         <Route
           path="/portal/dashboard"
@@ -230,6 +268,22 @@ function AppRouter() {
           element={
             <ProtectedRoute requiredScope="portal" redirectTo="/portal/login">
               <PortalAccountsOverviewPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/portal/dashboard/settings"
+          element={
+            <ProtectedRoute requiredScope="portal" redirectTo="/portal/login">
+              <SettingsPage
+                brandTitle="Teamify Portal"
+                pageTitle="Portal Settings"
+                dashboardPath="/portal/dashboard"
+                shopsPagePath="/portal/dashboard/shops"
+                reportsPath={null}
+                contactBookPath="/portal/dashboard/contact-book"
+                isPortal
+              />
             </ProtectedRoute>
           }
         />
