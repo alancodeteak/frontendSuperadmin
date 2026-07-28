@@ -1,36 +1,97 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Restaurant Superadmin
 
-## Getting Started
+Next.js superadmin panel for the UAE restaurant ecommerce platform.
 
-First, run the development server:
+## Stack
+
+- **Next.js 16** (App Router)
+- **React 19**
+- **TypeScript**
+- **Tailwind CSS 4**
+- **Cloudflare Tunnel** → `superadmin.yaadro.online`
+
+## Getting started
 
 ```bash
+npm install
+cp .env.example .env.local
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Cloudflare tunnel (public URL)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Uses existing tunnel `yaadro-superadmin-frontend` → `https://superadmin.yaadro.online`.
 
-## Learn More
+1. Ensure DNS is routed (once):
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm run tunnel:dns
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+2. Run Next.js + tunnel together:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm run dev:tunnel
+```
 
-## Deploy on Vercel
+Or in two terminals: `npm run dev` and `npm run tunnel`.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Browser traffic:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```text
+https://superadmin.yaadro.online/api/...
+  → Next.js rewrite → https://superadmin-api.yaadro.online/api/...
+
+https://superadmin.yaadro.online/dms-api/...
+  → Next.js rewrite → http://localhost:3001/dms-api/...
+```
+
+Same-origin `/api` and `/dms-api` avoid CORS through the tunnel.
+
+## Project structure
+
+```text
+src/
+  app/
+    (admin)/          # Admin shell (sidebar layout)
+      dashboard/
+      restaurants/
+      orders/
+      users/
+      settings/
+    login/
+  components/
+  config/
+  lib/                # apiFetch / dmsApiFetch (same-origin)
+  types/
+cloudflared/
+  config.yml          # Tunnel ingress for superadmin.yaadro.online
+```
+
+## Scripts
+
+| Command              | Description                          |
+| -------------------- | ------------------------------------ |
+| `npm run dev`        | Local Next.js on :3000               |
+| `npm run tunnel`     | Cloudflare tunnel only               |
+| `npm run dev:tunnel` | Next.js + tunnel                     |
+| `npm run tunnel:dns` | Point DNS at the named tunnel        |
+| `npm run build`      | Production build                     |
+| `npm run start`      | Production server                    |
+| `npm run lint`       | ESLint                               |
+
+## Environment
+
+| Variable | Purpose |
+| -------- | ------- |
+| `NEXT_PUBLIC_API_BASE_URL` | Browser API path (`/api`) |
+| `API_PROXY_TARGET` | Backend origin for `/api` rewrite |
+| `NEXT_PUBLIC_DMS_API_BASE_URL` | Browser DMS path (`/dms-api`) |
+| `DMS_API_PROXY_TARGET` | DMS origin for `/dms-api` rewrite |
+| `NEXT_PUBLIC_TUNNEL_HOST` | Cloudflare hostname |
+| `NEXT_PUBLIC_APP_URL` | Public app URL |
+| `NEXT_PUBLIC_DEVELOPMENT_MODE` | `true` skips real OTP |
+| `NEXT_PUBLIC_NUMVERIFY_ACCESS_KEY` | Phone carrier lookup |
+| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | Maps JS API |
