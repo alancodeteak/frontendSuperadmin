@@ -1730,6 +1730,36 @@ function ProductsTab({ shopId }: { shopId: string }) {
   );
 }
 
+const BONUS_PENALTY_START_STATUS_OPTIONS: Array<{
+  value: string;
+  label: string;
+}> = [
+  { value: "assigned", label: "Assigned" },
+  { value: "accepted", label: "Accepted" },
+  { value: "arrived", label: "Arrived" },
+  { value: "picked_up", label: "Picked up" },
+  { value: "on_the_way", label: "On the way" },
+  { value: "delivered", label: "Delivered" },
+];
+
+function bonusPenaltyStartStatusOptions(current: string) {
+  if (
+    current &&
+    !BONUS_PENALTY_START_STATUS_OPTIONS.some((o) => o.value === current)
+  ) {
+    return [
+      ...BONUS_PENALTY_START_STATUS_OPTIONS,
+      {
+        value: current,
+        label: current
+          .replace(/_/g, " ")
+          .replace(/\b\w/g, (c) => c.toUpperCase()),
+      },
+    ];
+  }
+  return BONUS_PENALTY_START_STATUS_OPTIONS;
+}
+
 function deliveryFormFromData(
   data: ShopDeliverySettings | Record<string, unknown> | null | undefined,
 ) {
@@ -1869,14 +1899,33 @@ function DeliveryTab({
             onChange={(v) => setField("bonus_penalty", v)}
           />
           <Field label="Bonus penalty start status">
-            <Input
-              value={form.bonus_penalty_start_status}
+            <Select
+              value={form.bonus_penalty_start_status || "assigned"}
               disabled={!form.bonus_penalty}
-              onChange={(e) =>
-                setField("bonus_penalty_start_status", e.target.value)
+              onValueChange={(value) =>
+                setField(
+                  "bonus_penalty_start_status",
+                  value ?? "assigned",
+                )
               }
-              placeholder="assigned"
-            />
+            >
+              <SelectTrigger
+                id="delivery_bonus_penalty_start_status"
+                data-field="bonus_penalty_start_status"
+                className="w-full"
+              >
+                <SelectValue placeholder="Select start status" />
+              </SelectTrigger>
+              <SelectContent>
+                {bonusPenaltyStartStatusOptions(
+                  form.bonus_penalty_start_status,
+                ).map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </Field>
         </div>
 
