@@ -9,6 +9,8 @@ import type {
   Invoice,
   InvoiceStatus,
   Paginated,
+  PatchShopInput,
+  PatchShopResponse,
   PosShopLink,
   PosTemplate,
   PosTemplateSummary,
@@ -16,12 +18,15 @@ import type {
   RestaurantPerformanceRow,
   Rider,
   ShopActivityResponse,
+  ShopDeliverySettings,
   ShopDetail,
+  ShopEcomSettings,
   ShopListItem,
   ShopProduct,
   TriggerShopLogoutResponse,
 } from "@/types/api";
 import { siteConfig } from "@/config/site";
+import { SHOP_USER_ID_MAX, SHOP_USER_ID_MIN } from "@/lib/shop-create-validation";
 
 export function isDevelopmentMode() {
   return siteConfig.developmentMode;
@@ -396,13 +401,16 @@ export async function mockCreateShop(input: CreateShopInput): Promise<ShopDetail
       { status: 400, code: "ecom_confirmation_requires_ecom" },
     );
   }
+  const userId =
+    input.user_id ??
+    Math.floor(SHOP_USER_ID_MIN + Math.random() * (SHOP_USER_ID_MAX - SHOP_USER_ID_MIN));
   const shop: ShopListItem = {
     shop_id: input.shop_id,
-    user_id: input.user_id,
+    user_id: userId,
     shop_name: input.shop_name,
     phone: input.phone ?? null,
     email: input.email ?? null,
-    status: "active",
+    status: (input.status as ShopListItem["status"]) ?? "active",
     is_deleted: false,
     ecom_enabled: input.ecom_enabled ?? false,
     ecom_slug: input.ecom_slug ?? null,
@@ -425,39 +433,12 @@ export async function mockCreateShop(input: CreateShopInput): Promise<ShopDetail
       return_option: input.return_option ?? false,
       customer_ticket: input.customer_ticket ?? false,
       ecom_slug: shop.ecom_slug,
-    },
-  });
-}
-
-export async function mockGetShop(shopId: string): Promise<ShopDetail> {
-  const shop = mockShops.find((s) => s.shop_id === shopId);
-  if (!shop) {
-    throw Object.assign(new Error("Shop not found"), { status: 404 });
-  }
-  return delay({
-    ...shop,
-    profile: {
-      shop_name: shop.shop_name,
-      phone: shop.phone,
-      email: shop.email,
-      photo: shop.photo ?? null,
-      photo_url: shop.photo_url ?? null,
-    },
-    features: {
-      ecom_enabled: Boolean(shop.ecom_enabled),
-      ecom_order_confirmation_enabled: Boolean(
-        shop.ecom_order_confirmation_enabled,
-      ),
-      scheduled_order: Boolean(shop.scheduled_order),
-      merge_order: Boolean(shop.merge_order),
-      return_option: false,
-      customer_ticket: Boolean(shop.ecom_enabled),
-      ecom_slug: shop.ecom_slug,
-      integration_enabled: false,
-      integration_rate_limit: 100,
+      integration_enabled: input.integration_enabled ?? false,
+      integration_rate_limit: input.integration_rate_limit ?? 300,
+      is_msg_activated: input.is_msg_activated ?? false,
+      single_msg: input.single_msg ?? false,
       has_integration_token: false,
     },
-    products: { items: mockProducts, total: mockProducts.length },
     delivery: {
       delivery_time: 30,
       self_assigned: false,
@@ -467,10 +448,89 @@ export async function mockGetShop(shopId: string): Promise<ShopDetail> {
       common_penalty_enabled: false,
       common_penalty_idle_minutes: 45,
       common_penalty_min_online_minutes: 45,
-      radius_km: 8,
-      base_fee: 8,
-      free_delivery_min: 80,
-      enabled: true,
+      ...(input.delivery ?? {}),
+    },
+    ecom: {
+      domain: null,
+      min_order_amount: "0",
+      delivery_radius_km: "5",
+      payment_methods: [],
+      robots_index: true,
+      ...(input.ecom ?? {}),
+    },
+  });
+}
+
+export async function mockGetShop(shopId: string): Promise<ShopDetail> {
+  const shop = mockShops.find((s) => s.shop_id === shopId);
+  if (!shop) {
+    throw Object.assign(new Error("Shop not found"), { status: 404 });
+  }
+  const stored = mockShopExtras[shopId];
+  return delay({
+    ...shop,
+    profile: {
+      shop_name: shop.shop_name,
+      second_name:
+        typeof stored?.profile?.second_name === "string"
+          ? stored.profile.second_name
+          : null,
+      phone: shop.phone,
+      email: shop.email,
+      photo: shop.photo ?? null,
+      photo_url: shop.photo_url ?? null,
+      shop_license_no:
+        typeof stored?.profile?.shop_license_no === "string"
+          ? stored.profile.shop_license_no
+          : null,
+      contact_person_number:
+        typeof stored?.profile?.contact_person_number === "string"
+          ? stored.profile.contact_person_number
+          : null,
+      contact_person_email:
+        typeof stored?.profile?.contact_person_email === "string"
+          ? stored.profile.contact_person_email
+          : null,
+      upi_id:
+        typeof stored?.profile?.upi_id === "string"
+          ? stored.profile.upi_id
+          : null,
+      vat_enabled: Boolean(stored?.profile?.vat_enabled),
+      vat:
+        stored?.profile?.vat != null ? String(stored.profile.vat) : "5",
+      enable_promotion: Boolean(stored?.profile?.enable_promotion),
+    },
+    features: {
+      ecom_enabled: Boolean(shop.ecom_enabled),
+      ecom_order_confirmation_enabled: Boolean(
+        shop.ecom_order_confirmation_enabled,
+      ),
+      scheduled_order: Boolean(shop.scheduled_order),
+      merge_order: Boolean(shop.merge_order),
+      return_option: Boolean(stored?.features?.return_option),
+      customer_ticket: Boolean(
+        stored?.features?.customer_ticket ?? shop.ecom_enabled,
+      ),
+      ecom_slug: shop.ecom_slug,
+      integration_enabled: Boolean(stored?.features?.integration_enabled),
+      integration_rate_limit:
+        typeof stored?.features?.integration_rate_limit === "number"
+          ? stored.features.integration_rate_limit
+          : 100,
+      has_integration_token: Boolean(stored?.has_integration_token),
+      is_msg_activated: Boolean(stored?.features?.is_msg_activated),
+      single_msg: Boolean(stored?.features?.single_msg),
+    },
+    products: { items: mockProducts, total: mockProducts.length },
+    delivery: stored?.delivery ?? {
+      delivery_time: 30,
+      self_assigned: false,
+      pickup_disabled: false,
+      bonus_penalty: false,
+      bonus_penalty_start_status: "assigned",
+      common_penalty_enabled: false,
+      common_penalty_idle_minutes: 45,
+      common_penalty_min_online_minutes: 45,
     },
     subscription: {
       plan: "growth",
@@ -482,17 +542,38 @@ export async function mockGetShop(shopId: string): Promise<ShopDetail> {
       active: true,
       discount_percent: 10,
     },
-  });
+    ecom: stored?.ecom ?? {
+      domain: null,
+      min_order_amount: "0",
+      delivery_radius_km: "5",
+      payment_methods: ["online", "cash_on_delivery"],
+      robots_index: true,
+    },
+  } satisfies ShopDetail);
 }
+
+type MockShopExtras = {
+  profile?: Record<string, unknown>;
+  features?: Record<string, unknown>;
+  delivery?: ShopDeliverySettings;
+  ecom?: ShopEcomSettings;
+  has_integration_token?: boolean;
+};
+
+const mockShopExtras: Record<string, MockShopExtras> = {};
 
 export async function mockPatchShop(
   shopId: string,
-  input: Record<string, unknown>,
-) {
+  input: PatchShopInput | Record<string, unknown>,
+): Promise<PatchShopResponse> {
   const idx = mockShops.findIndex((s) => s.shop_id === shopId);
-  if (idx < 0) return delay(input);
+  if (idx < 0) {
+    return delay({ shop_id: shopId, updated_at: new Date().toISOString() });
+  }
 
   const current = mockShops[idx];
+  const extras = mockShopExtras[shopId] ?? (mockShopExtras[shopId] = {});
+
   const nextEcom =
     typeof input.ecom_enabled === "boolean"
       ? input.ecom_enabled
@@ -525,9 +606,6 @@ export async function mockPatchShop(
     photoUrl = `data:${contentType};base64,${raw}`;
   }
 
-  const { photo_base64: _b64, photo_content_type: _ct, clear_photo: _clear, ...rest } =
-    input;
-
   const nextAddress =
     "address" in input
       ? input.address === null
@@ -540,22 +618,20 @@ export async function mockPatchShop(
           }
       : current.address;
 
-  mockShops[idx] = {
-    ...current,
-    ...rest,
-    ...(input.is_deleted === false
-      ? { is_deleted: false, status: current.status === "deleted" ? "inactive" : current.status }
-      : {}),
-    address: nextAddress as ShopListItem["address"],
-    photo: photo ?? null,
-    photo_url: photoUrl ?? null,
-    ecom_enabled: nextEcom,
-    ecom_order_confirmation_enabled: nextConfirm,
-    updated_at: new Date().toISOString(),
-  } as ShopListItem;
+  if (input.delivery && typeof input.delivery === "object") {
+    extras.delivery = {
+      ...(extras.delivery ?? {}),
+      ...(input.delivery as ShopDeliverySettings),
+    };
+  }
+  if (input.ecom && typeof input.ecom === "object") {
+    extras.ecom = {
+      ...(extras.ecom ?? {}),
+      ...(input.ecom as ShopEcomSettings),
+    };
+  }
 
-  const features: Record<string, unknown> = {};
-  for (const key of [
+  const featureKeys = [
     "ecom_enabled",
     "ecom_order_confirmation_enabled",
     "scheduled_order",
@@ -563,18 +639,90 @@ export async function mockPatchShop(
     "return_option",
     "customer_ticket",
     "ecom_slug",
-  ] as const) {
-    if (key in input) features[key] = input[key];
+    "integration_enabled",
+    "integration_rate_limit",
+    "is_msg_activated",
+    "single_msg",
+  ] as const;
+
+  const features: Record<string, unknown> = {};
+  for (const key of featureKeys) {
+    if (key in input) {
+      features[key] = (input as Record<string, unknown>)[key];
+      extras.features = { ...(extras.features ?? {}), [key]: features[key] };
+    }
   }
 
+  const profileKeys = [
+    "shop_name",
+    "second_name",
+    "phone",
+    "email",
+    "shop_license_no",
+    "contact_person_number",
+    "contact_person_email",
+    "upi_id",
+    "vat_enabled",
+    "vat",
+    "enable_promotion",
+  ] as const;
   const profile: Record<string, unknown> = {};
+  for (const key of profileKeys) {
+    if (key in input) {
+      profile[key] = (input as Record<string, unknown>)[key];
+      extras.profile = { ...(extras.profile ?? {}), [key]: profile[key] };
+    }
+  }
   if (input.clear_photo === true || typeof input.photo_base64 === "string") {
-    profile.photo = mockShops[idx].photo ?? null;
-    profile.photo_url = mockShops[idx].photo_url ?? null;
+    profile.photo = photo ?? null;
+    profile.photo_url = photoUrl ?? null;
   }
-  for (const key of ["shop_name", "phone", "email"] as const) {
-    if (key in input) profile[key] = input[key];
+
+  let integration_token: string | undefined;
+  if (
+    input.integration_enabled === true &&
+    !extras.has_integration_token
+  ) {
+    extras.has_integration_token = true;
+    features.has_integration_token = true;
+    integration_token = `mock-token-${shopId}-${Date.now()}`;
   }
+
+  mockShops[idx] = {
+    ...current,
+    shop_name:
+      typeof input.shop_name === "string" ? input.shop_name : current.shop_name,
+    phone:
+      input.phone !== undefined
+        ? (input.phone as string | null)
+        : current.phone,
+    email:
+      input.email !== undefined
+        ? (input.email as string | null)
+        : current.email,
+    status:
+      typeof input.status === "string"
+        ? (input.status as ShopListItem["status"])
+        : current.status,
+    address: nextAddress as ShopListItem["address"],
+    photo: photo ?? null,
+    photo_url: photoUrl ?? null,
+    ecom_enabled: nextEcom,
+    ecom_order_confirmation_enabled: nextConfirm,
+    ecom_slug:
+      "ecom_slug" in input
+        ? ((input.ecom_slug as string | null) ?? null)
+        : current.ecom_slug,
+    scheduled_order:
+      typeof input.scheduled_order === "boolean"
+        ? input.scheduled_order
+        : current.scheduled_order,
+    merge_order:
+      typeof input.merge_order === "boolean"
+        ? input.merge_order
+        : current.merge_order,
+    updated_at: new Date().toISOString(),
+  } as ShopListItem;
 
   return delay({
     shop_id: shopId,
@@ -582,6 +730,17 @@ export async function mockPatchShop(
     ...(Object.keys(features).length ? { features } : {}),
     ...(Object.keys(profile).length ? { profile } : {}),
     ...("address" in input ? { address: mockShops[idx].address } : {}),
+    ...("delivery" in input ? { delivery: extras.delivery } : {}),
+    ...("ecom" in input
+      ? {
+          ecom: (() => {
+            const { theme_config: _t, structured_data: _s, ...rest } =
+              extras.ecom ?? {};
+            return rest;
+          })(),
+        }
+      : {}),
+    ...(integration_token ? { integration_token } : {}),
   });
 }
 

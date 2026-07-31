@@ -108,7 +108,9 @@ Open [http://localhost:3002](http://localhost:3002) (dev server uses port **3002
 
 ### Cloudflare tunnel (public URL)
 
-Named tunnel: `yaadro-superadmin-frontend` → `https://superadmin.yaadro.online`.
+Named tunnel: `yaadro-superadmin-uae` → `https://superadmin.yaadro.online` (local Next.js on port **3002**).
+
+API stays on the separate tunnel/host: `https://superadmin-api.yaadro.ae` (or live tunnel `superadmin-api.yaadro.online` when that connector is up).
 
 1. Ensure DNS is routed (once):
 
@@ -131,7 +133,7 @@ Browser traffic stays same-origin to avoid CORS through the tunnel:
 ```text
 https://superadmin.yaadro.online/api/...
   → Next.js rewrite → API_PROXY_TARGET/api/...
-  (default: https://superadmin-api.yaadro.online)
+  (default: https://superadmin-api.yaadro.ae)
 
 https://superadmin.yaadro.online/dms-api/...
   → Next.js rewrite → DMS_API_PROXY_TARGET/dms-api/...
@@ -178,7 +180,7 @@ src/
     mock-data.ts             # Dev mocks when development mode is on
   types/
 cloudflared/
-  config.yml                 # Tunnel ingress for superadmin.yaadro.online
+  config.yml                 # Tunnel ingress for superadmin.yaadro.online (yaadro-superadmin-uae)
 public/
   images/ icons/ animations/
 ```
@@ -239,6 +241,6 @@ Useful references in the repo:
 ## Development notes
 
 - Prefer matching existing page patterns (`PageShell`, `TopBarSlot`, `DataTable`, shared states).
-- Shop create uses **POST** for core fields, then **PATCH** for feature flags and photo upload.
+- Shop create uses a single **POST** (owners + delivery + ecom rows + feature flags); optional **PATCH** for photo upload.
 - Drafts for the create wizard are stored in `localStorage` under `yaadro:shop-create-draft` (password excluded).
 - This Next.js version may differ from older docs; check `node_modules/next/dist/docs/` and deprecation notices when changing framework APIs.

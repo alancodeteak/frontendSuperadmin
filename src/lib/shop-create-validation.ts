@@ -343,7 +343,7 @@ function buildAddress(form: CreateShopFormValues): ShopAddress | undefined {
   return Object.keys(address).length > 0 ? address : undefined;
 }
 
-/** Fields allowed on POST /v2/shops (see admin-api Postman contract). */
+/** Fields allowed on POST /v2/shops (creates owners + delivery + ecom rows). */
 export function buildCreateShopPayload(
   form: CreateShopFormValues,
 ): CreateShopInput {
@@ -353,12 +353,20 @@ export function buildCreateShopPayload(
   }
 
   const shop_id = normalizeShopId(form.shop_id);
+  const ecom_enabled = form.ecom_enabled;
   const payload: CreateShopInput = {
     shop_name: form.shop_name.trim(),
     shop_id,
     password: form.password,
     user_id,
-    ecom_enabled: form.ecom_enabled,
+    ecom_enabled,
+    ecom_order_confirmation_enabled: ecom_enabled
+      ? form.ecom_order_confirmation_enabled
+      : false,
+    scheduled_order: form.scheduled_order,
+    merge_order: form.merge_order,
+    return_option: form.return_option,
+    customer_ticket: ecom_enabled ? form.customer_ticket : false,
   };
 
   const phone = hasMeaningfulUaePhone(form.phone)
@@ -378,21 +386,6 @@ export function buildCreateShopPayload(
   if (address) payload.address = address;
 
   return payload;
-}
-
-/** Feature flags applied via PATCH after create (not accepted on POST /v2/shops). */
-export function buildShopFeaturePatchPayload(form: CreateShopFormValues) {
-  const ecom_enabled = form.ecom_enabled;
-  return {
-    ecom_enabled,
-    ecom_order_confirmation_enabled: ecom_enabled
-      ? form.ecom_order_confirmation_enabled
-      : false,
-    scheduled_order: form.scheduled_order,
-    merge_order: form.merge_order,
-    return_option: form.return_option,
-    customer_ticket: ecom_enabled ? form.customer_ticket : false,
-  };
 }
 
 /** Map Nest/Zod API error body onto form field keys. */
@@ -415,6 +408,10 @@ export function mapApiErrorsToFields(err: {
       errors.ecom_slug = err.message || "Ecom slug already taken";
     } else if (code === "shop_license_taken" || field === "shop_license_no") {
       errors.form = err.message || "Shop license already taken";
+    } else if (code === "domain_taken" || field === "domain") {
+      errors.form = err.message || "Domain already taken";
+    } else if (code === "group_not_found" || field === "group_id") {
+      errors.form = err.message || "Group not found";
     }
 
     if (Array.isArray(record.errors)) {

@@ -133,7 +133,7 @@ export function CreateShopFlowDialog({
             <Loader2Icon className="mx-auto size-10 animate-spin text-primary" />
             <p className="mt-5 text-base font-semibold">Creating shop…</p>
             <p className="mt-2 text-sm text-muted-foreground">
-              Setting up the account, features, and shop profile.
+              Setting up the shop account, features, delivery, and ecom settings.
             </p>
             {phase === "slow" ? (
               <div className="mt-6 rounded-xl border border-dashed bg-muted/30 p-4 text-left">

@@ -12,7 +12,6 @@ import {
   mockListShopProducts,
   mockListShops,
   mockPatchShop,
-  mockPutDeliverySettings,
   mockPutPromotion,
   mockRestoreShop,
   mockTriggerShopLogout,
@@ -24,8 +23,12 @@ import {
 import type {
   CreateShopInput,
   Paginated,
+  PatchShopInput,
+  PatchShopResponse,
   ShopActivityResponse,
+  ShopDeliverySettings,
   ShopDetail,
+  ShopEcomSettings,
   ShopListItem,
   ShopProduct,
   ShopStatus,
@@ -102,15 +105,40 @@ export function createShop(input: CreateShopInput) {
     shop_name: input.shop_name,
     shop_id: input.shop_id,
     password: input.password,
-    user_id: input.user_id,
   };
+
+  if (input.user_id != null) {
+    body.user_id = input.user_id;
+  }
 
   const optionalKeys: Array<keyof CreateShopInput> = [
     "ecom_enabled",
+    "ecom_order_confirmation_enabled",
+    "scheduled_order",
+    "merge_order",
+    "return_option",
+    "customer_ticket",
     "ecom_slug",
+    "second_name",
+    "status",
+    "status_reason",
+    "vat_enabled",
+    "vat",
+    "enable_promotion",
+    "upi_id",
+    "integration_enabled",
+    "integration_rate_limit",
+    "is_msg_activated",
+    "single_msg",
     "phone",
     "email",
+    "contact_person_number",
+    "contact_person_email",
+    "group_id",
+    "shop_license_no",
     "address",
+    "delivery",
+    "ecom",
   ];
   for (const key of optionalKeys) {
     const value = input[key];
@@ -197,9 +225,9 @@ export function getShop(
   return apiFetch<ShopDetail>(`/v2/shops/${shopId}`, { params });
 }
 
-export function patchShop(shopId: string, input: Record<string, unknown>) {
+export function patchShop(shopId: string, input: PatchShopInput) {
   if (isDevelopmentMode()) return mockPatchShop(shopId, input);
-  return apiFetch<Partial<ShopDetail>>(`/v2/shops/${shopId}`, {
+  return apiFetch<PatchShopResponse>(`/v2/shops/${shopId}`, {
     method: "PATCH",
     body: JSON.stringify(input),
   });
@@ -216,7 +244,7 @@ export function shopFeatureFlagsFromDetail(
     | "merge_order"
     | "features"
   >,
-): Record<string, unknown> {
+): PatchShopInput {
   const f = shop.features ?? {};
   return {
     ecom_enabled: Boolean(f.ecom_enabled ?? shop.ecom_enabled),
@@ -233,6 +261,8 @@ export function shopFeatureFlagsFromDetail(
       typeof f.integration_rate_limit === "number"
         ? f.integration_rate_limit
         : 100,
+    is_msg_activated: Boolean(f.is_msg_activated),
+    single_msg: Boolean(f.single_msg),
   };
 }
 
@@ -359,23 +389,31 @@ export function listShopProducts(
 
 export function getDeliverySettings(shopId: string) {
   if (isDevelopmentMode()) return mockGetDeliverySettings();
-  return apiFetch<Record<string, unknown>>(
+  // Prefer nested delivery from GET shop; keep endpoint for older backends.
+  return apiFetch<ShopDeliverySettings>(
     `/v2/shops/${shopId}/delivery-settings`,
   );
 }
 
+/** Upsert delivery via PATCH /shops/:id { delivery }. */
+export function patchShopDelivery(
+  shopId: string,
+  delivery: ShopDeliverySettings,
+) {
+  return patchShop(shopId, { delivery });
+}
+
+/** Upsert ecom storefront via PATCH /shops/:id { ecom }. */
+export function patchShopEcom(shopId: string, ecom: ShopEcomSettings) {
+  return patchShop(shopId, { ecom });
+}
+
 export function putDeliverySettings(
   shopId: string,
-  input: Record<string, unknown>,
+  input: ShopDeliverySettings,
 ) {
-  if (isDevelopmentMode()) return mockPutDeliverySettings(input);
-  return apiFetch<Record<string, unknown>>(
-    `/v2/shops/${shopId}/delivery-settings`,
-    {
-      method: "PUT",
-      body: JSON.stringify(input),
-    },
-  );
+  // New contract: nested delivery on shop PATCH (dev + prod).
+  return patchShopDelivery(shopId, input);
 }
 
 export function createSubscription(

@@ -7,7 +7,7 @@
     "dev:tunnel": "concurrently -k -n next,tunnel -c cyan,magenta \"npm run dev\" \"npm run tunnel\"",
     "dev:app": "npm run dev",
     "tunnel": "cloudflared tunnel --config cloudflared/config.yml run",
-    "tunnel:dns": "cloudflared tunnel route dns -f 00a6502d-5b61-42a4-8b00-aef8c597116f superadmin.yaadro.online",
+    "tunnel:dns": "cloudflared tunnel route dns -f 71bc6dd4-3ef7-42bf-aad1-13e118fc85f0 superadmin.yaadro.online",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"

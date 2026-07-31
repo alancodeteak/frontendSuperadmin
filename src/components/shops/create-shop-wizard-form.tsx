@@ -29,7 +29,6 @@ import { appToast } from "@/lib/app-toast";
 import {
   createShop,
   isShopIdAvailable,
-  patchShop,
   patchShopPhoto,
   suggestNextShopUserId,
 } from "@/lib/api/shops";
@@ -43,7 +42,6 @@ import {
 } from "@/lib/shop-create-draft";
 import {
   buildCreateShopPayload,
-  buildShopFeaturePatchPayload,
   getUaePhoneDisplayPart,
   isCreateShopFormValid,
   mapApiErrorsToFields,
@@ -763,8 +761,6 @@ export function CreateShopWizard() {
 
       const shop = await createShop(payload);
       const id = String(shop?.shop_id || payload.shop_id);
-
-      await patchShop(id, buildShopFeaturePatchPayload(form));
 
       if (shopPhoto) {
         try {

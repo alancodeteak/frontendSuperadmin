@@ -1,4 +1,20 @@
-# Cloudflare DNS → Vercel custom domain
+# Cloudflare DNS
+
+## Local / tunnel (dev public URL)
+# Hostname: https://superadmin.yaadro.online
+# Tunnel:   yaadro-superadmin-uae (71bc6dd4-3ef7-42bf-aad1-13e118fc85f0)
+# Origin:   http://127.0.0.1:3002  (npm run dev)
+#
+# Route DNS (once):
+#   npm run tunnel:dns
+#
+# Run Next + tunnel:
+#   npm run dev:tunnel
+#
+# Cloudflare auto-creates a proxied CNAME:
+#   superadmin → <tunnel-id>.cfargotunnel.com  (orange cloud)
+
+## Production (Vercel custom domain)
 # Production app: https://superadmin.yaadro.ae
 # Production API: https://superadmin-api.yaadro.ae
 #
@@ -14,6 +30,4 @@
 #
 # Vercel env must proxy API to the LIVE host:
 #   API_PROXY_TARGET=https://superadmin-api.yaadro.ae
-# Do NOT use superadmin-api.yaadro.online (Cloudflare Tunnel down → HTTP 530).
-#
-# Remove any old tunnel CNAME for `superadmin` once Vercel is live.
+# Do NOT point production at a down tunnel (HTTP 530).

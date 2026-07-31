@@ -34,6 +34,8 @@ export type ShopFeatures = {
   integration_enabled?: boolean;
   integration_rate_limit?: number;
   has_integration_token?: boolean;
+  is_msg_activated?: boolean;
+  single_msg?: boolean;
   vat_enabled?: boolean;
   vat?: number;
 };
@@ -79,17 +81,35 @@ export type CreateShopInput = {
   shop_name: string;
   shop_id: string;
   password: string;
-  user_id: number;
+  /** 100000–999999; omitted → API auto-allocates */
+  user_id?: number;
+  ecom_slug?: string | null;
   ecom_enabled?: boolean;
   ecom_order_confirmation_enabled?: boolean;
   scheduled_order?: boolean;
   merge_order?: boolean;
   return_option?: boolean;
   customer_ticket?: boolean;
-  ecom_slug?: string;
+  second_name?: string | null;
+  status?: ShopStatus | string;
+  status_reason?: string | null;
+  vat_enabled?: boolean;
+  vat?: number | string;
+  enable_promotion?: boolean;
+  upi_id?: string | null;
+  integration_enabled?: boolean;
+  integration_rate_limit?: number;
+  is_msg_activated?: boolean;
+  single_msg?: boolean;
   phone?: string;
   email?: string;
+  contact_person_number?: string | null;
+  contact_person_email?: string | null;
+  group_id?: number | string | null;
+  shop_license_no?: string | null;
   address?: ShopAddress;
+  delivery?: ShopDeliverySettings;
+  ecom?: ShopEcomSettings;
 };
 
 export type ShopDeliverySettings = {
@@ -114,11 +134,15 @@ export type ShopPromotionSettings = {
 };
 
 export type ShopEcomSettings = {
+  /** Hostname only; unique when set. Send null on PATCH to clear. */
+  domain?: string | null;
   min_order_amount?: string | number | null;
-  delivery_radius_km?: number | null;
+  delivery_radius_km?: string | number | null;
   operating_hours?: unknown;
   payment_methods?: unknown;
   whatsapp_order_template?: string | null;
+  /** Write-only on create/patch; never returned */
+  theme_config?: unknown;
   seo_title?: string | null;
   seo_description?: string | null;
   seo_keywords?: string | null;
@@ -127,7 +151,61 @@ export type ShopEcomSettings = {
   og_image?: string | null;
   twitter_card?: string | null;
   robots_index?: boolean | null;
+  /** Write-only on create/patch; never returned */
+  structured_data?: unknown;
   [key: string]: unknown;
+};
+
+/** PATCH /api/v2/shops/:shop_id — flat profile/feature keys + nested upserts. */
+export type PatchShopInput = {
+  shop_name?: string;
+  second_name?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  shop_license_no?: string | null;
+  contact_person_number?: string | null;
+  contact_person_email?: string | null;
+  status?: ShopStatus | string;
+  status_reason?: string | null;
+  group_id?: number | string | null;
+  ecom_enabled?: boolean;
+  ecom_order_confirmation_enabled?: boolean;
+  ecom_slug?: string | null;
+  return_option?: boolean;
+  scheduled_order?: boolean;
+  merge_order?: boolean;
+  customer_ticket?: boolean;
+  vat_enabled?: boolean;
+  vat?: number | string | null;
+  enable_promotion?: boolean;
+  integration_enabled?: boolean;
+  integration_rate_limit?: number;
+  upi_id?: string | null;
+  is_msg_activated?: boolean;
+  single_msg?: boolean;
+  /** Nested address upsert; null clears shop address link */
+  address?: ShopAddress | null;
+  delivery?: ShopDeliverySettings;
+  ecom?: ShopEcomSettings;
+  photo_base64?: string;
+  photo_content_type?: string;
+  clear_photo?: boolean;
+};
+
+/** Sparse PATCH response — only groups for keys that were sent. */
+export type PatchShopResponse = {
+  shop_id: string;
+  updated_at?: string;
+  status?: ShopStatus | string;
+  status_reason?: string | null;
+  group_id?: number | string | null;
+  profile?: ShopProfile;
+  features?: ShopFeatures;
+  address?: ShopAddress | null;
+  delivery?: ShopDeliverySettings | null;
+  ecom?: ShopEcomSettings | null;
+  /** One-time plaintext when integration is first enabled */
+  integration_token?: string;
 };
 
 export type ShopDetail = ShopListItem & {

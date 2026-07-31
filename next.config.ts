@@ -22,7 +22,7 @@ const dmsApiProxyTarget = normalizeOrigin(
 );
 
 const tunnelHost =
-  process.env.NEXT_PUBLIC_TUNNEL_HOST ?? "superadmin.yaadro.ae";
+  process.env.NEXT_PUBLIC_TUNNEL_HOST ?? "superadmin.yaadro.online";
 
 const nextConfig: NextConfig = {
   // Allow Next.js dev assets/HMR when accessed via a custom hostname (local tunnel)
