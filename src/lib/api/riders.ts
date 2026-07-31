@@ -13,6 +13,12 @@ import {
 } from "@/lib/mock-data";
 import type { CreateRiderInput, Paginated, Rider } from "@/types/api";
 
+export type NextRiderIdResponse = {
+  delivery_partner_id?: string;
+  next_id?: string;
+  code?: string;
+};
+
 export function listRiders(
   shopId: string,
   params?: {
@@ -31,7 +37,7 @@ export function listRiders(
 
 export function getNextRiderId(shopId: string) {
   if (isDevelopmentMode()) return mockGetNextRiderId(shopId);
-  return apiFetch<{ delivery_partner_id?: string; next_id?: string; code?: string }>(
+  return apiFetch<NextRiderIdResponse>(
     `/v2/shops/${shopId}/riders/next-id`,
   );
 }

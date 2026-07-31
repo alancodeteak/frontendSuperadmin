@@ -764,10 +764,16 @@ export async function mockListRiders(
   return delay({ items, total: items.length, page: 1, limit: 50 });
 }
 
-export async function mockGetNextRiderId(shopId: string) {
+export async function mockGetNextRiderId(
+  shopId: string,
+): Promise<{
+  delivery_partner_id?: string;
+  next_id?: string;
+  code?: string;
+}> {
   const items = mockRidersByShop[shopId] ?? [];
   const next = `DP${1000 + items.length + 1}`;
-  return delay({ delivery_partner_id: next, next_id: next });
+  return delay({ delivery_partner_id: next, next_id: next, code: next });
 }
 
 export async function mockCreateRider(shopId: string, input: CreateRiderInput) {
