@@ -1735,17 +1735,23 @@ const BONUS_PENALTY_START_STATUS_OPTIONS: Array<{
   label: string;
 }> = [
   { value: "assigned", label: "Assigned" },
-  { value: "accepted", label: "Accepted" },
-  { value: "arrived", label: "Arrived" },
   { value: "picked_up", label: "Picked up" },
-  { value: "on_the_way", label: "On the way" },
-  { value: "delivered", label: "Delivered" },
+  { value: "out_for_delivery", label: "Out for delivery" },
 ];
+
+const BONUS_PENALTY_START_STATUS_VALUES = new Set(
+  BONUS_PENALTY_START_STATUS_OPTIONS.map((o) => o.value),
+);
+
+function normalizeBonusPenaltyStartStatus(value: unknown): string {
+  const raw = String(value ?? "assigned").trim();
+  return BONUS_PENALTY_START_STATUS_VALUES.has(raw) ? raw : "assigned";
+}
 
 function bonusPenaltyStartStatusOptions(current: string) {
   if (
     current &&
-    !BONUS_PENALTY_START_STATUS_OPTIONS.some((o) => o.value === current)
+    !BONUS_PENALTY_START_STATUS_VALUES.has(current)
   ) {
     return [
       ...BONUS_PENALTY_START_STATUS_OPTIONS,
@@ -1768,8 +1774,8 @@ function deliveryFormFromData(
     self_assigned: Boolean(data?.self_assigned ?? false),
     pickup_disabled: Boolean(data?.pickup_disabled ?? false),
     bonus_penalty: Boolean(data?.bonus_penalty ?? false),
-    bonus_penalty_start_status: String(
-      data?.bonus_penalty_start_status ?? "assigned",
+    bonus_penalty_start_status: normalizeBonusPenaltyStartStatus(
+      data?.bonus_penalty_start_status,
     ),
     common_penalty_enabled: Boolean(data?.common_penalty_enabled ?? false),
     common_penalty_idle_minutes: String(
@@ -1829,7 +1835,9 @@ function DeliveryTab({
         self_assigned: form.self_assigned,
         pickup_disabled: form.pickup_disabled,
         bonus_penalty: form.bonus_penalty,
-        bonus_penalty_start_status: form.bonus_penalty_start_status,
+        bonus_penalty_start_status: normalizeBonusPenaltyStartStatus(
+          form.bonus_penalty_start_status,
+        ),
         common_penalty_enabled: form.common_penalty_enabled,
         common_penalty_idle_minutes: Number(form.common_penalty_idle_minutes),
         common_penalty_min_online_minutes: Number(
