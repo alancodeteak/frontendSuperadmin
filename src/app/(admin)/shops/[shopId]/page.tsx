@@ -1709,6 +1709,42 @@ function ProductsTab({ shopId }: { shopId: string }) {
   );
 }
 
+const BONUS_PENALTY_START_STATUS_OPTIONS: Array<{
+  value: string;
+  label: string;
+}> = [
+  { value: "assigned", label: "Assigned" },
+  { value: "picked_up", label: "Picked up" },
+  { value: "out_for_delivery", label: "Out for delivery" },
+];
+
+const BONUS_PENALTY_START_STATUS_VALUES = new Set(
+  BONUS_PENALTY_START_STATUS_OPTIONS.map((o) => o.value),
+);
+
+function normalizeBonusPenaltyStartStatus(value: unknown): string {
+  const raw = String(value ?? "assigned").trim();
+  return BONUS_PENALTY_START_STATUS_VALUES.has(raw) ? raw : "assigned";
+}
+
+function bonusPenaltyStartStatusOptions(current: string) {
+  if (
+    current &&
+    !BONUS_PENALTY_START_STATUS_VALUES.has(current)
+  ) {
+    return [
+      ...BONUS_PENALTY_START_STATUS_OPTIONS,
+      {
+        value: current,
+        label: current
+          .replace(/_/g, " ")
+          .replace(/\b\w/g, (c) => c.toUpperCase()),
+      },
+    ];
+  }
+  return BONUS_PENALTY_START_STATUS_OPTIONS;
+}
+
 function deliveryFormFromData(
   data: ShopDeliverySettings | Record<string, unknown> | null | undefined,
 ) {
@@ -1717,8 +1753,8 @@ function deliveryFormFromData(
     self_assigned: Boolean(data?.self_assigned ?? false),
     pickup_disabled: Boolean(data?.pickup_disabled ?? false),
     bonus_penalty: Boolean(data?.bonus_penalty ?? false),
-    bonus_penalty_start_status: String(
-      data?.bonus_penalty_start_status ?? "assigned",
+    bonus_penalty_start_status: normalizeBonusPenaltyStartStatus(
+      data?.bonus_penalty_start_status,
     ),
     common_penalty_enabled: Boolean(data?.common_penalty_enabled ?? false),
     common_penalty_idle_minutes: String(
@@ -1761,7 +1797,9 @@ function DeliveryTab({
         self_assigned: form.self_assigned,
         pickup_disabled: form.pickup_disabled,
         bonus_penalty: form.bonus_penalty,
-        bonus_penalty_start_status: form.bonus_penalty_start_status || "assigned",
+        bonus_penalty_start_status: normalizeBonusPenaltyStartStatus(
+          form.bonus_penalty_start_status,
+        ),
         common_penalty_enabled: form.common_penalty_enabled,
         common_penalty_idle_minutes:
           Number(form.common_penalty_idle_minutes) || 45,
@@ -1829,14 +1867,33 @@ function DeliveryTab({
             onChange={(v) => setField("bonus_penalty", v)}
           />
           <Field label="Bonus penalty start status">
-            <Input
-              value={form.bonus_penalty_start_status}
+            <Select
+              value={form.bonus_penalty_start_status || "assigned"}
               disabled={!form.bonus_penalty}
-              onChange={(e) =>
-                setField("bonus_penalty_start_status", e.target.value)
+              onValueChange={(value) =>
+                setField(
+                  "bonus_penalty_start_status",
+                  value ?? "assigned",
+                )
               }
-              placeholder="assigned"
-            />
+            >
+              <SelectTrigger
+                id="delivery_bonus_penalty_start_status"
+                data-field="bonus_penalty_start_status"
+                className="w-full"
+              >
+                <SelectValue placeholder="Select start status" />
+              </SelectTrigger>
+              <SelectContent>
+                {bonusPenaltyStartStatusOptions(
+                  form.bonus_penalty_start_status,
+                ).map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </Field>
         </div>
 
