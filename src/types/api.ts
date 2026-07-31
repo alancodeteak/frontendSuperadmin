@@ -138,7 +138,14 @@ export type ShopEcomSettings = {
   domain?: string | null;
   min_order_amount?: string | number | null;
   delivery_radius_km?: string | number | null;
-  operating_hours?: unknown;
+  /**
+   * Week map: sun–sat → slots `{ open, close }` in HH:MM.
+   * Empty array = closed that day.
+   */
+  operating_hours?: Record<
+    string,
+    Array<{ open: string; close: string }>
+  > | null;
   payment_methods?: unknown;
   whatsapp_order_template?: string | null;
   /** Write-only on create/patch; never returned */

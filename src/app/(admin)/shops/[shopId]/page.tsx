@@ -17,6 +17,7 @@ import {
 
 import { ShopLocationModal } from "@/components/shops/shop-location-modal";
 import { ShopProfileHero } from "@/components/shops/shop-profile-hero";
+import { ShopEcomTab } from "@/components/shops/shop-ecom-tab";
 import {
   ShopConfirmDialog,
   type ShopConfirmPhase,
@@ -95,7 +96,6 @@ import type {
   Rider,
   ShopDeliverySettings,
   ShopDetail,
-  ShopEcomSettings,
   ShopFeatures,
   ShopProduct,
   ShopPromotionSettings,
@@ -114,6 +114,18 @@ const TABS = [
 ] as const;
 
 type Tab = (typeof TABS)[number];
+
+const TAB_LABELS: Record<Tab, string> = {
+  overview: "Overview",
+  features: "Features",
+  ecom: "Ecom",
+  products: "Products",
+  delivery: "Delivery",
+  subscription: "Subscription",
+  promotion: "Promotion",
+  riders: "Riders",
+  pos: "POS",
+};
 
 function ShopSection({
   title,
@@ -528,13 +540,13 @@ export default function ShopDetailPage() {
               key={item}
               type="button"
               onClick={() => setTab(item)}
-              className={`shrink-0 px-3 py-2.5 text-sm capitalize transition-colors ${
+              className={`shrink-0 px-3 py-2.5 text-sm transition-colors ${
                 tab === item
                   ? "border-b-2 border-primary font-medium text-primary"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              {item}
+              {TAB_LABELS[item]}
             </button>
           ))}
         </nav>
@@ -546,7 +558,7 @@ export default function ShopDetailPage() {
           <FeaturesTab shop={shop} onSaved={loadShop} />
         ) : null}
         {tab === "ecom" ? (
-          <EcomTab shop={shop} onSaved={loadShop} />
+          <ShopEcomTab shop={shop} onSaved={loadShop} />
         ) : null}
         {tab === "products" ? <ProductsTab shopId={shopId} /> : null}
         {tab === "delivery" ? (
@@ -1950,382 +1962,6 @@ function DeliveryTab({
           {saving ? "Saving…" : "Save delivery settings"}
         </Button>
       </form>
-    </ShopSection>
-  );
-}
-
-function ecomFormFromData(ecom: ShopEcomSettings | null | undefined) {
-  const paymentMethods = Array.isArray(ecom?.payment_methods)
-    ? (ecom.payment_methods as unknown[]).map(String).join(", ")
-    : ecom?.payment_methods != null
-      ? String(ecom.payment_methods)
-      : "";
-  return {
-    domain: String(ecom?.domain ?? ""),
-    min_order_amount: ecom?.min_order_amount != null ? String(ecom.min_order_amount) : "",
-    delivery_radius_km:
-      ecom?.delivery_radius_km != null ? String(ecom.delivery_radius_km) : "",
-    operating_hours:
-      ecom?.operating_hours == null
-        ? ""
-        : typeof ecom.operating_hours === "string"
-          ? ecom.operating_hours
-          : JSON.stringify(ecom.operating_hours, null, 2),
-    payment_methods: paymentMethods,
-    whatsapp_order_template: String(ecom?.whatsapp_order_template ?? ""),
-    seo_title: String(ecom?.seo_title ?? ""),
-    seo_description: String(ecom?.seo_description ?? ""),
-    seo_keywords: String(ecom?.seo_keywords ?? ""),
-    og_title: String(ecom?.og_title ?? ""),
-    og_description: String(ecom?.og_description ?? ""),
-    og_image: String(ecom?.og_image ?? ""),
-    twitter_card: String(ecom?.twitter_card ?? ""),
-    robots_index: Boolean(ecom?.robots_index ?? true),
-  };
-}
-
-function isShopEcomEnabled(shop: ShopDetail) {
-  return Boolean(shop.features?.ecom_enabled ?? shop.ecom_enabled);
-}
-
-function EcomTab({
-  shop,
-  onSaved,
-}: {
-  shop: ShopDetail;
-  onSaved: () => Promise<void>;
-}) {
-  const ecomEnabled = isShopEcomEnabled(shop);
-  const initialForm = useMemo(() => ecomFormFromData(shop.ecom), [shop.ecom]);
-  const [form, setForm] = useState(initialForm);
-  const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    setForm(initialForm);
-    setEditing(false);
-    setError(null);
-    setFieldErrors({});
-  }, [initialForm]);
-
-  useEffect(() => {
-    if (!ecomEnabled) setEditing(false);
-  }, [ecomEnabled]);
-
-  function setField<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
-    setForm((prev) => ({ ...prev, [key]: value }));
-    setFieldErrors((prev) => {
-      if (!prev[key as string]) return prev;
-      const next = { ...prev };
-      delete next[key as string];
-      return next;
-    });
-  }
-
-  async function onSave(e: React.FormEvent) {
-    e.preventDefault();
-    if (!ecomEnabled) {
-      appToast.error("Enable ecom in Features before editing storefront settings.");
-      return;
-    }
-    setSaving(true);
-    setError(null);
-    setFieldErrors({});
-
-    let operating_hours: unknown = undefined;
-    const hoursRaw = form.operating_hours.trim();
-    if (hoursRaw) {
-      try {
-        operating_hours = JSON.parse(hoursRaw);
-      } catch {
-        setError("Operating hours must be valid JSON");
-        setFieldErrors({ operating_hours: "Invalid JSON" });
-        setSaving(false);
-        return;
-      }
-    }
-
-    const payment_methods = form.payment_methods
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-
-    const ecom: ShopEcomSettings = {
-      domain: form.domain.trim() ? form.domain.trim().toLowerCase() : null,
-      min_order_amount: form.min_order_amount.trim()
-        ? Number(form.min_order_amount)
-        : 0,
-      delivery_radius_km: form.delivery_radius_km.trim()
-        ? Number(form.delivery_radius_km)
-        : null,
-      operating_hours: hoursRaw ? operating_hours : null,
-      payment_methods: payment_methods.length ? payment_methods : null,
-      whatsapp_order_template: form.whatsapp_order_template.trim() || null,
-      seo_title: form.seo_title.trim() || null,
-      seo_description: form.seo_description.trim() || null,
-      seo_keywords: form.seo_keywords.trim() || null,
-      og_title: form.og_title.trim() || null,
-      og_description: form.og_description.trim() || null,
-      og_image: form.og_image.trim() || null,
-      twitter_card: form.twitter_card.trim() || null,
-      robots_index: form.robots_index,
-    };
-
-    try {
-      await patchShop(shop.shop_id, { ecom });
-      appToast.success("Ecom storefront saved.");
-      await onSaved();
-      setEditing(false);
-    } catch (err) {
-      const parsed = parseApiFormError(err, "Failed to save ecom settings");
-      setError(parsed.message);
-      setFieldErrors(parsed.fields);
-      appToast.error(parsed.message);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  const ecom = shop.ecom;
-
-  return (
-    <ShopSection
-      title="Ecom settings"
-      description={
-        ecomEnabled
-          ? "Domain, order rules, SEO, and storefront settings."
-          : "Ecom is disabled for this shop. Enable it under Features to edit storefront settings."
-      }
-      actions={
-        ecomEnabled && !editing ? (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setEditing(true)}
-          >
-            <PencilIcon className="size-3.5" />
-            Edit
-          </Button>
-        ) : null
-      }
-    >
-      {!ecomEnabled ? (
-        <div className="mb-4 rounded-xl border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
-          Turn on <span className="font-medium text-foreground">Ecom enabled</span>{" "}
-          in the Features tab to unlock editing.
-        </div>
-      ) : null}
-
-      {!editing ? (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          <CopyableDetail label="Domain" value={ecom?.domain} />
-          <CopyableDetail
-            label="Min order amount"
-            value={
-              ecom?.min_order_amount != null
-                ? String(ecom.min_order_amount)
-                : null
-            }
-          />
-          <CopyableDetail
-            label="Delivery radius (km)"
-            value={
-              ecom?.delivery_radius_km != null
-                ? String(ecom.delivery_radius_km)
-                : null
-            }
-          />
-          <CopyableDetail
-            label="WhatsApp order template"
-            value={ecom?.whatsapp_order_template}
-          />
-          <CopyableDetail
-            label="Operating hours"
-            value={formatDetailValue(ecom?.operating_hours)}
-          />
-          <CopyableDetail
-            label="Payment methods"
-            value={formatDetailValue(ecom?.payment_methods)}
-          />
-          <CopyableDetail label="SEO title" value={ecom?.seo_title} />
-          <CopyableDetail
-            label="SEO description"
-            value={ecom?.seo_description}
-          />
-          <CopyableDetail label="SEO keywords" value={ecom?.seo_keywords} />
-          <CopyableDetail label="OG title" value={ecom?.og_title} />
-          <CopyableDetail label="OG description" value={ecom?.og_description} />
-          <CopyableDetail label="OG image" value={ecom?.og_image} />
-          <CopyableDetail label="Twitter card" value={ecom?.twitter_card} />
-          <CopyableDetail
-            label="Robots index"
-            value={
-              ecom?.robots_index == null
-                ? null
-                : ecom.robots_index
-                  ? "Yes"
-                  : "No"
-            }
-          />
-        </div>
-      ) : (
-        <form onSubmit={onSave} className="space-y-6">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Domain (hostname only)">
-              <Input
-                data-field="domain"
-                value={form.domain}
-                onChange={(e) => setField("domain", e.target.value)}
-                placeholder="shop.example.com"
-              />
-              {fieldErrors.domain ? (
-                <p className="mt-1.5 text-xs font-medium text-destructive">
-                  {fieldErrors.domain}
-                </p>
-              ) : null}
-            </Field>
-            <Field label="Min order amount">
-              <Input
-                inputMode="decimal"
-                value={form.min_order_amount}
-                onChange={(e) => setField("min_order_amount", e.target.value)}
-              />
-            </Field>
-            <Field label="Delivery radius (km)">
-              <Input
-                inputMode="decimal"
-                value={form.delivery_radius_km}
-                onChange={(e) => setField("delivery_radius_km", e.target.value)}
-              />
-            </Field>
-            <Field label="Twitter card">
-              <Input
-                value={form.twitter_card}
-                onChange={(e) => setField("twitter_card", e.target.value)}
-                placeholder="summary_large_image"
-              />
-            </Field>
-          </div>
-
-          <Field label="WhatsApp order template">
-            <Textarea
-              value={form.whatsapp_order_template}
-              onChange={(e) =>
-                setField("whatsapp_order_template", e.target.value)
-              }
-              rows={2}
-              placeholder="Hi, your order {{order_id}} is confirmed"
-            />
-          </Field>
-
-          <Field label="Payment methods (comma-separated)">
-            <Input
-              value={form.payment_methods}
-              onChange={(e) => setField("payment_methods", e.target.value)}
-              placeholder="online, cash_on_delivery"
-            />
-          </Field>
-
-          <Field label="Operating hours (JSON)">
-            <Textarea
-              data-field="operating_hours"
-              value={form.operating_hours}
-              onChange={(e) => setField("operating_hours", e.target.value)}
-              rows={5}
-              className="font-mono text-xs"
-              placeholder='{"monday":[{"open":"09:00","close":"22:00"}]}'
-            />
-            {fieldErrors.operating_hours ? (
-              <p className="mt-1.5 text-xs font-medium text-destructive">
-                {fieldErrors.operating_hours}
-              </p>
-            ) : null}
-          </Field>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="SEO title">
-              <Input
-                value={form.seo_title}
-                onChange={(e) => setField("seo_title", e.target.value)}
-              />
-            </Field>
-            <Field label="SEO keywords">
-              <Input
-                value={form.seo_keywords}
-                onChange={(e) => setField("seo_keywords", e.target.value)}
-              />
-            </Field>
-          </div>
-          <Field label="SEO description">
-            <Textarea
-              value={form.seo_description}
-              onChange={(e) => setField("seo_description", e.target.value)}
-              rows={2}
-            />
-          </Field>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="OG title">
-              <Input
-                value={form.og_title}
-                onChange={(e) => setField("og_title", e.target.value)}
-              />
-            </Field>
-            <Field label="OG image URL">
-              <Input
-                value={form.og_image}
-                onChange={(e) => setField("og_image", e.target.value)}
-              />
-            </Field>
-          </div>
-          <Field label="OG description">
-            <Textarea
-              value={form.og_description}
-              onChange={(e) => setField("og_description", e.target.value)}
-              rows={2}
-            />
-          </Field>
-
-          <FeatureToggleRow
-            id="ecom_robots_index"
-            label="Robots index"
-            description="Allow search engines to index the storefront."
-            checked={form.robots_index}
-            onChange={(v) => setField("robots_index", v)}
-          />
-
-          {error ? (
-            <div
-              role="alert"
-              className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
-            >
-              {error}
-            </div>
-          ) : null}
-
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={saving}
-              onClick={() => {
-                setForm(initialForm);
-                setEditing(false);
-                setError(null);
-                setFieldErrors({});
-              }}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={saving}>
-              {saving ? "Saving…" : "Save ecom settings"}
-            </Button>
-          </div>
-        </form>
-      )}
     </ShopSection>
   );
 }
