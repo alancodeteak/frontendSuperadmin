@@ -1,0 +1,19 @@
+# Cloudflare DNS → Vercel custom domain
+# Production app: https://superadmin.yaadro.ae
+# Production API: https://superadmin-api.yaadro.ae
+#
+# 1) Vercel → Project → Settings → Domains → Add `superadmin.yaadro.ae`
+# 2) Cloudflare → DNS → Records (zone yaadro.ae):
+
+# Type   Name          Content                 Proxy status
+# CNAME  superadmin    cname.vercel-dns.com    DNS only (grey cloud)
+
+# Why DNS only (grey cloud)?
+# - Vercel manages TLS for the custom domain.
+# - Orange-cloud often causes SSL / caching issues with Vercel.
+#
+# Vercel env must proxy API to the LIVE host:
+#   API_PROXY_TARGET=https://superadmin-api.yaadro.ae
+# Do NOT use superadmin-api.yaadro.online (Cloudflare Tunnel down → HTTP 530).
+#
+# Remove any old tunnel CNAME for `superadmin` once Vercel is live.

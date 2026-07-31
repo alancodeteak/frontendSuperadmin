@@ -1,0 +1,22 @@
+# Paste into Vercel → Project → Settings → Environment Variables
+# Apply to: Production (and Preview if you want preview deploys to work)
+
+# ── Public (inlined at build; set for Production + Preview) ─────────────────
+NEXT_PUBLIC_API_BASE_URL=/api
+NEXT_PUBLIC_DMS_API_BASE_URL=/dms-api
+NEXT_PUBLIC_APP_URL=https://superadmin.yaadro.ae
+NEXT_PUBLIC_APP_NAME=Restaurant Superadmin
+NEXT_PUBLIC_TUNNEL_HOST=superadmin.yaadro.ae
+NEXT_PUBLIC_DEVELOPMENT_MODE=false
+NEXT_PUBLIC_ADMIN_API_KEY=
+NEXT_PUBLIC_NUMVERIFY_ACCESS_KEY=
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=
+
+# ── Server / build (rewrites + middleware + search) ─────────────────────────
+# Must be the LIVE admin-api host (yaadro.ae). yaadro.online tunnel returns 530.
+API_PROXY_TARGET=https://superadmin-api.yaadro.ae
+DMS_API_PROXY_TARGET=https://YOUR_DMS_API_HOST
+ADMIN_API_KEY=
+MEILISEARCH_HOST=
+MEILISEARCH_API_KEY=
+MEILISEARCH_INDEX_SUPERADMIN=superadmin

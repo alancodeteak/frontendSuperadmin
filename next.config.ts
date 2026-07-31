@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const apiProxyTarget = (
-  process.env.API_PROXY_TARGET ?? "https://superadmin-api.yaadro.online"
+  process.env.API_PROXY_TARGET ?? "https://superadmin-api.yaadro.ae"
 ).replace(/\/$/, "");
 
 const dmsApiProxyTarget = (
@@ -9,10 +9,10 @@ const dmsApiProxyTarget = (
 ).replace(/\/$/, "");
 
 const tunnelHost =
-  process.env.NEXT_PUBLIC_TUNNEL_HOST ?? "superadmin.yaadro.online";
+  process.env.NEXT_PUBLIC_TUNNEL_HOST ?? "superadmin.yaadro.ae";
 
 const nextConfig: NextConfig = {
-  // Allow Next.js dev assets/HMR when accessed via the Cloudflare tunnel hostname
+  // Allow Next.js dev assets/HMR when accessed via a custom hostname (local tunnel)
   allowedDevOrigins: [tunnelHost],
 
   async rewrites() {

@@ -20,7 +20,7 @@ import type {
 
 function adminApiBase() {
   return (
-    process.env.API_PROXY_TARGET ?? "https://superadmin-api.yaadro.online"
+    process.env.API_PROXY_TARGET ?? "https://superadmin-api.yaadro.ae"
   ).replace(/\/$/, "");
 }
 
