@@ -19,9 +19,10 @@ import type {
 } from "@/lib/search/types";
 
 function adminApiBase() {
-  return (
-    process.env.API_PROXY_TARGET ?? "https://superadmin-api.yaadro.online"
-  ).replace(/\/$/, "");
+  const raw = (
+    process.env.API_PROXY_TARGET ?? "https://superadmin-api.yaadro.ae"
+  ).trim();
+  return raw.replace(/\\/g, "/").replace(/\/$/, "");
 }
 
 async function adminFetch<T>(
