@@ -101,6 +101,29 @@ async function parseError(response: Response): Promise<ApiError> {
 
 let refreshPromise: Promise<boolean> | null = null;
 
+function applyApiHeaders(
+  headers: HeadersInit | undefined,
+  options?: { json?: boolean; auth?: boolean },
+): Record<string, string> {
+  const next: Record<string, string> = {
+    ...(options?.json === false ? {} : { "Content-Type": "application/json" }),
+    ...(headers as Record<string, string> | undefined),
+  };
+
+  if (siteConfig.adminApiKey) {
+    next["x-api-key"] = siteConfig.adminApiKey;
+  }
+
+  if (options?.auth !== false) {
+    const token = getAccessToken();
+    if (token) {
+      next.Authorization = `Bearer ${token}`;
+    }
+  }
+
+  return next;
+}
+
 async function refreshAccessToken(): Promise<boolean> {
   if (refreshPromise) return refreshPromise;
 
@@ -111,7 +134,7 @@ async function refreshAccessToken(): Promise<boolean> {
     try {
       const response = await fetch(joinPath(siteConfig.apiBaseUrl, "/v2/auth/refresh"), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: applyApiHeaders(undefined, { auth: false }),
         body: JSON.stringify({ refresh_token: refreshToken }),
       });
 
@@ -153,17 +176,7 @@ export async function apiFetch<T>(
   const { params, headers, auth = true, skipRefresh = false, ...rest } = options;
   const url = withParams(joinPath(siteConfig.apiBaseUrl, path), params);
 
-  const requestHeaders: HeadersInit = {
-    "Content-Type": "application/json",
-    ...headers,
-  };
-
-  if (auth) {
-    const token = getAccessToken();
-    if (token) {
-      (requestHeaders as Record<string, string>).Authorization = `Bearer ${token}`;
-    }
-  }
+  const requestHeaders = applyApiHeaders(headers, { auth });
 
   const response = await fetch(url, {
     ...rest,
@@ -199,7 +212,9 @@ export async function healthFetch<T>(): Promise<T> {
     const { mockHealth } = await import("@/lib/mock-data");
     return mockHealth() as Promise<T>;
   }
-  const response = await fetch("/health");
+  const response = await fetch("/health", {
+    headers: applyApiHeaders(undefined, { json: false, auth: false }),
+  });
   if (!response.ok) throw await parseError(response);
   return response.json() as Promise<T>;
 }
@@ -212,13 +227,7 @@ export async function apiDownload(
   const { params, headers, auth = true, skipRefresh = false, ...rest } = options;
   const url = withParams(joinPath(siteConfig.apiBaseUrl, path), params);
 
-  const requestHeaders: HeadersInit = { ...headers };
-  if (auth) {
-    const token = getAccessToken();
-    if (token) {
-      (requestHeaders as Record<string, string>).Authorization = `Bearer ${token}`;
-    }
-  }
+  const requestHeaders = applyApiHeaders(headers, { json: false, auth });
 
   const response = await fetch(url, { ...rest, headers: requestHeaders });
 

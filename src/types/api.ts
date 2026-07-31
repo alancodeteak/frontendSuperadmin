@@ -92,12 +92,53 @@ export type CreateShopInput = {
   address?: ShopAddress;
 };
 
+export type ShopDeliverySettings = {
+  delivery_time?: number | null;
+  self_assigned?: boolean | null;
+  pickup_disabled?: boolean | null;
+  bonus_penalty?: boolean | null;
+  bonus_penalty_start_status?: string | null;
+  common_penalty_enabled?: boolean | null;
+  common_penalty_idle_minutes?: number | null;
+  common_penalty_min_online_minutes?: number | null;
+  [key: string]: unknown;
+};
+
+export type ShopPromotionSettings = {
+  promotion_link?: string | null;
+  promotion_header?: string | null;
+  promotion_content?: string | null;
+  promotion_image_s3_key?: string | null;
+  is_marketing_enabled?: boolean | null;
+  [key: string]: unknown;
+};
+
+export type ShopEcomSettings = {
+  min_order_amount?: string | number | null;
+  delivery_radius_km?: number | null;
+  operating_hours?: unknown;
+  payment_methods?: unknown;
+  whatsapp_order_template?: string | null;
+  seo_title?: string | null;
+  seo_description?: string | null;
+  seo_keywords?: string | null;
+  og_title?: string | null;
+  og_description?: string | null;
+  og_image?: string | null;
+  twitter_card?: string | null;
+  robots_index?: boolean | null;
+  [key: string]: unknown;
+};
+
 export type ShopDetail = ShopListItem & {
+  status_reason?: string | null;
+  group_id?: string | number | null;
+  subscription_id?: string | number | null;
   features?: ShopFeatures;
-  delivery?: unknown;
-  subscription?: unknown;
-  promotion?: unknown;
-  ecom?: unknown;
+  delivery?: ShopDeliverySettings | null;
+  subscription?: Record<string, unknown> | null;
+  promotion?: ShopPromotionSettings | null;
+  ecom?: ShopEcomSettings | null;
   products?: Paginated<ShopProduct> | ShopProduct[];
   [key: string]: unknown;
 };

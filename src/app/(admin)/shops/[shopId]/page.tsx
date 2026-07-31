@@ -9,6 +9,7 @@ import {
   KeyRoundIcon,
   PencilIcon,
   RefreshCwIcon,
+  RotateCcwIcon,
   ShieldCheckIcon,
   Trash2Icon,
   UserMinusIcon,
@@ -16,6 +17,10 @@ import {
 
 import { ShopLocationModal } from "@/components/shops/shop-location-modal";
 import { ShopProfileHero } from "@/components/shops/shop-profile-hero";
+import {
+  ShopConfirmDialog,
+  type ShopConfirmPhase,
+} from "@/components/shops/shop-confirm-dialog";
 import { RiderEditDialog } from "@/components/shops/rider-edit-dialog";
 import { CopyButton } from "@/components/shared/copy-button";
 import {
@@ -42,6 +47,10 @@ import {
 } from "@/components/ui/tooltip";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiError } from "@/lib/api";
+import {
+  focusHighlightedField,
+  parseApiFormError,
+} from "@/lib/api-form-error";
 import { appToast } from "@/lib/app-toast";
 import {
   deleteShop,
@@ -50,6 +59,8 @@ import {
   putPromotion,
   createSubscription,
   resetShopPassword,
+  restoreShop,
+  softDeleteShop,
   triggerShopLogoutEvent,
 } from "@/lib/api/shops";
 import {
@@ -83,9 +94,11 @@ import { cn, formatCurrency } from "@/lib/utils";
 import type {
   PosShopLink,
   Rider,
+  ShopDeliverySettings,
   ShopDetail,
   ShopFeatures,
   ShopProduct,
+  ShopPromotionSettings,
 } from "@/types/api";
 
 const TABS = [
@@ -225,6 +238,12 @@ export default function ShopDetailPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [logoutBusy, setLogoutBusy] = useState(false);
   const [logoutNote, setLogoutNote] = useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = useState<
+    "soft-delete" | "hard-delete" | "restore" | "force-logout" | null
+  >(null);
+  const [confirmPhase, setConfirmPhase] =
+    useState<ShopConfirmPhase>("confirm");
+  const [confirmError, setConfirmError] = useState<string | null>(null);
 
   const shopQuery = useQuery(shopDetailQuery(shopId));
   const shop = shopQuery.data ?? null;
@@ -242,50 +261,88 @@ export default function ShopDetailPage() {
     router.replace(`/shops/${shopId}?tab=${next}`);
   }
 
-  async function onSoftDelete() {
-    if (!confirm("Soft-delete this shop?")) return;
-    try {
-      await deleteShop(shopId, false);
-      appToast.success("Shop soft-deleted.");
-      router.push("/shops");
-    } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Delete failed";
-      setMessage(msg);
-      appToast.error(msg);
-    }
+  function openConfirm(
+    action: "soft-delete" | "hard-delete" | "restore" | "force-logout",
+  ) {
+    setConfirmError(null);
+    setConfirmPhase("confirm");
+    setConfirmAction(action);
   }
 
-  async function onHardDelete() {
-    if (!confirm("HARD delete this shop? This cannot be undone.")) return;
-    try {
-      await deleteShop(shopId, true);
-      appToast.success("Shop permanently deleted.");
-      router.push("/shops");
-    } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Delete failed";
-      setMessage(msg);
-      appToast.error(msg);
-    }
+  function closeConfirm() {
+    if (confirmPhase === "loading" || confirmPhase === "success") return;
+    setConfirmAction(null);
+    setConfirmPhase("confirm");
+    setConfirmError(null);
   }
 
-  async function onForceLogout() {
-    const confirmed = confirm(
-      "All online shop owners and delivery partners for this shop will see a 30-second logout alert. Offline users will not be affected.\n\nSend logout alert now?",
-    );
-    if (!confirmed) return;
+  function goToShopsList() {
+    setConfirmAction(null);
+    setConfirmPhase("confirm");
+    setConfirmError(null);
+    router.push("/shops");
+  }
 
-    setLogoutBusy(true);
-    setLogoutNote(null);
+  async function runConfirmAction() {
+    if (!confirmAction) return;
+    setConfirmPhase("loading");
+    setConfirmError(null);
     setMessage(null);
+
     try {
+      if (confirmAction === "soft-delete") {
+        await softDeleteShop(shopId, shop);
+        setConfirmPhase("success");
+        appToast.success("Shop soft-deleted.");
+        window.setTimeout(() => {
+          goToShopsList();
+        }, 1200);
+        return;
+      }
+
+      if (confirmAction === "hard-delete") {
+        await deleteShop(shopId, true);
+        setConfirmPhase("success");
+        appToast.success("Shop permanently deleted.");
+        window.setTimeout(() => {
+          goToShopsList();
+        }, 1200);
+        return;
+      }
+
+      if (confirmAction === "restore") {
+        await restoreShop(shopId);
+        setConfirmPhase("success");
+        appToast.success(
+          "Shop restored. Status is inactive — activate if needed.",
+        );
+        await loadShop();
+        window.setTimeout(() => {
+          setConfirmAction(null);
+          setConfirmPhase("confirm");
+          setConfirmError(null);
+        }, 900);
+        return;
+      }
+
+      // force-logout
+      setLogoutBusy(true);
+      setLogoutNote(null);
       const res = await triggerShopLogoutEvent(shopId);
       setLogoutNote(
         `Logout alert accepted · event ${res.event_id} · ${new Date(res.occurred_at).toLocaleString("en-AE", { timeZone: "Asia/Dubai" })}`,
       );
+      setConfirmPhase("success");
       appToast.success("Logout alert sent to online sessions.");
+      window.setTimeout(() => {
+        setConfirmAction(null);
+        setConfirmPhase("confirm");
+        setConfirmError(null);
+        setLogoutBusy(false);
+      }, 900);
     } catch (err) {
       let msg: string;
-      if (err instanceof ApiError) {
+      if (err instanceof ApiError && confirmAction === "force-logout") {
         if (err.status === 404) {
           msg = "Shop not found — cannot send logout alert.";
         } else if (err.status === 403) {
@@ -293,15 +350,25 @@ export default function ShopDetailPage() {
         } else if (err.status >= 500) {
           msg = "Server error sending logout alert. Please retry.";
         } else {
-          msg = err.message;
+          msg = parseApiFormError(err, "Failed to send logout alert.").message;
         }
+      } else if (confirmAction === "soft-delete" || confirmAction === "hard-delete") {
+        msg = parseApiFormError(err, "Delete failed").message;
+      } else if (confirmAction === "restore") {
+        msg = parseApiFormError(err, "Restore failed").message;
       } else {
-        msg = "Failed to send logout alert. Please retry.";
+        msg = parseApiFormError(
+          err,
+          "Failed to send logout alert. Please retry.",
+        ).message;
       }
+      setConfirmPhase("error");
+      setConfirmError(msg);
       setMessage(msg);
       appToast.error(msg);
-    } finally {
-      window.setTimeout(() => setLogoutBusy(false), 2500);
+      if (confirmAction === "force-logout") {
+        setLogoutBusy(false);
+      }
     }
   }
 
@@ -324,6 +391,80 @@ export default function ShopDetailPage() {
     );
   }
 
+  const shopDisplayName =
+    shop.shop_name ?? shop.profile?.shop_name ?? shopId;
+
+  const confirmConfig =
+    confirmAction === "soft-delete"
+      ? {
+          title: "Soft-delete this shop?",
+          description:
+            "The shop will be marked deleted and hidden from the default list. Feature flags (including ecom enabled) are kept. You can restore it later from Deleted shops.",
+          confirmLabel: "Soft delete",
+          confirmVariant: "destructive" as const,
+          icon: Trash2Icon,
+          iconClassName: "bg-destructive/10 text-destructive",
+          loadingTitle: "Soft-deleting shop…",
+          loadingDescription: "Marking this shop as deleted.",
+          successTitle: "Shop soft-deleted",
+          successDescription:
+            "Feature flags were preserved. Redirecting you back to the shops list.",
+          successActionLabel: "Back to shops",
+          errorTitle: "Could not soft-delete shop",
+        }
+      : confirmAction === "hard-delete"
+        ? {
+            title: "Permanently delete this shop?",
+            description:
+              "This hard-deletes the shop and cannot be undone. Prefer soft delete unless you are sure.",
+            confirmLabel: "Hard delete",
+            confirmVariant: "destructive" as const,
+            icon: Trash2Icon,
+            iconClassName: "bg-destructive/10 text-destructive",
+            loadingTitle: "Deleting shop…",
+            loadingDescription: "Permanently removing this shop.",
+            successTitle: "Shop permanently deleted",
+            successDescription:
+              "Redirecting you back to the shops list.",
+            successActionLabel: "Back to shops",
+            errorTitle: "Could not delete shop",
+          }
+        : confirmAction === "restore"
+          ? {
+              title: "Restore this shop?",
+              description:
+                "Clears the deleted flag. Status stays inactive — re-activate the shop if needed. Feature flags are left as they were.",
+              confirmLabel: "Restore shop",
+              confirmVariant: "default" as const,
+              icon: RotateCcwIcon,
+              iconClassName: "bg-primary/10 text-primary",
+              loadingTitle: "Restoring shop…",
+              loadingDescription: "Clearing the deleted flag.",
+              successTitle: "Shop restored",
+              successDescription:
+                "Status is inactive — activate if needed.",
+              successActionLabel: "Done",
+              errorTitle: "Could not restore shop",
+            }
+          : confirmAction === "force-logout"
+            ? {
+                title: "Send logout alert?",
+                description:
+                  "All online shop owners and delivery partners for this shop will see a 30-second logout alert. Offline users will not be affected.",
+                confirmLabel: "Send logout alert",
+                confirmVariant: "default" as const,
+                icon: BanIcon,
+                iconClassName: "bg-primary/10 text-primary",
+                loadingTitle: "Sending logout alert…",
+                loadingDescription: "Notifying online sessions.",
+                successTitle: "Logout alert sent",
+                successDescription:
+                  "Online shop owners and riders will see the logout countdown.",
+                successActionLabel: "Done",
+                errorTitle: "Could not send logout alert",
+              }
+            : null;
+
   return (
     <div className="min-h-0 w-full flex-1 overflow-auto">
       <ShopProfileHero shop={shop} onPhotoUpdated={loadShop} fullWidth />
@@ -334,18 +475,40 @@ export default function ShopDetailPage() {
             ← Shops
           </Button>
           <div className="flex flex-wrap items-center gap-2">
+            {shop.is_deleted ? (
+              <StatusBadge status="deleted" />
+            ) : null}
             <Button
               variant="outline"
               size="sm"
-              disabled={logoutBusy}
-              onClick={() => void onForceLogout()}
+              disabled={logoutBusy || Boolean(shop.is_deleted)}
+              onClick={() => openConfirm("force-logout")}
             >
               {logoutBusy ? "Sending…" : "Force logout"}
             </Button>
-            <Button variant="ghost" size="sm" onClick={onSoftDelete}>
-              Soft delete
-            </Button>
-            <Button variant="destructive" size="sm" onClick={onHardDelete}>
+            {shop.is_deleted ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => openConfirm("restore")}
+              >
+                <RotateCcwIcon className="size-3.5" />
+                Restore
+              </Button>
+            ) : (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => openConfirm("soft-delete")}
+              >
+                Soft delete
+              </Button>
+            )}
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => openConfirm("hard-delete")}
+            >
               Hard delete
             </Button>
           </div>
@@ -382,14 +545,82 @@ export default function ShopDetailPage() {
           <FeaturesTab shop={shop} onSaved={loadShop} />
         ) : null}
         {tab === "products" ? <ProductsTab shopId={shopId} /> : null}
-        {tab === "delivery" ? <DeliveryTab shopId={shopId} /> : null}
-        {tab === "subscription" ? <SubscriptionTab shopId={shopId} /> : null}
-        {tab === "promotion" ? <PromotionTab shopId={shopId} /> : null}
+        {tab === "delivery" ? (
+          <DeliveryTab shopId={shopId} shop={shop} />
+        ) : null}
+        {tab === "subscription" ? (
+          <SubscriptionTab shopId={shopId} shop={shop} />
+        ) : null}
+        {tab === "promotion" ? (
+          <PromotionTab shopId={shopId} shop={shop} />
+        ) : null}
         {tab === "riders" ? <RidersTab shopId={shopId} /> : null}
         {tab === "pos" ? <PosLinkTab shopId={shopId} /> : null}
       </div>
+
+      {confirmConfig ? (
+        <ShopConfirmDialog
+          open={confirmAction != null}
+          phase={confirmPhase}
+          title={confirmConfig.title}
+          description={confirmConfig.description}
+          confirmLabel={confirmConfig.confirmLabel}
+          confirmVariant={confirmConfig.confirmVariant}
+          icon={confirmConfig.icon}
+          iconClassName={confirmConfig.iconClassName}
+          shopName={shopDisplayName}
+          shopId={shopId}
+          loadingTitle={confirmConfig.loadingTitle}
+          loadingDescription={confirmConfig.loadingDescription}
+          successTitle={confirmConfig.successTitle}
+          successDescription={confirmConfig.successDescription}
+          successActionLabel={confirmConfig.successActionLabel}
+          errorTitle={confirmConfig.errorTitle}
+          errorMessage={confirmError}
+          onOpenChange={(open) => {
+            if (!open) closeConfirm();
+          }}
+          onConfirm={() => void runConfirmAction()}
+          onSuccessAction={() => {
+            if (
+              confirmAction === "soft-delete" ||
+              confirmAction === "hard-delete"
+            ) {
+              goToShopsList();
+              return;
+            }
+            setConfirmAction(null);
+            setConfirmPhase("confirm");
+            setConfirmError(null);
+          }}
+          onRetry={() => void runConfirmAction()}
+        />
+      ) : null}
     </div>
   );
+}
+
+function formatDetailValue(value: unknown): string {
+  if (value == null || value === "") return "";
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "number") return String(value);
+  if (typeof value === "string") return value;
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function formatDetailDate(iso?: string | null) {
+  if (!iso) return "";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleString("en-AE", {
+    timeZone: "Asia/Dubai",
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
 }
 
 function OverviewTab({
@@ -399,19 +630,31 @@ function OverviewTab({
   shop: ShopDetail;
   onSaved: () => Promise<void>;
 }) {
+  const profile = shop.profile;
   const initialForm = useMemo(
     () => ({
-      shop_name: shop.shop_name ?? shop.profile?.shop_name ?? "",
-      phone: shop.phone ?? shop.profile?.phone ?? "",
-      email: shop.email ?? shop.profile?.email ?? "",
+      shop_name: shop.shop_name ?? profile?.shop_name ?? "",
+      second_name: profile?.second_name ?? "",
+      phone: shop.phone ?? profile?.phone ?? "",
+      email: shop.email ?? profile?.email ?? "",
       ecom_slug: shop.ecom_slug ?? shop.features?.ecom_slug ?? "",
       status: String(shop.status ?? "active"),
+      status_reason: shop.status_reason ?? "",
+      shop_license_no: profile?.shop_license_no ?? "",
+      contact_person_number: profile?.contact_person_number ?? "",
+      contact_person_email: profile?.contact_person_email ?? "",
+      upi_id: profile?.upi_id ?? "",
+      vat_enabled: Boolean(profile?.vat_enabled),
+      vat: String(profile?.vat ?? "5"),
+      enable_promotion: Boolean(profile?.enable_promotion),
     }),
-    [shop],
+    [shop, profile],
   );
   const [form, setForm] = useState(initialForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [highlightFields, setHighlightFields] = useState<string[]>([]);
   const [password, setPassword] = useState("");
   const [pwMessage, setPwMessage] = useState<string | null>(null);
   const [locationOpen, setLocationOpen] = useState(false);
@@ -420,50 +663,141 @@ function OverviewTab({
   useEffect(() => {
     setForm(initialForm);
     setEditing(false);
+    setError(null);
+    setFieldErrors({});
+    setHighlightFields([]);
   }, [initialForm]);
+
+  function overviewFieldInvalid(field: string) {
+    return highlightFields.includes(field) || Boolean(fieldErrors[field]);
+  }
+
+  function updateOverviewField<K extends keyof typeof form>(
+    key: K,
+    value: (typeof form)[K],
+  ) {
+    setForm((prev) => ({ ...prev, [key]: value }));
+    setError(null);
+    setFieldErrors((prev) => {
+      if (!prev[key as string]) return prev;
+      const next = { ...prev };
+      delete next[key as string];
+      return next;
+    });
+    setHighlightFields((prev) => prev.filter((f) => f !== key));
+  }
 
   async function onSave(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     setError(null);
+    setFieldErrors({});
+    setHighlightFields([]);
     try {
       await patchShop(shop.shop_id, {
         shop_name: form.shop_name,
+        second_name: form.second_name || null,
         phone: form.phone,
         email: form.email,
         status: form.status,
+        status_reason: form.status_reason || null,
+        shop_license_no: form.shop_license_no || null,
+        contact_person_number: form.contact_person_number || null,
+        contact_person_email: form.contact_person_email || null,
+        upi_id: form.upi_id || null,
+        vat_enabled: form.vat_enabled,
+        vat: form.vat,
+        enable_promotion: form.enable_promotion,
       });
       await onSaved();
       setEditing(false);
       appToast.success("Shop details saved.");
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Save failed";
-      setError(msg);
-      appToast.error(msg);
+      const parsed = parseApiFormError(err, "Save failed");
+      setError(parsed.message);
+      setFieldErrors(parsed.fields);
+      setHighlightFields(parsed.highlightFields);
+      appToast.error(parsed.message);
+      window.requestAnimationFrame(() =>
+        focusHighlightedField(parsed.highlightFields),
+      );
     } finally {
       setSaving(false);
     }
   }
 
   const address = shop.address;
+  const ecom = shop.ecom;
   const addressLabel = address
-    ? [address.address_line_1, address.locality, address.city]
+    ? [
+        address.address_line_1,
+        address.address_line_2,
+        address.locality,
+        address.city,
+      ]
         .filter(Boolean)
         .join(", ")
     : null;
   const coordinates =
-    typeof address?.latitude === "number" && typeof address?.longitude === "number"
-      ? `${address.latitude.toFixed(5)}, ${address.longitude.toFixed(5)}`
+    typeof address?.latitude === "number" &&
+    typeof address?.longitude === "number"
+      ? `${address.latitude}, ${address.longitude}`
       : null;
 
   return (
     <div className="space-y-12">
       <ShopSection
+        title="Account"
+        description="Immutable identifiers and account status."
+      >
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <CopyableDetail label="Shop ID" value={shop.shop_id} />
+          <CopyableDetail
+            label="User ID"
+            value={shop.user_id != null ? String(shop.user_id) : null}
+          />
+          <CopyableDetail label="Status" value={String(shop.status ?? "")} />
+          <CopyableDetail
+            label="Status reason"
+            value={shop.status_reason}
+          />
+          <CopyableDetail
+            label="Group ID"
+            value={shop.group_id != null ? String(shop.group_id) : null}
+          />
+          <CopyableDetail
+            label="Subscription ID"
+            value={
+              shop.subscription_id != null
+                ? String(shop.subscription_id)
+                : null
+            }
+          />
+          <CopyableDetail
+            label="Created at"
+            value={formatDetailDate(shop.created_at)}
+          />
+          <CopyableDetail
+            label="Updated at"
+            value={formatDetailDate(shop.updated_at)}
+          />
+          <CopyableDetail
+            label="Deleted"
+            value={shop.is_deleted ? "Yes" : "No"}
+          />
+        </div>
+      </ShopSection>
+
+      <ShopSection
         title="Shop details"
         description="Core profile used across ecom, POS, and billing."
         actions={
           !editing ? (
-            <Button type="button" variant="outline" onClick={() => setEditing(true)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setEditing(true)}
+            >
               Edit
             </Button>
           ) : null
@@ -471,61 +805,170 @@ function OverviewTab({
       >
         <form onSubmit={onSave} className="space-y-8">
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            <CopyableDetail label="Shop ID" value={shop.shop_id} />
             <CopyableDetail label="Shop name" value={form.shop_name} />
+            <CopyableDetail label="Second name" value={form.second_name} />
             <CopyableDetail label="Phone" value={form.phone} />
             <CopyableDetail label="Email" value={form.email} />
             <CopyableDetail label="Ecom slug" value={form.ecom_slug} />
-            <CopyableDetail label="Address" value={addressLabel} />
-            <CopyableDetail label="Coordinates" value={coordinates} />
             <CopyableDetail
-              label="Location contact"
-              value={address?.contact_number ?? null}
+              label="Shop license no"
+              value={form.shop_license_no}
+            />
+            <CopyableDetail
+              label="Contact person number"
+              value={form.contact_person_number}
+            />
+            <CopyableDetail
+              label="Contact person email"
+              value={form.contact_person_email}
+            />
+            <CopyableDetail label="UPI ID" value={form.upi_id} />
+            <CopyableDetail
+              label="VAT enabled"
+              value={form.vat_enabled ? "Yes" : "No"}
+            />
+            <CopyableDetail label="VAT %" value={form.vat} />
+            <CopyableDetail
+              label="Enable promotion"
+              value={form.enable_promotion ? "Yes" : "No"}
+            />
+            <CopyableDetail
+              label="Photo"
+              value={profile?.photo ?? shop.photo}
+            />
+            <CopyableDetail
+              label="Photo URL"
+              value={profile?.photo_url ?? shop.photo_url}
             />
           </div>
 
           <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
-            <Field label="Shop name">
-              <Input
-                value={form.shop_name}
-                disabled={!editing}
-                onChange={(e) => setForm({ ...form, shop_name: e.target.value })}
-              />
-            </Field>
+            {(
+              [
+                ["shop_name", "Shop name", form.shop_name],
+                ["second_name", "Second name", form.second_name],
+                ["status_reason", "Status reason", form.status_reason],
+                ["phone", "Phone", form.phone],
+                ["email", "Email", form.email],
+                ["shop_license_no", "Shop license no", form.shop_license_no],
+                ["upi_id", "UPI ID", form.upi_id],
+                [
+                  "contact_person_number",
+                  "Contact person number",
+                  form.contact_person_number,
+                ],
+                [
+                  "contact_person_email",
+                  "Contact person email",
+                  form.contact_person_email,
+                ],
+                ["vat", "VAT %", form.vat],
+              ] as const
+            ).map(([key, label, value]) => (
+              <Field key={key} label={label}>
+                <Input
+                  id={`overview_${key}`}
+                  data-field={key}
+                  value={value}
+                  disabled={!editing}
+                  aria-invalid={overviewFieldInvalid(key) || undefined}
+                  className={
+                    overviewFieldInvalid(key)
+                      ? "border-destructive focus-visible:ring-destructive/30"
+                      : undefined
+                  }
+                  onChange={(e) => updateOverviewField(key, e.target.value)}
+                />
+                {fieldErrors[key] ? (
+                  <p className="mt-1.5 text-xs font-medium text-destructive">
+                    {fieldErrors[key]}
+                  </p>
+                ) : null}
+              </Field>
+            ))}
             <Field label="Status">
-              <Select
-                value={form.status}
-                disabled={!editing}
-                onValueChange={(value) => setForm({ ...form, status: value ?? "active" })}
+              <div
+                data-field="status"
+                className={
+                  overviewFieldInvalid("status")
+                    ? "rounded-lg ring-2 ring-destructive/40"
+                    : undefined
+                }
               >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                  <SelectItem value="suspended">Suspended</SelectItem>
-                  <SelectItem value="blocked">Blocked</SelectItem>
-                </SelectContent>
-              </Select>
+                <Select
+                  value={form.status}
+                  disabled={!editing}
+                  onValueChange={(value) =>
+                    updateOverviewField("status", value ?? "active")
+                  }
+                >
+                  <SelectTrigger
+                    id="overview_status"
+                    aria-invalid={overviewFieldInvalid("status") || undefined}
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                    <SelectItem value="suspended">Suspended</SelectItem>
+                    <SelectItem value="blocked">Blocked</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {fieldErrors.status ? (
+                <p className="mt-1.5 text-xs font-medium text-destructive">
+                  {fieldErrors.status}
+                </p>
+              ) : null}
             </Field>
-            <Field label="Phone">
+            <Field label="Ecom slug">
               <Input
-                value={form.phone}
-                disabled={!editing}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                id="overview_ecom_slug"
+                data-field="ecom_slug"
+                value={form.ecom_slug}
+                disabled
+                readOnly
               />
             </Field>
-            <Field label="Email">
-              <Input
-                value={form.email}
+            <label
+              data-field="vat_enabled"
+              className={`flex items-center gap-2 text-sm sm:col-span-2 ${
+                overviewFieldInvalid("vat_enabled")
+                  ? "rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2"
+                  : ""
+              }`}
+            >
+              <input
+                type="checkbox"
+                className="size-4 accent-primary"
+                checked={form.vat_enabled}
                 disabled={!editing}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                onChange={(e) =>
+                  updateOverviewField("vat_enabled", e.target.checked)
+                }
               />
-            </Field>
-            <Field label="Ecom slug" className="space-y-1.5 sm:col-span-2">
-              <Input value={form.ecom_slug} disabled readOnly />
-            </Field>
+              VAT enabled
+            </label>
+            <label
+              data-field="enable_promotion"
+              className={`flex items-center gap-2 text-sm sm:col-span-2 ${
+                overviewFieldInvalid("enable_promotion")
+                  ? "rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2"
+                  : ""
+              }`}
+            >
+              <input
+                type="checkbox"
+                className="size-4 accent-primary"
+                checked={form.enable_promotion}
+                disabled={!editing}
+                onChange={(e) =>
+                  updateOverviewField("enable_promotion", e.target.checked)
+                }
+              />
+              Enable promotion
+            </label>
           </div>
 
           <div className="border-t pt-6">
@@ -548,33 +991,40 @@ function OverviewTab({
                 Update location
               </Button>
             </div>
-            {addressLabel ? (
-              <dl className="grid gap-3 text-sm sm:grid-cols-2">
-                <div>
-                  <dt className="text-muted-foreground">Address</dt>
-                  <dd className="mt-0.5 font-medium">{addressLabel}</dd>
-                </div>
-                {coordinates ? (
-                  <div>
-                    <dt className="text-muted-foreground">Coordinates</dt>
-                    <dd className="mt-0.5 font-mono text-xs">{coordinates}</dd>
-                  </div>
-                ) : null}
-                {address?.contact_number ? (
-                  <div>
-                    <dt className="text-muted-foreground">Contact</dt>
-                    <dd className="mt-0.5">{address.contact_number}</dd>
-                  </div>
-                ) : null}
-              </dl>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                No location set yet.
-              </p>
-            )}
+            <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <CopyableDetail
+                label="Address line 1"
+                value={address?.address_line_1}
+              />
+              <CopyableDetail
+                label="Address line 2"
+                value={address?.address_line_2}
+              />
+              <CopyableDetail label="Locality" value={address?.locality} />
+              <CopyableDetail label="City" value={address?.city} />
+              <CopyableDetail label="Latitude" value={
+                address?.latitude != null ? String(address.latitude) : null
+              } />
+              <CopyableDetail label="Longitude" value={
+                address?.longitude != null ? String(address.longitude) : null
+              } />
+              <CopyableDetail
+                label="Contact number"
+                value={address?.contact_number}
+              />
+              <CopyableDetail label="Full address" value={addressLabel} />
+              <CopyableDetail label="Coordinates" value={coordinates} />
+            </div>
           </div>
 
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          {error ? (
+          <div
+            role="alert"
+            className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+          >
+            {error}
+          </div>
+        ) : null}
           {editing ? (
             <div className="flex gap-2">
               <Button
@@ -598,6 +1048,65 @@ function OverviewTab({
       </ShopSection>
 
       <ShopSection
+        title="Ecom storefront"
+        description="Online store settings from the shop detail response."
+      >
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <CopyableDetail
+            label="Min order amount"
+            value={
+              ecom?.min_order_amount != null
+                ? String(ecom.min_order_amount)
+                : null
+            }
+          />
+          <CopyableDetail
+            label="Delivery radius (km)"
+            value={
+              ecom?.delivery_radius_km != null
+                ? String(ecom.delivery_radius_km)
+                : null
+            }
+          />
+          <CopyableDetail
+            label="WhatsApp order template"
+            value={ecom?.whatsapp_order_template}
+          />
+          <CopyableDetail
+            label="Operating hours"
+            value={formatDetailValue(ecom?.operating_hours)}
+          />
+          <CopyableDetail
+            label="Payment methods"
+            value={formatDetailValue(ecom?.payment_methods)}
+          />
+          <CopyableDetail label="SEO title" value={ecom?.seo_title} />
+          <CopyableDetail
+            label="SEO description"
+            value={ecom?.seo_description}
+          />
+          <CopyableDetail label="SEO keywords" value={ecom?.seo_keywords} />
+          <CopyableDetail label="OG title" value={ecom?.og_title} />
+          <CopyableDetail
+            label="OG description"
+            value={ecom?.og_description}
+          />
+          <CopyableDetail label="OG image" value={ecom?.og_image} />
+          <CopyableDetail label="Twitter card" value={ecom?.twitter_card} />
+          <CopyableDetail
+            label="Robots index"
+            value={
+              ecom?.robots_index == null
+                ? null
+                : ecom.robots_index
+                  ? "Yes"
+                  : "No"
+            }
+          />
+        </div>
+      </ShopSection>
+
+      <ShopSection
         title="Reset password"
         description="Issues a new password for the shop owner login."
       >
@@ -613,7 +1122,7 @@ function OverviewTab({
               appToast.success("Shop password reset.");
             } catch (err) {
               const msg =
-                err instanceof ApiError ? err.message : "Password reset failed";
+                parseApiFormError(err, "Password reset failed").message;
               setPwMessage(msg);
               appToast.error(msg);
             }
@@ -656,8 +1165,13 @@ function readShopFeatures(shop: ShopDetail): Required<
     | "merge_order"
     | "return_option"
     | "customer_ticket"
+    | "integration_enabled"
   >
-> & { ecom_slug: string } {
+> & {
+  ecom_slug: string;
+  integration_rate_limit: string;
+  has_integration_token: boolean;
+} {
   const f = (shop.features ?? {}) as ShopFeatures;
   return {
     ecom_enabled: Boolean(f.ecom_enabled ?? shop.ecom_enabled),
@@ -669,6 +1183,9 @@ function readShopFeatures(shop: ShopDetail): Required<
     return_option: Boolean(f.return_option),
     customer_ticket: Boolean(f.customer_ticket),
     ecom_slug: String(f.ecom_slug ?? shop.ecom_slug ?? ""),
+    integration_enabled: Boolean(f.integration_enabled),
+    integration_rate_limit: String(f.integration_rate_limit ?? 100),
+    has_integration_token: Boolean(f.has_integration_token),
   };
 }
 
@@ -678,6 +1195,8 @@ function FeatureToggleRow({
   description,
   checked,
   disabled,
+  error,
+  invalid,
   onChange,
 }: {
   id: string;
@@ -685,30 +1204,50 @@ function FeatureToggleRow({
   description: string;
   checked: boolean;
   disabled?: boolean;
+  error?: string | null;
+  invalid?: boolean;
   onChange: (value: boolean) => void;
 }) {
+  const showError = Boolean(error) || invalid;
   return (
-    <label
-      htmlFor={id}
-      className={`flex cursor-pointer items-start gap-3 border-b border-border/60 py-3.5 last:border-b-0 ${
-        disabled ? "cursor-not-allowed opacity-60" : "hover:bg-muted/30"
+    <div
+      data-field={id.replace(/^feat_/, "")}
+      className={`rounded-lg border-b border-border/60 last:border-b-0 ${
+        showError
+          ? "border border-destructive/40 bg-destructive/5 px-3"
+          : ""
       }`}
     >
-      <input
-        id={id}
-        type="checkbox"
-        className="mt-1 size-4 accent-primary"
-        checked={checked}
-        disabled={disabled}
-        onChange={(e) => onChange(e.target.checked)}
-      />
-      <span className="min-w-0">
-        <span className="block text-sm font-medium">{label}</span>
-        <span className="mt-0.5 block text-xs text-muted-foreground">
-          {description}
+      <label
+        htmlFor={id}
+        className={`flex cursor-pointer items-start gap-3 py-3.5 ${
+          disabled ? "cursor-not-allowed opacity-60" : "hover:bg-muted/30"
+        } ${showError ? "hover:bg-transparent" : ""}`}
+      >
+        <input
+          id={id}
+          type="checkbox"
+          className={`mt-1 size-4 accent-primary ${
+            showError ? "outline outline-2 outline-offset-2 outline-destructive" : ""
+          }`}
+          checked={checked}
+          disabled={disabled}
+          aria-invalid={showError || undefined}
+          onChange={(e) => onChange(e.target.checked)}
+        />
+        <span className="min-w-0">
+          <span className="block text-sm font-medium">{label}</span>
+          <span className="mt-0.5 block text-xs text-muted-foreground">
+            {description}
+          </span>
+          {error ? (
+            <span className="mt-1.5 block text-xs font-medium text-destructive">
+              {error}
+            </span>
+          ) : null}
         </span>
-      </span>
-    </label>
+      </label>
+    </div>
   );
 }
 
@@ -723,19 +1262,57 @@ function FeaturesTab({
   const [form, setForm] = useState(initial);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Keep form in sync when shop reloads after save
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [highlightFields, setHighlightFields] = useState<string[]>([]);
+
   useEffect(() => {
     setForm(readShopFeatures(shop));
+    setError(null);
+    setFieldErrors({});
+    setHighlightFields([]);
   }, [shop]);
 
+  function clearFieldError(key: string) {
+    setFieldErrors((prev) => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+    setHighlightFields((prev) => prev.filter((f) => f !== key));
+  }
+
   function setFlag<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
+    clearFieldError(String(key));
+    setError(null);
     setForm((prev) => {
       const next = { ...prev, [key]: value };
       if (key === "ecom_enabled" && value === false) {
         next.ecom_order_confirmation_enabled = false;
         next.customer_ticket = false;
+        clearFieldError("ecom_order_confirmation_enabled");
+        clearFieldError("customer_ticket");
       }
       return next;
+    });
+  }
+
+  function applyFormError(err: unknown, fallback: string) {
+    const parsed = parseApiFormError(err, fallback);
+    setError(parsed.message);
+    setFieldErrors(parsed.fields);
+    setHighlightFields(parsed.highlightFields);
+    appToast.error(parsed.message);
+    window.requestAnimationFrame(() => {
+      focusHighlightedField(
+        parsed.highlightFields.map((f) =>
+          f === "ecom_slug" || f === "integration_rate_limit"
+            ? `features_${f}`
+            : `feat_${f}`,
+        ),
+      );
+      // Also try data-field attribute via helper's second pass
+      focusHighlightedField(parsed.highlightFields);
     });
   }
 
@@ -743,6 +1320,34 @@ function FeaturesTab({
     e.preventDefault();
     setSaving(true);
     setError(null);
+    setFieldErrors({});
+    setHighlightFields([]);
+
+    // Client-side dependency checks before hitting the API
+    if (
+      !form.ecom_enabled &&
+      (form.ecom_order_confirmation_enabled || form.customer_ticket)
+    ) {
+      const parsed = parseApiFormError(
+        new ApiError(
+          400,
+          form.ecom_order_confirmation_enabled
+            ? "ecom_order_confirmation_enabled requires ecom_enabled to be true"
+            : "customer_ticket requires ecom_enabled to be true",
+        ),
+        "Ecom must be enabled for this feature.",
+      );
+      setError(parsed.message);
+      setFieldErrors(parsed.fields);
+      setHighlightFields(parsed.highlightFields);
+      appToast.error(parsed.message);
+      window.requestAnimationFrame(() =>
+        focusHighlightedField(parsed.highlightFields),
+      );
+      setSaving(false);
+      return;
+    }
+
     try {
       const ecomEnabled = form.ecom_enabled;
       await patchShop(shop.shop_id, {
@@ -755,34 +1360,47 @@ function FeaturesTab({
         merge_order: form.merge_order,
         return_option: form.return_option,
         customer_ticket: ecomEnabled ? form.customer_ticket : false,
+        integration_enabled: form.integration_enabled,
+        integration_rate_limit: Number(form.integration_rate_limit) || 100,
       });
       appToast.success("Feature flags saved.");
       await onSaved();
     } catch (err) {
-      const message =
-        err instanceof ApiError
-          ? err.message
-          : "Failed to save feature flags";
-      setError(message);
-      appToast.error(message);
+      applyFormError(err, "Failed to save feature flags");
     } finally {
       setSaving(false);
     }
   }
 
+  function isHighlighted(field: string) {
+    return highlightFields.includes(field) || Boolean(fieldErrors[field]);
+  }
+
   return (
     <ShopSection
       title="Feature flags"
-      description="Flat PATCH to shop settings. Confirmation requires ecom enabled."
+      description="Flat PATCH to shop settings. Confirmation and tickets require ecom enabled."
     >
       <form onSubmit={onSave} className="space-y-6">
         <Field label="Ecom slug">
           <Input
             id="features_ecom_slug"
+            data-field="ecom_slug"
             value={form.ecom_slug}
+            aria-invalid={isHighlighted("ecom_slug") || undefined}
+            className={
+              isHighlighted("ecom_slug")
+                ? "border-destructive focus-visible:ring-destructive/30"
+                : undefined
+            }
             onChange={(e) => setFlag("ecom_slug", e.target.value)}
             placeholder="my-shop-slug"
           />
+          {fieldErrors.ecom_slug ? (
+            <p className="mt-1.5 text-xs font-medium text-destructive">
+              {fieldErrors.ecom_slug}
+            </p>
+          ) : null}
         </Field>
 
         <div>
@@ -791,6 +1409,8 @@ function FeaturesTab({
             label="Ecom enabled"
             description="Master switch for online ecommerce."
             checked={form.ecom_enabled}
+            invalid={isHighlighted("ecom_enabled")}
+            error={fieldErrors.ecom_enabled}
             onChange={(v) => setFlag("ecom_enabled", v)}
           />
           <FeatureToggleRow
@@ -799,6 +1419,8 @@ function FeaturesTab({
             description="Shop must accept/reject blank ecom orders before fulfillment."
             checked={form.ecom_order_confirmation_enabled}
             disabled={!form.ecom_enabled}
+            invalid={isHighlighted("ecom_order_confirmation_enabled")}
+            error={fieldErrors.ecom_order_confirmation_enabled}
             onChange={(v) => setFlag("ecom_order_confirmation_enabled", v)}
           />
           <FeatureToggleRow
@@ -806,6 +1428,8 @@ function FeaturesTab({
             label="Scheduled orders"
             description="Enables scheduled-order APIs in the shop DMS."
             checked={form.scheduled_order}
+            invalid={isHighlighted("scheduled_order")}
+            error={fieldErrors.scheduled_order}
             onChange={(v) => setFlag("scheduled_order", v)}
           />
           <FeatureToggleRow
@@ -813,6 +1437,8 @@ function FeaturesTab({
             label="Merge orders"
             description="Enables order merge and customer credit in the shop DMS."
             checked={form.merge_order}
+            invalid={isHighlighted("merge_order")}
+            error={fieldErrors.merge_order}
             onChange={(v) => setFlag("merge_order", v)}
           />
           <FeatureToggleRow
@@ -820,6 +1446,8 @@ function FeaturesTab({
             label="Return option"
             description="Allow product returns for this shop."
             checked={form.return_option}
+            invalid={isHighlighted("return_option")}
+            error={fieldErrors.return_option}
             onChange={(v) => setFlag("return_option", v)}
           />
           <FeatureToggleRow
@@ -828,11 +1456,63 @@ function FeaturesTab({
             description="Customer support tickets. Requires ecom."
             checked={form.customer_ticket}
             disabled={!form.ecom_enabled}
+            invalid={isHighlighted("customer_ticket")}
+            error={fieldErrors.customer_ticket}
             onChange={(v) => setFlag("customer_ticket", v)}
+          />
+          <FeatureToggleRow
+            id="feat_integration_enabled"
+            label="Integration enabled"
+            description="Allow third-party / POS API integration for this shop."
+            checked={form.integration_enabled}
+            invalid={isHighlighted("integration_enabled")}
+            error={fieldErrors.integration_enabled}
+            onChange={(v) => setFlag("integration_enabled", v)}
           />
         </div>
 
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        <div className="grid gap-3 sm:grid-cols-2">
+          <CopyableDetail
+            label="Has integration token"
+            value={form.has_integration_token ? "Yes" : "No"}
+          />
+          <Field label="Integration rate limit">
+            <Input
+              id="features_integration_rate_limit"
+              data-field="integration_rate_limit"
+              inputMode="numeric"
+              value={form.integration_rate_limit}
+              aria-invalid={
+                isHighlighted("integration_rate_limit") || undefined
+              }
+              className={
+                isHighlighted("integration_rate_limit")
+                  ? "border-destructive focus-visible:ring-destructive/30"
+                  : undefined
+              }
+              onChange={(e) =>
+                setFlag(
+                  "integration_rate_limit",
+                  e.target.value.replace(/\D/g, ""),
+                )
+              }
+            />
+            {fieldErrors.integration_rate_limit ? (
+              <p className="mt-1.5 text-xs font-medium text-destructive">
+                {fieldErrors.integration_rate_limit}
+              </p>
+            ) : null}
+          </Field>
+        </div>
+
+        {error ? (
+          <div
+            role="alert"
+            className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+          >
+            {error}
+          </div>
+        ) : null}
 
         <Button type="submit" disabled={saving}>
           {saving ? "Saving…" : "Save feature flags"}
@@ -1050,42 +1730,64 @@ function ProductsTab({ shopId }: { shopId: string }) {
   );
 }
 
-function DeliveryTab({ shopId }: { shopId: string }) {
-  const [form, setForm] = useState({
-    delivery_time: "30",
-    self_assigned: true,
-    pickup_disabled: false,
-    bonus_penalty: false,
-    bonus_penalty_start_status: "assigned",
-    common_penalty_enabled: false,
-    common_penalty_idle_minutes: "45",
-    common_penalty_min_online_minutes: "45",
-  });
+function deliveryFormFromData(
+  data: ShopDeliverySettings | Record<string, unknown> | null | undefined,
+) {
+  return {
+    delivery_time: String(data?.delivery_time ?? 30),
+    self_assigned: Boolean(data?.self_assigned ?? false),
+    pickup_disabled: Boolean(data?.pickup_disabled ?? false),
+    bonus_penalty: Boolean(data?.bonus_penalty ?? false),
+    bonus_penalty_start_status: String(
+      data?.bonus_penalty_start_status ?? "assigned",
+    ),
+    common_penalty_enabled: Boolean(data?.common_penalty_enabled ?? false),
+    common_penalty_idle_minutes: String(
+      data?.common_penalty_idle_minutes ?? 45,
+    ),
+    common_penalty_min_online_minutes: String(
+      data?.common_penalty_min_online_minutes ?? 45,
+    ),
+  };
+}
+
+function mergeDeliverySources(
+  fromShop: ShopDeliverySettings | null | undefined,
+  fromApi: Record<string, unknown> | null | undefined,
+): ShopDeliverySettings {
+  return {
+    ...(fromShop ?? {}),
+    ...(fromApi ?? {}),
+  };
+}
+
+function DeliveryTab({
+  shopId,
+  shop,
+}: {
+  shopId: string;
+  shop: ShopDetail;
+}) {
+  const [form, setForm] = useState(() =>
+    deliveryFormFromData(shop.delivery),
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const deliveryQuery = useQuery(shopDeliveryQuery(shopId));
-  const loading = deliveryQuery.isPending;
 
   useEffect(() => {
-    const data = deliveryQuery.data;
-    if (!data) return;
-    setForm({
-      delivery_time: String(data.delivery_time ?? 30),
-      self_assigned: Boolean(data.self_assigned ?? true),
-      pickup_disabled: Boolean(data.pickup_disabled ?? false),
-      bonus_penalty: Boolean(data.bonus_penalty ?? false),
-      bonus_penalty_start_status: String(
-        data.bonus_penalty_start_status ?? "assigned",
-      ),
-      common_penalty_enabled: Boolean(data.common_penalty_enabled ?? false),
-      common_penalty_idle_minutes: String(
-        data.common_penalty_idle_minutes ?? 45,
-      ),
-      common_penalty_min_online_minutes: String(
-        data.common_penalty_min_online_minutes ?? 45,
-      ),
-    });
-  }, [deliveryQuery.data]);
+    const merged = mergeDeliverySources(
+      shop.delivery,
+      deliveryQuery.data ?? undefined,
+    );
+    if (shop.delivery || deliveryQuery.data) {
+      setForm(deliveryFormFromData(merged));
+    }
+  }, [deliveryQuery.data, shop.delivery]);
+
+  function setField<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  }
 
   async function onSave(e: React.FormEvent) {
     e.preventDefault();
@@ -1105,8 +1807,9 @@ function DeliveryTab({ shopId }: { shopId: string }) {
         ),
       });
       appToast.success("Delivery settings saved.");
+      await deliveryQuery.refetch();
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Save failed";
+      const msg = parseApiFormError(err, "Save failed").message;
       setError(msg);
       appToast.error(msg);
     } finally {
@@ -1114,41 +1817,118 @@ function DeliveryTab({ shopId }: { shopId: string }) {
     }
   }
 
-  if (loading) return <LoadingState />;
+  if (deliveryQuery.isPending && !shop.delivery) return <LoadingState />;
 
   return (
     <ShopSection
       title="Delivery settings"
-      description="Defaults applied when the shop fulfills orders."
+      description="All delivery, bonus, and common penalty settings for this shop."
+      className="max-w-3xl"
     >
-      <form onSubmit={onSave} className="max-w-md space-y-5">
-        <Field label="Delivery time (min)">
-          <Input
-            value={form.delivery_time}
-            onChange={(e) => setForm({ ...form, delivery_time: e.target.value })}
+      <form onSubmit={onSave} className="space-y-8">
+        <div className="space-y-4">
+          <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+            Basics
+          </p>
+          <Field label="Delivery time (min)">
+            <Input
+              inputMode="numeric"
+              value={form.delivery_time}
+              onChange={(e) =>
+                setField("delivery_time", e.target.value.replace(/\D/g, ""))
+              }
+            />
+          </Field>
+          <div>
+            <FeatureToggleRow
+              id="delivery_self_assigned"
+              label="Self assigned"
+              description="Shop can self-assign riders to orders."
+              checked={form.self_assigned}
+              onChange={(v) => setField("self_assigned", v)}
+            />
+            <FeatureToggleRow
+              id="delivery_pickup_disabled"
+              label="Pickup disabled"
+              description="Disable customer pickup for this shop."
+              checked={form.pickup_disabled}
+              onChange={(v) => setField("pickup_disabled", v)}
+            />
+          </div>
+        </div>
+
+        <div className="space-y-4 border-t pt-6">
+          <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+            Bonus / penalty
+          </p>
+          <FeatureToggleRow
+            id="delivery_bonus_penalty"
+            label="Bonus / penalty"
+            description="Enable rider bonus and penalty rules for this shop."
+            checked={form.bonus_penalty}
+            onChange={(v) => setField("bonus_penalty", v)}
           />
-        </Field>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            className="size-4 accent-primary"
-            checked={form.self_assigned}
-            onChange={(e) => setForm({ ...form, self_assigned: e.target.checked })}
+          <Field label="Bonus penalty start status">
+            <Input
+              value={form.bonus_penalty_start_status}
+              disabled={!form.bonus_penalty}
+              onChange={(e) =>
+                setField("bonus_penalty_start_status", e.target.value)
+              }
+              placeholder="assigned"
+            />
+          </Field>
+        </div>
+
+        <div className="space-y-4 border-t pt-6">
+          <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+            Common penalty
+          </p>
+          <FeatureToggleRow
+            id="delivery_common_penalty_enabled"
+            label="Common penalty enabled"
+            description="Apply shared idle / online-time penalty rules."
+            checked={form.common_penalty_enabled}
+            onChange={(v) => setField("common_penalty_enabled", v)}
           />
-          Self assigned
-        </label>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            className="size-4 accent-primary"
-            checked={form.pickup_disabled}
-            onChange={(e) =>
-              setForm({ ...form, pickup_disabled: e.target.checked })
-            }
-          />
-          Pickup disabled
-        </label>
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Idle minutes">
+              <Input
+                inputMode="numeric"
+                value={form.common_penalty_idle_minutes}
+                disabled={!form.common_penalty_enabled}
+                onChange={(e) =>
+                  setField(
+                    "common_penalty_idle_minutes",
+                    e.target.value.replace(/\D/g, ""),
+                  )
+                }
+              />
+            </Field>
+            <Field label="Min online minutes">
+              <Input
+                inputMode="numeric"
+                value={form.common_penalty_min_online_minutes}
+                disabled={!form.common_penalty_enabled}
+                onChange={(e) =>
+                  setField(
+                    "common_penalty_min_online_minutes",
+                    e.target.value.replace(/\D/g, ""),
+                  )
+                }
+              />
+            </Field>
+          </div>
+        </div>
+
+        {error ? (
+          <div
+            role="alert"
+            className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+          >
+            {error}
+          </div>
+        ) : null}
         <Button type="submit" disabled={saving}>
           {saving ? "Saving…" : "Save delivery settings"}
         </Button>
@@ -1157,7 +1937,13 @@ function DeliveryTab({ shopId }: { shopId: string }) {
   );
 }
 
-function SubscriptionTab({ shopId }: { shopId: string }) {
+function SubscriptionTab({
+  shopId,
+  shop,
+}: {
+  shopId: string;
+  shop: ShopDetail;
+}) {
   const [form, setForm] = useState({
     start_date: "",
     end_date: "",
@@ -1169,7 +1955,11 @@ function SubscriptionTab({ shopId }: { shopId: string }) {
   const [saving, setSaving] = useState(false);
 
   const subscriptionQuery = useQuery(shopSubscriptionQuery(shopId));
-  const active = subscriptionQuery.data ?? null;
+  const active =
+    subscriptionQuery.data ??
+    (shop.subscription as Record<string, unknown> | null | undefined) ??
+    null;
+
   const load = async () => {
     await subscriptionQuery.refetch();
   };
@@ -1189,7 +1979,7 @@ function SubscriptionTab({ shopId }: { shopId: string }) {
       appToast.success("Subscription created.");
       await load();
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Create failed";
+      const msg = parseApiFormError(err, "Create failed").message;
       setError(msg);
       appToast.error(msg);
     } finally {
@@ -1197,36 +1987,70 @@ function SubscriptionTab({ shopId }: { shopId: string }) {
     }
   }
 
+  const embeddedEntries = active
+    ? Object.entries(active).filter(
+        ([, value]) => value != null && value !== "",
+      )
+    : [];
+
   return (
     <div className="grid gap-12 lg:grid-cols-2">
-      <ShopSection title="Active subscription" className="max-w-none">
-        {active ? (
-          <div className="rounded-xl border bg-card p-4">
-            <dl>
-              {[
-                ["Plan", active.plan],
-                ["Status", active.status],
-                ["Amount", active.amount],
-                ["Start date", active.start_date],
-                ["End date", active.end_date],
-                ["Renews at", active.renews_at],
-                ["Last payment", active.last_payment_date],
-                ["Subscription ID", active.subscription_id ?? active.id],
-              ]
-                .filter(([, value]) => value != null && value !== "")
-                .map(([label, value]) => (
-                  <SubscriptionDetailRow
-                    key={label}
-                    label={label}
-                    value={formatSubscriptionValue(value)}
-                  />
-                ))}
-            </dl>
+      <div className="space-y-8">
+        <ShopSection title="Subscription identifiers" className="max-w-none">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <CopyableDetail
+              label="Subscription ID (shop)"
+              value={
+                shop.subscription_id != null
+                  ? String(shop.subscription_id)
+                  : null
+              }
+            />
+            <CopyableDetail
+              label="Has embedded subscription"
+              value={shop.subscription ? "Yes" : "No"}
+            />
           </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">No active subscription.</p>
-        )}
-      </ShopSection>
+        </ShopSection>
+
+        <ShopSection title="Active subscription" className="max-w-none">
+          {active ? (
+            <div className="rounded-xl border bg-card p-4">
+              <dl>
+                {(embeddedEntries.length
+                  ? embeddedEntries
+                  : ([
+                      ["plan", active.plan],
+                      ["status", active.status],
+                      ["amount", active.amount],
+                      ["start_date", active.start_date],
+                      ["end_date", active.end_date],
+                      ["renews_at", active.renews_at],
+                      ["last_payment_date", active.last_payment_date],
+                      [
+                        "subscription_id",
+                        active.subscription_id ?? active.id,
+                      ],
+                    ] as [string, unknown][])
+                )
+                  .filter(([, value]) => value != null && value !== "")
+                  .map(([key, value]) => (
+                    <SubscriptionDetailRow
+                      key={key}
+                      label={String(key).replaceAll("_", " ")}
+                      value={formatSubscriptionValue(value)}
+                    />
+                  ))}
+              </dl>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No active subscription.
+            </p>
+          )}
+        </ShopSection>
+      </div>
+
       <ShopSection
         title="Create subscription"
         description="Starts a new billing period for this shop."
@@ -1239,14 +2063,18 @@ function SubscriptionTab({ shopId }: { shopId: string }) {
                 type="date"
                 required
                 value={form.start_date}
-                onChange={(e) => setForm({ ...form, start_date: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, start_date: e.target.value })
+                }
               />
               <Input
                 type="date"
                 required
                 value={form.end_date}
                 min={form.start_date || undefined}
-                onChange={(e) => setForm({ ...form, end_date: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, end_date: e.target.value })
+                }
               />
             </div>
           </Field>
@@ -1255,6 +2083,12 @@ function SubscriptionTab({ shopId }: { shopId: string }) {
               required
               value={form.amount}
               onChange={(e) => setForm({ ...form, amount: e.target.value })}
+            />
+          </Field>
+          <Field label="Status">
+            <Input
+              value={form.status}
+              onChange={(e) => setForm({ ...form, status: e.target.value })}
             />
           </Field>
           <Field label="Last payment date">
@@ -1266,7 +2100,14 @@ function SubscriptionTab({ shopId }: { shopId: string }) {
               }
             />
           </Field>
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          {error ? (
+          <div
+            role="alert"
+            className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+          >
+            {error}
+          </div>
+        ) : null}
           <Button type="submit" disabled={saving}>
             {saving ? "Creating…" : "Create"}
           </Button>
@@ -1276,38 +2117,63 @@ function SubscriptionTab({ shopId }: { shopId: string }) {
   );
 }
 
-function PromotionTab({ shopId }: { shopId: string }) {
-  const [form, setForm] = useState({
-    promotion_header: "",
-    promotion_content: "",
-    promotion_link: "",
-    is_marketing_enabled: true,
-  });
+function promotionFormFromData(
+  data: ShopPromotionSettings | Record<string, unknown> | null | undefined,
+) {
+  return {
+    promotion_header: String(data?.promotion_header ?? ""),
+    promotion_content: String(data?.promotion_content ?? ""),
+    promotion_link: String(data?.promotion_link ?? ""),
+    promotion_image_s3_key: String(data?.promotion_image_s3_key ?? ""),
+    is_marketing_enabled: Boolean(data?.is_marketing_enabled ?? false),
+  };
+}
+
+function PromotionTab({
+  shopId,
+  shop,
+}: {
+  shopId: string;
+  shop: ShopDetail;
+}) {
+  const [form, setForm] = useState(() =>
+    promotionFormFromData(shop.promotion),
+  );
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const promotionQuery = useQuery(shopPromotionQuery(shopId));
 
   useEffect(() => {
-    const data = promotionQuery.data;
-    if (!data) return;
-    setForm({
-      promotion_header: String(data.promotion_header ?? ""),
-      promotion_content: String(data.promotion_content ?? ""),
-      promotion_link: String(data.promotion_link ?? ""),
-      is_marketing_enabled: Boolean(data.is_marketing_enabled ?? true),
-    });
-  }, [promotionQuery.data]);
+    if (promotionQuery.data) {
+      setForm(promotionFormFromData(promotionQuery.data));
+      return;
+    }
+    if (shop.promotion) {
+      setForm(promotionFormFromData(shop.promotion));
+    }
+  }, [promotionQuery.data, shop.promotion]);
 
   async function onSave(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setSaving(true);
     try {
-      await putPromotion(shopId, form);
+      await putPromotion(shopId, {
+        promotion_header: form.promotion_header || null,
+        promotion_content: form.promotion_content || null,
+        promotion_link: form.promotion_link || null,
+        promotion_image_s3_key: form.promotion_image_s3_key || null,
+        is_marketing_enabled: form.is_marketing_enabled,
+      });
       appToast.success("Promotion saved.");
+      await promotionQuery.refetch();
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Save failed";
+      const msg = parseApiFormError(err, "Save failed").message;
       setError(msg);
       appToast.error(msg);
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -1316,11 +2182,30 @@ function PromotionTab({ shopId }: { shopId: string }) {
       title="Promotion"
       description="Marketing content shown to customers for this shop."
     >
+      <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <CopyableDetail label="Promotion header" value={form.promotion_header} />
+        <CopyableDetail
+          label="Promotion content"
+          value={form.promotion_content}
+        />
+        <CopyableDetail label="Promotion link" value={form.promotion_link} />
+        <CopyableDetail
+          label="Promotion image S3 key"
+          value={form.promotion_image_s3_key}
+        />
+        <CopyableDetail
+          label="Marketing enabled"
+          value={form.is_marketing_enabled ? "Yes" : "No"}
+        />
+      </div>
+
       <form onSubmit={onSave} className="max-w-xl space-y-4">
         <Field label="Header">
           <Input
             value={form.promotion_header}
-            onChange={(e) => setForm({ ...form, promotion_header: e.target.value })}
+            onChange={(e) =>
+              setForm({ ...form, promotion_header: e.target.value })
+            }
           />
         </Field>
         <Field label="Content">
@@ -1334,7 +2219,17 @@ function PromotionTab({ shopId }: { shopId: string }) {
         <Field label="Link">
           <Input
             value={form.promotion_link}
-            onChange={(e) => setForm({ ...form, promotion_link: e.target.value })}
+            onChange={(e) =>
+              setForm({ ...form, promotion_link: e.target.value })
+            }
+          />
+        </Field>
+        <Field label="Promotion image S3 key">
+          <Input
+            value={form.promotion_image_s3_key}
+            onChange={(e) =>
+              setForm({ ...form, promotion_image_s3_key: e.target.value })
+            }
           />
         </Field>
         <label className="flex items-center gap-2 text-sm">
@@ -1348,8 +2243,17 @@ function PromotionTab({ shopId }: { shopId: string }) {
           />
           Marketing enabled
         </label>
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
-        <Button type="submit">Save promotion</Button>
+        {error ? (
+          <div
+            role="alert"
+            className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+          >
+            {error}
+          </div>
+        ) : null}
+        <Button type="submit" disabled={saving}>
+          {saving ? "Saving…" : "Save promotion"}
+        </Button>
       </form>
     </ShopSection>
   );
@@ -1508,7 +2412,7 @@ function RidersTab({ shopId }: { shopId: string }) {
             appToast.success(blocked ? "Rider unblocked." : "Rider blocked.");
           } catch (err) {
             const msg =
-              err instanceof ApiError ? err.message : "Action failed";
+              parseApiFormError(err, "Action failed").message;
             setMessage(msg);
             appToast.error(msg);
           }
@@ -1522,7 +2426,7 @@ function RidersTab({ shopId }: { shopId: string }) {
             appToast.success("Rider password reset.");
           } catch (err) {
             const msg =
-              err instanceof ApiError ? err.message : "Reset failed";
+              parseApiFormError(err, "Reset failed").message;
             setMessage(msg);
             appToast.error(msg);
           }
@@ -1536,7 +2440,7 @@ function RidersTab({ shopId }: { shopId: string }) {
             appToast.success("Rider soft-deleted.");
           } catch (err) {
             const msg =
-              err instanceof ApiError ? err.message : "Delete failed";
+              parseApiFormError(err, "Delete failed").message;
             setMessage(msg);
             appToast.error(msg);
           }
@@ -1556,7 +2460,7 @@ function RidersTab({ shopId }: { shopId: string }) {
             appToast.success("Rider permanently deleted.");
           } catch (err) {
             const msg =
-              err instanceof ApiError ? err.message : "Hard delete failed";
+              parseApiFormError(err, "Hard delete failed").message;
             setMessage(msg);
             appToast.error(msg);
           }
@@ -1570,7 +2474,7 @@ function RidersTab({ shopId }: { shopId: string }) {
             appToast.success("Rider restored.");
           } catch (err) {
             const msg =
-              err instanceof ApiError ? err.message : "Restore failed";
+              parseApiFormError(err, "Restore failed").message;
             setMessage(msg);
             appToast.error(msg);
           }
@@ -1706,7 +2610,7 @@ function RidersTab({ shopId }: { shopId: string }) {
       const id = digitsOnly(String(rawId)).slice(-4);
       setForm((f) => ({ ...f, delivery_partner_id: id }));
     } catch (err) {
-      setMessage(err instanceof ApiError ? err.message : "Next id failed");
+      setMessage(parseApiFormError(err, "Next id failed").message);
     } finally {
       setNextIdLoading(false);
     }
@@ -1748,7 +2652,7 @@ function RidersTab({ shopId }: { shopId: string }) {
       await load();
       appToast.success("Rider created.");
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Create failed";
+      const msg = parseApiFormError(err, "Create failed").message;
       setMessage(msg);
       appToast.error(msg);
     } finally {
@@ -2001,7 +2905,7 @@ function PosLinkTab({ shopId }: { shopId: string }) {
       appToast.success("POS link attached.");
       await load();
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Attach failed";
+      const msg = parseApiFormError(err, "Attach failed").message;
       setError(msg);
       appToast.error(msg);
     }
@@ -2019,7 +2923,7 @@ function PosLinkTab({ shopId }: { shopId: string }) {
       appToast.success("POS link features updated.");
       await load();
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Update failed";
+      const msg = parseApiFormError(err, "Update failed").message;
       setError(msg);
       appToast.error(msg);
     }
@@ -2098,7 +3002,14 @@ function PosLinkTab({ shopId }: { shopId: string }) {
               Order pull
             </label>
           </div>
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          {error ? (
+          <div
+            role="alert"
+            className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+          >
+            {error}
+          </div>
+        ) : null}
           <div className="flex gap-2">
             <Button type="submit">Save link</Button>
             <Button type="button" variant="outline" onClick={() => void onFeatures()}>

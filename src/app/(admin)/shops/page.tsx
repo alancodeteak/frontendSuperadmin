@@ -10,6 +10,10 @@ import { AnimateIcon } from "@/components/animate-ui/icons/icon";
 import { Search } from "@/components/animate-ui/icons/search";
 import { PageShell } from "@/components/layout/page-shell";
 import { TopBarSlot } from "@/components/layout/top-bar-slot";
+import {
+  ShopConfirmDialog,
+  type ShopConfirmPhase,
+} from "@/components/shops/shop-confirm-dialog";
 import { CopyButton } from "@/components/shared/copy-button";
 import {
   EmptyState,
@@ -32,7 +36,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { ApiError } from "@/lib/api";
+import { parseApiFormError } from "@/lib/api-form-error";
 import { restoreShop } from "@/lib/api/shops";
 import { appToast } from "@/lib/app-toast";
 import { shopsListQuery } from "@/lib/queries/shops";
@@ -247,13 +251,51 @@ const shopColumns: ColumnDef<ShopListItem>[] = [
     size: 280,
   },
   {
-    accessorKey: "status",
+    id: "status",
+    accessorFn: (row) =>
+      `${row.status ?? ""} ${row.is_deleted ? "deleted" : ""}`,
     header: "Status",
-    cell: ({ row }) => <StatusBadge status={row.original.status} />,
+    cell: ({ row }) => (
+      <div className="flex flex-wrap items-center gap-1.5">
+        <StatusBadge status={row.original.status} />
+        {row.original.is_deleted ? (
+          <StatusBadge status="deleted" />
+        ) : null}
+      </div>
+    ),
     meta: { label: "Status" },
-    size: 100,
+    size: 140,
   },
 ];
+
+type ShopListFilter =
+  | "all"
+  | "active"
+  | "deleted"
+  | "suspended"
+  | "inactive"
+  | "blocked";
+
+function listParamsFromFilter(filter: ShopListFilter): {
+  status?: string;
+  deleted?: boolean;
+} {
+  switch (filter) {
+    case "active":
+      return { deleted: false, status: "active" };
+    case "deleted":
+      return { deleted: true };
+    case "suspended":
+      return { deleted: false, status: "suspended" };
+    case "inactive":
+      return { deleted: false, status: "inactive" };
+    case "blocked":
+      return { deleted: false, status: "blocked" };
+    case "all":
+    default:
+      return {};
+  }
+}
 
 export default function ShopsPage() {
   const router = useRouter();
@@ -261,7 +303,20 @@ export default function ShopsPage() {
   const searchParams = useSearchParams();
   const [page, setPage] = useState(1);
   const [q, setQ] = useState(() => searchParams.get("q") ?? "");
-  const [status, setStatus] = useState<string>("all");
+  const [filter, setFilter] = useState<ShopListFilter>(() => {
+    const fromUrl = searchParams.get("status");
+    if (fromUrl === "deleted") return "deleted";
+    if (fromUrl === "active") return "active";
+    if (fromUrl === "suspended") return "suspended";
+    if (fromUrl === "inactive") return "inactive";
+    if (fromUrl === "blocked") return "blocked";
+    return "all";
+  });
+  const [restoreShopTarget, setRestoreShopTarget] =
+    useState<ShopListItem | null>(null);
+  const [restorePhase, setRestorePhase] =
+    useState<ShopConfirmPhase>("confirm");
+  const [restoreError, setRestoreError] = useState<string | null>(null);
 
   useEffect(() => {
     const fromUrl = searchParams.get("q") ?? "";
@@ -269,14 +324,15 @@ export default function ShopsPage() {
     setPage(1);
   }, [searchParams]);
 
+  const listParams = listParamsFromFilter(filter);
+
   const shopsQuery = useQuery(
     shopsListQuery({
       page,
       limit: 20,
       q: q || undefined,
-      status: status === "all" || status === "deleted" ? undefined : status,
-      include_deleted: status === "deleted" ? true : undefined,
-      deleted_only: status === "deleted" ? true : undefined,
+      status: listParams.status,
+      deleted: listParams.deleted,
     }),
   );
 
@@ -290,14 +346,39 @@ export default function ShopsPage() {
     : null;
   const load = () => void shopsQuery.refetch();
 
-  async function handleRestore(shopId: string) {
-    if (!confirm(`Restore shop ${shopId}?`)) return;
+  function openRestore(shop: ShopListItem) {
+    setRestoreError(null);
+    setRestorePhase("confirm");
+    setRestoreShopTarget(shop);
+  }
+
+  function closeRestore() {
+    if (restorePhase === "loading" || restorePhase === "success") return;
+    setRestoreShopTarget(null);
+    setRestorePhase("confirm");
+    setRestoreError(null);
+  }
+
+  async function runRestore() {
+    if (!restoreShopTarget) return;
+    setRestorePhase("loading");
+    setRestoreError(null);
     try {
-      await restoreShop(shopId);
+      await restoreShop(restoreShopTarget.shop_id);
       await queryClient.invalidateQueries({ queryKey: ["shops"] });
-      appToast.success("Shop restored.");
+      setRestorePhase("success");
+      appToast.success(
+        "Shop restored. Status is inactive — activate if needed.",
+      );
+      window.setTimeout(() => {
+        setRestoreShopTarget(null);
+        setRestorePhase("confirm");
+        setRestoreError(null);
+      }, 900);
     } catch (err) {
-      const message = err instanceof ApiError ? err.message : "Restore failed";
+      const message = parseApiFormError(err, "Restore failed").message;
+      setRestorePhase("error");
+      setRestoreError(message);
       appToast.error(message);
     }
   }
@@ -310,7 +391,7 @@ export default function ShopsPage() {
       meta: { label: "Actions" },
       size: 92,
       cell: ({ row }) =>
-        row.original.is_deleted || row.original.status === "deleted" ? (
+        row.original.is_deleted ? (
           <Button
             type="button"
             variant="ghost"
@@ -318,7 +399,7 @@ export default function ShopsPage() {
             className="h-8 px-2"
             onClick={(event) => {
               event.stopPropagation();
-              void handleRestore(row.original.shop_id);
+              openRestore(row.original);
             }}
           >
             <RotateCcwIcon className="size-3.5" />
@@ -352,22 +433,22 @@ export default function ShopsPage() {
           />
         </AnimateIcon>
         <Select
-          value={status}
+          value={filter}
           onValueChange={(value) => {
             setPage(1);
-            setStatus(value ?? "all");
+            setFilter((value as ShopListFilter) ?? "all");
           }}
         >
-          <SelectTrigger className="w-[160px]">
-            <SelectValue placeholder="Status" />
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Filter" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All statuses</SelectItem>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="inactive">Inactive</SelectItem>
+            <SelectItem value="all">All shops</SelectItem>
+            <SelectItem value="active">Active only</SelectItem>
+            <SelectItem value="deleted">Deleted / trash</SelectItem>
             <SelectItem value="suspended">Suspended</SelectItem>
+            <SelectItem value="inactive">Inactive</SelectItem>
             <SelectItem value="blocked">Blocked</SelectItem>
-            <SelectItem value="deleted">Soft deleted</SelectItem>
           </SelectContent>
         </Select>
         <Button
@@ -410,6 +491,39 @@ export default function ShopsPage() {
           }}
         />
       ) : null}
+
+      <ShopConfirmDialog
+        open={restoreShopTarget != null}
+        phase={restorePhase}
+        title="Restore this shop?"
+        description="Clears the deleted flag. Status stays inactive — re-activate the shop if needed. Feature flags are left as they were."
+        confirmLabel="Restore shop"
+        icon={RotateCcwIcon}
+        iconClassName="bg-primary/10 text-primary"
+        shopName={
+          restoreShopTarget?.shop_name ??
+          restoreShopTarget?.profile?.shop_name ??
+          null
+        }
+        shopId={restoreShopTarget?.shop_id}
+        loadingTitle="Restoring shop…"
+        loadingDescription="Clearing the deleted flag."
+        successTitle="Shop restored"
+        successDescription="Status is inactive — activate if needed."
+        successActionLabel="Done"
+        errorTitle="Could not restore shop"
+        errorMessage={restoreError}
+        onOpenChange={(open) => {
+          if (!open) closeRestore();
+        }}
+        onConfirm={() => void runRestore()}
+        onSuccessAction={() => {
+          setRestoreShopTarget(null);
+          setRestorePhase("confirm");
+          setRestoreError(null);
+        }}
+        onRetry={() => void runRestore()}
+      />
     </PageShell>
   );
 }

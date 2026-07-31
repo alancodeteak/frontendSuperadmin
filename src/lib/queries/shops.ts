@@ -21,8 +21,8 @@ type ShopListParams = {
   limit?: number;
   q?: string;
   status?: ShopStatus | string;
-  include_deleted?: boolean;
-  deleted_only?: boolean;
+  /** `true` = only deleted, `false` = only non-deleted, omit = both */
+  deleted?: boolean;
 };
 
 export const shopKeys = {

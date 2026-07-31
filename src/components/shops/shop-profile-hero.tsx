@@ -269,16 +269,37 @@ export function ShopProfileHero({
                 {displayName}
               </h2>
               <StatusBadge status={shop.status} />
+              {shop.is_deleted ? <StatusBadge status="deleted" /> : null}
             </div>
-            <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-              <span className="font-mono text-xs">{shop.shop_id}</span>
-              <CopyButton
-                value={shop.shop_id}
-                iconOnly
-                size={13}
-                label="Copy shop ID"
-                className="size-7 p-0"
-              />
+            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="text-xs uppercase tracking-wide">Shop ID</span>
+                <span className="font-mono text-xs text-foreground">
+                  {shop.shop_id}
+                </span>
+                <CopyButton
+                  value={shop.shop_id}
+                  iconOnly
+                  size={13}
+                  label="Copy shop ID"
+                  className="size-7 p-0"
+                />
+              </span>
+              {shop.user_id != null ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="text-xs uppercase tracking-wide">User ID</span>
+                  <span className="font-mono text-xs text-foreground">
+                    {shop.user_id}
+                  </span>
+                  <CopyButton
+                    value={String(shop.user_id)}
+                    iconOnly
+                    size={13}
+                    label="Copy user ID"
+                    className="size-7 p-0"
+                  />
+                </span>
+              ) : null}
               {email ? <span>{email}</span> : null}
               {phone ? <span>{phone}</span> : null}
             </div>

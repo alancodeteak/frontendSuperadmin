@@ -14,6 +14,8 @@ export const siteConfig = {
   developmentMode: process.env.NEXT_PUBLIC_DEVELOPMENT_MODE === "true",
   numverifyAccessKey: process.env.NEXT_PUBLIC_NUMVERIFY_ACCESS_KEY ?? "",
   googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "",
+  /** Sent as `x-api-key` on admin-api requests (rewrite-forwarded). */
+  adminApiKey: process.env.NEXT_PUBLIC_ADMIN_API_KEY ?? "",
 } as const;
 
 export const navItems = [

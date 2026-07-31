@@ -14,6 +14,7 @@ import {
   mockPatchShop,
   mockPutDeliverySettings,
   mockPutPromotion,
+  mockRestoreShop,
   mockTriggerShopLogout,
 } from "@/lib/mock-data";
 import {
@@ -36,11 +37,24 @@ export function listShops(params?: {
   limit?: number;
   q?: string;
   status?: ShopStatus | string;
-  include_deleted?: boolean;
-  deleted_only?: boolean;
+  /** `true` = only deleted, `false` = only non-deleted, omit = both */
+  deleted?: boolean;
 }) {
   if (isDevelopmentMode()) return mockListShops(params);
-  return apiFetch<Paginated<ShopListItem>>("/v2/shops", { params });
+  return apiFetch<Paginated<ShopListItem>>("/v2/shops", {
+    params: {
+      page: params?.page,
+      limit: params?.limit,
+      q: params?.q,
+      status: params?.status,
+      deleted:
+        params?.deleted === undefined
+          ? undefined
+          : params.deleted
+            ? "true"
+            : "false",
+    },
+  });
 }
 
 /** Fetch every shop page until the full catalog is loaded. */
@@ -48,8 +62,7 @@ export async function listAllShops(params?: {
   q?: string;
   status?: ShopStatus | string;
   pageSize?: number;
-  include_deleted?: boolean;
-  deleted_only?: boolean;
+  deleted?: boolean;
 }) {
   const pageSize = params?.pageSize ?? 100;
   const all: ShopListItem[] = [];
@@ -62,8 +75,7 @@ export async function listAllShops(params?: {
       limit: pageSize,
       q: params?.q,
       status: params?.status,
-      include_deleted: params?.include_deleted,
-      deleted_only: params?.deleted_only,
+      deleted: params?.deleted,
     });
     const items = data.items ?? [];
     all.push(...items);
@@ -193,6 +205,55 @@ export function patchShop(shopId: string, input: Record<string, unknown>) {
   });
 }
 
+/** Feature flags to keep intact across soft-delete (backend may clear them). */
+export function shopFeatureFlagsFromDetail(
+  shop: Pick<
+    ShopDetail,
+    | "ecom_enabled"
+    | "ecom_slug"
+    | "ecom_order_confirmation_enabled"
+    | "scheduled_order"
+    | "merge_order"
+    | "features"
+  >,
+): Record<string, unknown> {
+  const f = shop.features ?? {};
+  return {
+    ecom_enabled: Boolean(f.ecom_enabled ?? shop.ecom_enabled),
+    ecom_order_confirmation_enabled: Boolean(
+      f.ecom_order_confirmation_enabled ?? shop.ecom_order_confirmation_enabled,
+    ),
+    scheduled_order: Boolean(f.scheduled_order ?? shop.scheduled_order),
+    merge_order: Boolean(f.merge_order ?? shop.merge_order),
+    return_option: Boolean(f.return_option),
+    customer_ticket: Boolean(f.customer_ticket),
+    ecom_slug: f.ecom_slug ?? shop.ecom_slug ?? undefined,
+    integration_enabled: Boolean(f.integration_enabled),
+    integration_rate_limit:
+      typeof f.integration_rate_limit === "number"
+        ? f.integration_rate_limit
+        : 100,
+  };
+}
+
+/**
+ * Soft-delete a shop without wiping feature flags (especially ecom_enabled).
+ * Some backends clear ecom on DELETE soft — we re-apply the previous flags.
+ */
+export async function softDeleteShop(
+  shopId: string,
+  shop?: Parameters<typeof shopFeatureFlagsFromDetail>[0] | null,
+) {
+  const features = shop ? shopFeatureFlagsFromDetail(shop) : null;
+  await deleteShop(shopId, false);
+  if (!features) return;
+  try {
+    await patchShop(shopId, features);
+  } catch {
+    // Shop may still be soft-deleted even if feature restore fails.
+  }
+}
+
 /** Upload shop logo/photo (R2 CDN). Accepts jpeg/png/webp. */
 export function patchShopPhoto(
   shopId: string,
@@ -207,7 +268,7 @@ export function clearShopPhoto(shopId: string) {
 }
 
 export function deleteShop(shopId: string, hard = false) {
-  if (isDevelopmentMode()) return mockDeleteShop(shopId);
+  if (isDevelopmentMode()) return mockDeleteShop(shopId, hard);
   return apiFetch<unknown>(`/v2/shops/${shopId}`, {
     method: "DELETE",
     params: { mode: hard ? "hard" : "soft" },
@@ -215,8 +276,10 @@ export function deleteShop(shopId: string, hard = false) {
 }
 
 export function restoreShop(shopId: string) {
-  if (isDevelopmentMode()) return mockPatchShop(shopId, { is_deleted: false });
-  return patchShop(shopId, { is_deleted: false });
+  if (isDevelopmentMode()) return mockRestoreShop(shopId);
+  return apiFetch<ShopDetail>(`/v2/shops/${shopId}/restore`, {
+    method: "POST",
+  });
 }
 
 export function resetShopPassword(shopId: string, password: string) {

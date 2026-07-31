@@ -76,7 +76,7 @@ export function StatusBadge({
   const tone =
     value === "active"
       ? "bg-emerald-500/10 text-emerald-700"
-      : value === "blocked" || value === "suspended"
+      : value === "blocked" || value === "suspended" || value === "deleted"
         ? "bg-destructive/10 text-destructive"
         : "bg-muted text-muted-foreground";
 

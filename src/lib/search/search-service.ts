@@ -39,9 +39,13 @@ async function adminFetch<T>(
   }
 
   try {
+    const apiKey =
+      process.env.ADMIN_API_KEY?.trim() ||
+      process.env.NEXT_PUBLIC_ADMIN_API_KEY?.trim();
     const response = await fetch(url.toString(), {
       headers: {
         Accept: "application/json",
+        ...(apiKey ? { "x-api-key": apiKey } : {}),
         ...(authHeader ? { Authorization: authHeader } : {}),
       },
       cache: "no-store",

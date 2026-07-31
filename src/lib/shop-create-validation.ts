@@ -1,4 +1,5 @@
 import type { CreateShopInput, ShopAddress } from "@/types/api";
+import { humanizeApiMessage } from "@/lib/api-form-error";
 
 /** Matches admin-api / Postman create-shop contract. Cache-bust: wizard-step-valid-v2 */
 export const SHOP_ID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{2,49}$/;
@@ -424,19 +425,22 @@ export function mapApiErrorsToFields(err: {
         const msg = typeof row.message === "string" ? row.message : "";
         if (!path || !msg) continue;
         const key = path.split(".")[0];
+        const friendly = humanizeApiMessage(
+          path && msg.includes(path) ? msg : `${path}: ${msg}`,
+        );
         if (key === "address") {
           const nested = path.split(".")[1] as CreateShopField | undefined;
-          if (nested) errors[nested] = msg;
-          else errors.address_line_1 = msg;
+          if (nested) errors[nested] = friendly;
+          else errors.address_line_1 = friendly;
         } else {
-          errors[key as CreateShopField] = msg;
+          errors[key as CreateShopField] = friendly;
         }
       }
     }
   }
 
   if (Object.keys(errors).length === 0 && err.message) {
-    errors.form = err.message;
+    errors.form = humanizeApiMessage(err.message);
   }
   return errors;
 }

@@ -207,6 +207,8 @@ Copy `.env.example` → `.env.local`.
 | -------- | ------- |
 | `NEXT_PUBLIC_API_BASE_URL` | Browser API path (default `/api`) |
 | `API_PROXY_TARGET` | Backend origin for `/api` rewrite (no `/api` suffix) |
+| `ADMIN_API_KEY` | Server-only key for middleware / search sync (`x-api-key`) |
+| `NEXT_PUBLIC_ADMIN_API_KEY` | Browser key sent as `x-api-key` on admin-api requests |
 | `NEXT_PUBLIC_DMS_API_BASE_URL` | Browser DMS path (default `/dms-api`) |
 | `DMS_API_PROXY_TARGET` | DMS origin for `/dms-api` rewrite |
 | `NEXT_PUBLIC_TUNNEL_HOST` | Cloudflare hostname |

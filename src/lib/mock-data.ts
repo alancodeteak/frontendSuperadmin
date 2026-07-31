@@ -39,6 +39,7 @@ const mockShops: ShopListItem[] = [
     phone: "+971501234567",
     email: "alnoor@example.com",
     status: "active",
+    is_deleted: false,
     ecom_enabled: true,
     ecom_slug: "al-noor-kitchen",
     ecom_order_confirmation_enabled: true,
@@ -64,6 +65,7 @@ const mockShops: ShopListItem[] = [
     phone: "+971509876543",
     email: "marina@example.com",
     status: "active",
+    is_deleted: false,
     ecom_enabled: true,
     ecom_slug: "marina-bites",
     ecom_order_confirmation_enabled: false,
@@ -88,6 +90,7 @@ const mockShops: ShopListItem[] = [
     phone: "+971551112233",
     email: "corniche@example.com",
     status: "inactive",
+    is_deleted: false,
     ecom_enabled: false,
     ecom_slug: "corniche-grill",
     ecom_order_confirmation_enabled: false,
@@ -99,9 +102,30 @@ const mockShops: ShopListItem[] = [
       latitude: 24.4764,
       longitude: 54.3705,
     },
-    photo: null,
-    created_at: "2026-03-15T08:00:00Z",
-    updated_at: "2026-06-01T10:00:00Z",
+    created_at: "2026-03-01T08:00:00Z",
+    updated_at: "2026-07-10T10:00:00Z",
+  },
+  {
+    shop_id: "SHOP004",
+    user_id: 100004,
+    shop_name: "Desert Deli (Deleted)",
+    phone: "+971501119998",
+    email: "desert@example.com",
+    status: "inactive",
+    is_deleted: true,
+    ecom_enabled: false,
+    ecom_slug: "desert-deli",
+    ecom_order_confirmation_enabled: false,
+    scheduled_order: false,
+    merge_order: false,
+    address: {
+      address_line_1: "Al Quoz",
+      city: "Dubai",
+      latitude: 25.14,
+      longitude: 55.23,
+    },
+    created_at: "2026-01-01T08:00:00Z",
+    updated_at: "2026-07-25T10:00:00Z",
   },
 ];
 
@@ -322,26 +346,40 @@ export async function mockListShops(params?: {
   limit?: number;
   q?: string;
   status?: string;
-  include_deleted?: boolean;
-  deleted_only?: boolean;
+  deleted?: boolean;
 }): Promise<Paginated<ShopListItem>> {
   let items = [...mockShops];
-  if (params?.deleted_only) {
-    items = items.filter((s) => s.is_deleted === true || s.status === "deleted");
-  } else if (!params?.include_deleted) {
-    items = items.filter((s) => s.is_deleted !== true && s.status !== "deleted");
+
+  if (params?.deleted === true) {
+    items = items.filter((s) => s.is_deleted === true);
+  } else if (params?.deleted === false) {
+    items = items.filter((s) => s.is_deleted !== true);
   }
+
   if (params?.q) {
     const q = params.q.toLowerCase();
     items = items.filter(
       (s) =>
         s.shop_name.toLowerCase().includes(q) ||
-        s.shop_id.toLowerCase().includes(q),
+        s.shop_id.toLowerCase().includes(q) ||
+        String(s.email ?? "")
+          .toLowerCase()
+          .includes(q) ||
+        String(s.phone ?? "").includes(q),
     );
   }
   if (params?.status) {
     items = items.filter((s) => s.status === params.status);
   }
+
+  // Active (non-deleted) first, then deleted — both by name
+  items.sort((a, b) => {
+    const aDeleted = a.is_deleted === true ? 1 : 0;
+    const bDeleted = b.is_deleted === true ? 1 : 0;
+    if (aDeleted !== bDeleted) return aDeleted - bDeleted;
+    return a.shop_name.localeCompare(b.shop_name);
+  });
+
   return delay({
     items,
     page: params?.page ?? 1,
@@ -365,6 +403,7 @@ export async function mockCreateShop(input: CreateShopInput): Promise<ShopDetail
     phone: input.phone ?? null,
     email: input.email ?? null,
     status: "active",
+    is_deleted: false,
     ecom_enabled: input.ecom_enabled ?? false,
     ecom_slug: input.ecom_slug ?? null,
     ecom_order_confirmation_enabled:
@@ -420,6 +459,14 @@ export async function mockGetShop(shopId: string): Promise<ShopDetail> {
     },
     products: { items: mockProducts, total: mockProducts.length },
     delivery: {
+      delivery_time: 30,
+      self_assigned: false,
+      pickup_disabled: false,
+      bonus_penalty: false,
+      bonus_penalty_start_status: "assigned",
+      common_penalty_enabled: false,
+      common_penalty_idle_minutes: 45,
+      common_penalty_min_online_minutes: 45,
       radius_km: 8,
       base_fee: 8,
       free_delivery_min: 80,
@@ -538,17 +585,46 @@ export async function mockPatchShop(
   });
 }
 
-export async function mockDeleteShop(shopId: string) {
+export async function mockDeleteShop(shopId: string, hard = false) {
   const idx = mockShops.findIndex((s) => s.shop_id === shopId);
-  if (idx >= 0) {
-    mockShops[idx] = {
-      ...mockShops[idx],
-      is_deleted: true,
-      status: "deleted",
-      updated_at: new Date().toISOString(),
-    };
+  if (idx < 0) {
+    return delay({ ok: true, mode: hard ? "hard" : "soft" });
   }
+
+  if (hard) {
+    mockShops.splice(idx, 1);
+    return delay({ ok: true, mode: "hard" });
+  }
+
+  // Soft delete only marks deleted — do not clear ecom / feature flags.
+  mockShops[idx] = {
+    ...mockShops[idx],
+    is_deleted: true,
+    status: "inactive",
+    updated_at: new Date().toISOString(),
+  };
   return delay({ ok: true, is_deleted: true, mode: "soft" });
+}
+
+export async function mockRestoreShop(shopId: string): Promise<ShopDetail> {
+  const idx = mockShops.findIndex((s) => s.shop_id === shopId);
+  if (idx < 0) {
+    throw Object.assign(new Error("Shop not found"), { status: 404 });
+  }
+  if (mockShops[idx].is_deleted !== true) {
+    throw Object.assign(
+      new Error(`Shop ${shopId} is not deleted`),
+      { status: 409, code: "shop_not_deleted" },
+    );
+  }
+  mockShops[idx] = {
+    ...mockShops[idx],
+    is_deleted: false,
+    // status stays inactive after restore
+    status: "inactive",
+    updated_at: new Date().toISOString(),
+  };
+  return mockGetShop(shopId);
 }
 
 export async function mockGetShopActivity(): Promise<ShopActivityResponse> {
@@ -606,6 +682,10 @@ export async function mockGetDeliverySettings(): Promise<Record<string, unknown>
     self_assigned: true,
     pickup_disabled: false,
     bonus_penalty: false,
+    bonus_penalty_start_status: "assigned",
+    common_penalty_enabled: false,
+    common_penalty_idle_minutes: 45,
+    common_penalty_min_online_minutes: 45,
     radius_km: 8,
     base_fee: 8,
     free_delivery_min: 80,
