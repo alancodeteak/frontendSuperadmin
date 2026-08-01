@@ -24,6 +24,7 @@ import {
 } from "@/components/shops/shop-confirm-dialog";
 import { RiderEditDialog } from "@/components/shops/rider-edit-dialog";
 import { CopyButton } from "@/components/shared/copy-button";
+import { DetailList } from "@/components/shared/detail-list";
 import {
   EmptyState,
   ErrorState,
@@ -171,41 +172,6 @@ function Field({
         {label}
       </Label>
       {children}
-    </div>
-  );
-}
-
-function CopyableDetail({
-  label,
-  value,
-  className,
-}: {
-  label: string;
-  value?: string | null;
-  className?: string;
-}) {
-  const text = typeof value === "string" ? value.trim() : "";
-
-  return (
-    <div className={cn("rounded-xl border bg-card p-3", className)}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-            {label}
-          </p>
-          <p className="mt-1 break-all text-sm font-medium">
-            {text || "—"}
-          </p>
-        </div>
-        <CopyButton
-          value={text}
-          iconOnly
-          size={13}
-          label={`Copy ${label}`}
-          className="size-8 shrink-0 p-0"
-          disabled={!text}
-        />
-      </div>
     </div>
   );
 }
@@ -765,42 +731,37 @@ function OverviewTab({
         title="Account"
         description="Immutable identifiers and account status."
       >
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          <CopyableDetail label="Shop ID" value={shop.shop_id} />
-          <CopyableDetail
-            label="User ID"
-            value={shop.user_id != null ? String(shop.user_id) : null}
-          />
-          <CopyableDetail label="Status" value={String(shop.status ?? "")} />
-          <CopyableDetail
-            label="Status reason"
-            value={shop.status_reason}
-          />
-          <CopyableDetail
-            label="Group ID"
-            value={shop.group_id != null ? String(shop.group_id) : null}
-          />
-          <CopyableDetail
-            label="Subscription ID"
-            value={
-              shop.subscription_id != null
-                ? String(shop.subscription_id)
-                : null
-            }
-          />
-          <CopyableDetail
-            label="Created at"
-            value={formatDetailDate(shop.created_at)}
-          />
-          <CopyableDetail
-            label="Updated at"
-            value={formatDetailDate(shop.updated_at)}
-          />
-          <CopyableDetail
-            label="Deleted"
-            value={shop.is_deleted ? "Yes" : "No"}
-          />
-        </div>
+        <DetailList
+          items={[
+            { label: "Shop ID", value: shop.shop_id },
+            {
+              label: "User ID",
+              value: shop.user_id != null ? String(shop.user_id) : null,
+            },
+            { label: "Status", value: String(shop.status ?? "") },
+            { label: "Status reason", value: shop.status_reason },
+            {
+              label: "Group ID",
+              value: shop.group_id != null ? String(shop.group_id) : null,
+            },
+            {
+              label: "Subscription ID",
+              value:
+                shop.subscription_id != null
+                  ? String(shop.subscription_id)
+                  : null,
+            },
+            {
+              label: "Created at",
+              value: formatDetailDate(shop.created_at),
+            },
+            {
+              label: "Updated at",
+              value: formatDetailDate(shop.updated_at),
+            },
+            { label: "Deleted", value: shop.is_deleted ? "Yes" : "No" },
+          ]}
+        />
       </ShopSection>
 
       <ShopSection
@@ -811,236 +772,297 @@ function OverviewTab({
             <Button
               type="button"
               variant="outline"
+              size="sm"
               onClick={() => setEditing(true)}
             >
+              <PencilIcon className="size-3.5" />
               Edit
             </Button>
           ) : null
         }
       >
-        <form onSubmit={onSave} className="space-y-8">
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            <CopyableDetail label="Shop name" value={form.shop_name} />
-            <CopyableDetail label="Second name" value={form.second_name} />
-            <CopyableDetail label="Phone" value={form.phone} />
-            <CopyableDetail label="Email" value={form.email} />
-            <CopyableDetail label="Ecom slug" value={form.ecom_slug} />
-            <CopyableDetail
-              label="Shop license no"
-              value={form.shop_license_no}
+        {!editing ? (
+          <div className="space-y-8">
+            <DetailList
+              items={[
+                { label: "Shop name", value: form.shop_name },
+                { label: "Second name", value: form.second_name },
+                { label: "Phone", value: form.phone },
+                { label: "Email", value: form.email },
+                { label: "Ecom slug", value: form.ecom_slug },
+                { label: "Shop license no", value: form.shop_license_no },
+                {
+                  label: "Contact person number",
+                  value: form.contact_person_number,
+                },
+                {
+                  label: "Contact person email",
+                  value: form.contact_person_email,
+                },
+                { label: "UPI ID", value: form.upi_id },
+                {
+                  label: "VAT enabled",
+                  value: form.vat_enabled ? "Yes" : "No",
+                },
+                { label: "VAT %", value: form.vat },
+                {
+                  label: "Enable promotion",
+                  value: form.enable_promotion ? "Yes" : "No",
+                },
+                {
+                  label: "Photo",
+                  value: profile?.photo ?? shop.photo,
+                },
+                {
+                  label: "Photo URL",
+                  value: profile?.photo_url ?? shop.photo_url,
+                },
+              ]}
             />
-            <CopyableDetail
-              label="Contact person number"
-              value={form.contact_person_number}
-            />
-            <CopyableDetail
-              label="Contact person email"
-              value={form.contact_person_email}
-            />
-            <CopyableDetail label="UPI ID" value={form.upi_id} />
-            <CopyableDetail
-              label="VAT enabled"
-              value={form.vat_enabled ? "Yes" : "No"}
-            />
-            <CopyableDetail label="VAT %" value={form.vat} />
-            <CopyableDetail
-              label="Enable promotion"
-              value={form.enable_promotion ? "Yes" : "No"}
-            />
-            <CopyableDetail
-              label="Photo"
-              value={profile?.photo ?? shop.photo}
-            />
-            <CopyableDetail
-              label="Photo URL"
-              value={profile?.photo_url ?? shop.photo_url}
-            />
-          </div>
 
-          <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
-            {(
-              [
-                ["shop_name", "Shop name", form.shop_name],
-                ["second_name", "Second name", form.second_name],
-                ["status_reason", "Status reason", form.status_reason],
-                ["phone", "Phone", form.phone],
-                ["email", "Email", form.email],
-                ["shop_license_no", "Shop license no", form.shop_license_no],
-                ["upi_id", "UPI ID", form.upi_id],
-                [
-                  "contact_person_number",
-                  "Contact person number",
-                  form.contact_person_number,
-                ],
-                [
-                  "contact_person_email",
-                  "Contact person email",
-                  form.contact_person_email,
-                ],
-                ["vat", "VAT %", form.vat],
-              ] as const
-            ).map(([key, label, value]) => (
-              <Field key={key} label={label}>
-                <Input
-                  id={`overview_${key}`}
-                  data-field={key}
-                  value={value}
-                  disabled={!editing}
-                  aria-invalid={overviewFieldInvalid(key) || undefined}
-                  className={
-                    overviewFieldInvalid(key)
-                      ? "border-destructive focus-visible:ring-destructive/30"
-                      : undefined
-                  }
-                  onChange={(e) => updateOverviewField(key, e.target.value)}
-                />
-                {fieldErrors[key] ? (
-                  <p className="mt-1.5 text-xs font-medium text-destructive">
-                    {fieldErrors[key]}
-                  </p>
-                ) : null}
-              </Field>
-            ))}
-            <Field label="Status">
-              <div
-                data-field="status"
-                className={
-                  overviewFieldInvalid("status")
-                    ? "rounded-lg ring-2 ring-destructive/40"
-                    : undefined
-                }
-              >
-                <Select
-                  value={form.status}
-                  disabled={!editing}
-                  onValueChange={(value) =>
-                    updateOverviewField("status", value ?? "active")
-                  }
-                >
-                  <SelectTrigger
-                    id="overview_status"
-                    aria-invalid={overviewFieldInvalid("status") || undefined}
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
-                    <SelectItem value="suspended">Suspended</SelectItem>
-                    <SelectItem value="blocked">Blocked</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              {fieldErrors.status ? (
-                <p className="mt-1.5 text-xs font-medium text-destructive">
-                  {fieldErrors.status}
-                </p>
-              ) : null}
-            </Field>
-            <Field label="Ecom slug">
-              <Input
-                id="overview_ecom_slug"
-                data-field="ecom_slug"
-                value={form.ecom_slug}
-                disabled
-                readOnly
-              />
-            </Field>
-            <label
-              data-field="vat_enabled"
-              className={`flex items-center gap-2 text-sm sm:col-span-2 ${
-                overviewFieldInvalid("vat_enabled")
-                  ? "rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2"
-                  : ""
-              }`}
-            >
-              <input
-                type="checkbox"
-                className="size-4 accent-primary"
-                checked={form.vat_enabled}
-                disabled={!editing}
-                onChange={(e) =>
-                  updateOverviewField("vat_enabled", e.target.checked)
-                }
-              />
-              VAT enabled
-            </label>
-            <label
-              data-field="enable_promotion"
-              className={`flex items-center gap-2 text-sm sm:col-span-2 ${
-                overviewFieldInvalid("enable_promotion")
-                  ? "rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2"
-                  : ""
-              }`}
-            >
-              <input
-                type="checkbox"
-                className="size-4 accent-primary"
-                checked={form.enable_promotion}
-                disabled={!editing}
-                onChange={(e) =>
-                  updateOverviewField("enable_promotion", e.target.checked)
-                }
-              />
-              Enable promotion
-            </label>
-          </div>
-
-          <div className="border-t pt-6">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <div>
+            <div>
+              <div className="mb-1 flex items-center justify-between gap-3 border-b border-border/70 pb-2">
                 <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
                   Location
                 </p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Used for maps, delivery radius, and shop discovery.
-                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setLocationOpen(true)}
+                >
+                  Update location
+                </Button>
               </div>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                disabled={!editing}
-                onClick={() => setLocationOpen(true)}
+              <DetailList
+                items={[
+                  {
+                    label: "Address line 1",
+                    value: address?.address_line_1,
+                  },
+                  {
+                    label: "Address line 2",
+                    value: address?.address_line_2,
+                  },
+                  { label: "Locality", value: address?.locality },
+                  { label: "City", value: address?.city },
+                  {
+                    label: "Latitude",
+                    value:
+                      address?.latitude != null
+                        ? String(address.latitude)
+                        : null,
+                  },
+                  {
+                    label: "Longitude",
+                    value:
+                      address?.longitude != null
+                        ? String(address.longitude)
+                        : null,
+                  },
+                  {
+                    label: "Contact number",
+                    value: address?.contact_number,
+                  },
+                  { label: "Full address", value: addressLabel },
+                  { label: "Coordinates", value: coordinates },
+                ]}
+              />
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={onSave} className="space-y-8">
+            <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
+              {(
+                [
+                  ["shop_name", "Shop name", form.shop_name],
+                  ["second_name", "Second name", form.second_name],
+                  ["status_reason", "Status reason", form.status_reason],
+                  ["phone", "Phone", form.phone],
+                  ["email", "Email", form.email],
+                  ["shop_license_no", "Shop license no", form.shop_license_no],
+                  ["upi_id", "UPI ID", form.upi_id],
+                  [
+                    "contact_person_number",
+                    "Contact person number",
+                    form.contact_person_number,
+                  ],
+                  [
+                    "contact_person_email",
+                    "Contact person email",
+                    form.contact_person_email,
+                  ],
+                  ["vat", "VAT %", form.vat],
+                ] as const
+              ).map(([key, label, value]) => (
+                <Field key={key} label={label}>
+                  <Input
+                    id={`overview_${key}`}
+                    data-field={key}
+                    value={value}
+                    aria-invalid={overviewFieldInvalid(key) || undefined}
+                    className={
+                      overviewFieldInvalid(key)
+                        ? "border-destructive focus-visible:ring-destructive/30"
+                        : undefined
+                    }
+                    onChange={(e) => updateOverviewField(key, e.target.value)}
+                  />
+                  {fieldErrors[key] ? (
+                    <p className="mt-1.5 text-xs font-medium text-destructive">
+                      {fieldErrors[key]}
+                    </p>
+                  ) : null}
+                </Field>
+              ))}
+              <Field label="Status">
+                <div
+                  data-field="status"
+                  className={
+                    overviewFieldInvalid("status")
+                      ? "rounded-lg ring-2 ring-destructive/40"
+                      : undefined
+                  }
+                >
+                  <Select
+                    value={form.status}
+                    onValueChange={(value) =>
+                      updateOverviewField("status", value ?? "active")
+                    }
+                  >
+                    <SelectTrigger
+                      id="overview_status"
+                      aria-invalid={
+                        overviewFieldInvalid("status") || undefined
+                      }
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                      <SelectItem value="suspended">Suspended</SelectItem>
+                      <SelectItem value="blocked">Blocked</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {fieldErrors.status ? (
+                  <p className="mt-1.5 text-xs font-medium text-destructive">
+                    {fieldErrors.status}
+                  </p>
+                ) : null}
+              </Field>
+              <Field label="Ecom slug">
+                <Input
+                  id="overview_ecom_slug"
+                  data-field="ecom_slug"
+                  value={form.ecom_slug}
+                  disabled
+                  readOnly
+                />
+              </Field>
+              <label
+                data-field="vat_enabled"
+                className={`flex items-center gap-2 text-sm sm:col-span-2 ${
+                  overviewFieldInvalid("vat_enabled")
+                    ? "rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2"
+                    : ""
+                }`}
               >
-                Update location
-              </Button>
+                <input
+                  type="checkbox"
+                  className="size-4 accent-primary"
+                  checked={form.vat_enabled}
+                  onChange={(e) =>
+                    updateOverviewField("vat_enabled", e.target.checked)
+                  }
+                />
+                VAT enabled
+              </label>
+              <label
+                data-field="enable_promotion"
+                className={`flex items-center gap-2 text-sm sm:col-span-2 ${
+                  overviewFieldInvalid("enable_promotion")
+                    ? "rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2"
+                    : ""
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  className="size-4 accent-primary"
+                  checked={form.enable_promotion}
+                  onChange={(e) =>
+                    updateOverviewField("enable_promotion", e.target.checked)
+                  }
+                />
+                Enable promotion
+              </label>
             </div>
-            <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              <CopyableDetail
-                label="Address line 1"
-                value={address?.address_line_1}
-              />
-              <CopyableDetail
-                label="Address line 2"
-                value={address?.address_line_2}
-              />
-              <CopyableDetail label="Locality" value={address?.locality} />
-              <CopyableDetail label="City" value={address?.city} />
-              <CopyableDetail label="Latitude" value={
-                address?.latitude != null ? String(address.latitude) : null
-              } />
-              <CopyableDetail label="Longitude" value={
-                address?.longitude != null ? String(address.longitude) : null
-              } />
-              <CopyableDetail
-                label="Contact number"
-                value={address?.contact_number}
-              />
-              <CopyableDetail label="Full address" value={addressLabel} />
-              <CopyableDetail label="Coordinates" value={coordinates} />
-            </div>
-          </div>
 
-          {error ? (
-          <div
-            role="alert"
-            className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
-          >
-            {error}
-          </div>
-        ) : null}
-          {editing ? (
+            <div className="border-t pt-6">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                    Location
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Used for maps, delivery radius, and shop discovery.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setLocationOpen(true)}
+                >
+                  Update location
+                </Button>
+              </div>
+              <DetailList
+                items={[
+                  {
+                    label: "Address line 1",
+                    value: address?.address_line_1,
+                  },
+                  {
+                    label: "Address line 2",
+                    value: address?.address_line_2,
+                  },
+                  { label: "Locality", value: address?.locality },
+                  { label: "City", value: address?.city },
+                  {
+                    label: "Latitude",
+                    value:
+                      address?.latitude != null
+                        ? String(address.latitude)
+                        : null,
+                  },
+                  {
+                    label: "Longitude",
+                    value:
+                      address?.longitude != null
+                        ? String(address.longitude)
+                        : null,
+                  },
+                  {
+                    label: "Contact number",
+                    value: address?.contact_number,
+                  },
+                  { label: "Full address", value: addressLabel },
+                  { label: "Coordinates", value: coordinates },
+                ]}
+              />
+            </div>
+
+            {error ? (
+              <div
+                role="alert"
+                className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+              >
+                {error}
+              </div>
+            ) : null}
+
             <div className="flex gap-2">
               <Button
                 type="button"
@@ -1058,8 +1080,8 @@ function OverviewTab({
                 {saving ? "Saving…" : "Save changes"}
               </Button>
             </div>
-          ) : null}
-        </form>
+          </form>
+        )}
       </ShopSection>
 
       <ShopSection
@@ -1462,10 +1484,14 @@ function FeaturesTab({
           />
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <CopyableDetail
-            label="Has integration token"
-            value={form.has_integration_token ? "Yes" : "No"}
+        <div className="space-y-4">
+          <DetailList
+            items={[
+              {
+                label: "Has integration token",
+                value: form.has_integration_token ? "Yes" : "No",
+              },
+            ]}
           />
           <Field label="Integration rate limit">
             <Input
@@ -2026,20 +2052,21 @@ function SubscriptionTab({
     <div className="grid gap-12 lg:grid-cols-2">
       <div className="space-y-8">
         <ShopSection title="Subscription identifiers" className="max-w-none">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <CopyableDetail
-              label="Subscription ID (shop)"
-              value={
-                shop.subscription_id != null
-                  ? String(shop.subscription_id)
-                  : null
-              }
-            />
-            <CopyableDetail
-              label="Has embedded subscription"
-              value={shop.subscription ? "Yes" : "No"}
-            />
-          </div>
+          <DetailList
+            items={[
+              {
+                label: "Subscription ID (shop)",
+                value:
+                  shop.subscription_id != null
+                    ? String(shop.subscription_id)
+                    : null,
+              },
+              {
+                label: "Has embedded subscription",
+                value: shop.subscription ? "Yes" : "No",
+              },
+            ]}
+          />
         </ShopSection>
 
         <ShopSection title="Active subscription" className="max-w-none">
@@ -2168,6 +2195,7 @@ function PromotionTab({
   const [form, setForm] = useState(() =>
     promotionFormFromData(shop.promotion),
   );
+  const [editing, setEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -2197,6 +2225,7 @@ function PromotionTab({
       });
       appToast.success("Promotion saved.");
       await promotionQuery.refetch();
+      setEditing(false);
     } catch (err) {
       const msg = parseApiFormError(err, "Save failed").message;
       setError(msg);
@@ -2210,80 +2239,112 @@ function PromotionTab({
     <ShopSection
       title="Promotion"
       description="Marketing content shown to customers for this shop."
-    >
-      <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        <CopyableDetail label="Promotion header" value={form.promotion_header} />
-        <CopyableDetail
-          label="Promotion content"
-          value={form.promotion_content}
-        />
-        <CopyableDetail label="Promotion link" value={form.promotion_link} />
-        <CopyableDetail
-          label="Promotion image S3 key"
-          value={form.promotion_image_s3_key}
-        />
-        <CopyableDetail
-          label="Marketing enabled"
-          value={form.is_marketing_enabled ? "Yes" : "No"}
-        />
-      </div>
-
-      <form onSubmit={onSave} className="max-w-xl space-y-4">
-        <Field label="Header">
-          <Input
-            value={form.promotion_header}
-            onChange={(e) =>
-              setForm({ ...form, promotion_header: e.target.value })
-            }
-          />
-        </Field>
-        <Field label="Content">
-          <Textarea
-            value={form.promotion_content}
-            onChange={(e) =>
-              setForm({ ...form, promotion_content: e.target.value })
-            }
-          />
-        </Field>
-        <Field label="Link">
-          <Input
-            value={form.promotion_link}
-            onChange={(e) =>
-              setForm({ ...form, promotion_link: e.target.value })
-            }
-          />
-        </Field>
-        <Field label="Promotion image S3 key">
-          <Input
-            value={form.promotion_image_s3_key}
-            onChange={(e) =>
-              setForm({ ...form, promotion_image_s3_key: e.target.value })
-            }
-          />
-        </Field>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            className="size-4 accent-primary"
-            checked={form.is_marketing_enabled}
-            onChange={(e) =>
-              setForm({ ...form, is_marketing_enabled: e.target.checked })
-            }
-          />
-          Marketing enabled
-        </label>
-        {error ? (
-          <div
-            role="alert"
-            className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+      actions={
+        !editing ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setEditing(true)}
           >
-            {error}
+            <PencilIcon className="size-3.5" />
+            Edit
+          </Button>
+        ) : null
+      }
+    >
+      {!editing ? (
+        <DetailList
+          items={[
+            { label: "Promotion header", value: form.promotion_header },
+            { label: "Promotion content", value: form.promotion_content },
+            { label: "Promotion link", value: form.promotion_link },
+            {
+              label: "Promotion image S3 key",
+              value: form.promotion_image_s3_key,
+            },
+            {
+              label: "Marketing enabled",
+              value: form.is_marketing_enabled ? "Yes" : "No",
+            },
+          ]}
+        />
+      ) : (
+        <form onSubmit={onSave} className="max-w-xl space-y-4">
+          <Field label="Header">
+            <Input
+              value={form.promotion_header}
+              onChange={(e) =>
+                setForm({ ...form, promotion_header: e.target.value })
+              }
+            />
+          </Field>
+          <Field label="Content">
+            <Textarea
+              value={form.promotion_content}
+              onChange={(e) =>
+                setForm({ ...form, promotion_content: e.target.value })
+              }
+            />
+          </Field>
+          <Field label="Link">
+            <Input
+              value={form.promotion_link}
+              onChange={(e) =>
+                setForm({ ...form, promotion_link: e.target.value })
+              }
+            />
+          </Field>
+          <Field label="Promotion image S3 key">
+            <Input
+              value={form.promotion_image_s3_key}
+              onChange={(e) =>
+                setForm({ ...form, promotion_image_s3_key: e.target.value })
+              }
+            />
+          </Field>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="size-4 accent-primary"
+              checked={form.is_marketing_enabled}
+              onChange={(e) =>
+                setForm({ ...form, is_marketing_enabled: e.target.checked })
+              }
+            />
+            Marketing enabled
+          </label>
+          {error ? (
+            <div
+              role="alert"
+              className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+            >
+              {error}
+            </div>
+          ) : null}
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={saving}
+              onClick={() => {
+                setForm(
+                  promotionFormFromData(
+                    promotionQuery.data ?? shop.promotion,
+                  ),
+                );
+                setEditing(false);
+                setError(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={saving}>
+              {saving ? "Saving…" : "Save promotion"}
+            </Button>
           </div>
-        ) : null}
-        <Button type="submit" disabled={saving}>
-          {saving ? "Saving…" : "Save promotion"}
-        </Button>
-      </form>
+        </form>
+      )}
     </ShopSection>
   );
 }

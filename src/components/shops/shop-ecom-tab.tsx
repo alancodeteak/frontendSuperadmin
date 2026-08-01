@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { PencilIcon } from "lucide-react";
 
-import { CopyButton } from "@/components/shared/copy-button";
+import { DetailList } from "@/components/shared/detail-list";
 import {
   OperatingHoursDisplay,
   OperatingHoursEditor,
@@ -18,7 +18,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { parseApiFormError } from "@/lib/api-form-error";
 import { appToast } from "@/lib/app-toast";
 import { patchShop } from "@/lib/api/shops";
-import { cn } from "@/lib/utils";
 import type { ShopDetail, ShopEcomSettings } from "@/types/api";
 
 function ShopSection({
@@ -67,39 +66,6 @@ function Field({
         {label}
       </Label>
       {children}
-    </div>
-  );
-}
-
-function CopyableDetail({
-  label,
-  value,
-  className,
-}: {
-  label: string;
-  value?: string | null;
-  className?: string;
-}) {
-  const text = typeof value === "string" ? value.trim() : "";
-
-  return (
-    <div className={cn("rounded-xl border bg-card p-3", className)}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-            {label}
-          </p>
-          <p className="mt-1 break-all text-sm font-medium">{text || "—"}</p>
-        </div>
-        <CopyButton
-          value={text}
-          iconOnly
-          size={13}
-          label={`Copy ${label}`}
-          className="size-8 shrink-0 p-0"
-          disabled={!text}
-        />
-      </div>
     </div>
   );
 }
@@ -316,60 +282,53 @@ export function ShopEcomTab({
       ) : null}
 
       {!editing ? (
-        <div className="space-y-6">
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            <CopyableDetail label="Domain" value={ecom?.domain} />
-            <CopyableDetail
-              label="Min order amount"
-              value={
-                ecom?.min_order_amount != null
-                  ? String(ecom.min_order_amount)
-                  : null
-              }
-            />
-            <CopyableDetail
-              label="Delivery radius (km)"
-              value={
-                ecom?.delivery_radius_km != null
-                  ? String(ecom.delivery_radius_km)
-                  : null
-              }
-            />
-            <CopyableDetail
-              label="WhatsApp order template"
-              value={ecom?.whatsapp_order_template}
-            />
-            <CopyableDetail
-              label="Payment methods"
-              value={formatDetailValue(ecom?.payment_methods)}
-            />
-            <CopyableDetail label="SEO title" value={ecom?.seo_title} />
-            <CopyableDetail
-              label="SEO description"
-              value={ecom?.seo_description}
-            />
-            <CopyableDetail label="SEO keywords" value={ecom?.seo_keywords} />
-            <CopyableDetail label="OG title" value={ecom?.og_title} />
-            <CopyableDetail
-              label="OG description"
-              value={ecom?.og_description}
-            />
-            <CopyableDetail label="OG image" value={ecom?.og_image} />
-            <CopyableDetail label="Twitter card" value={ecom?.twitter_card} />
-            <CopyableDetail
-              label="Robots index"
-              value={
-                ecom?.robots_index == null
-                  ? null
-                  : ecom.robots_index
-                    ? "Yes"
-                    : "No"
-              }
-            />
-          </div>
+        <div className="space-y-8">
+          <DetailList
+            items={[
+              { label: "Domain", value: ecom?.domain },
+              {
+                label: "Min order amount",
+                value:
+                  ecom?.min_order_amount != null
+                    ? String(ecom.min_order_amount)
+                    : null,
+              },
+              {
+                label: "Delivery radius (km)",
+                value:
+                  ecom?.delivery_radius_km != null
+                    ? String(ecom.delivery_radius_km)
+                    : null,
+              },
+              {
+                label: "WhatsApp order template",
+                value: ecom?.whatsapp_order_template,
+              },
+              {
+                label: "Payment methods",
+                value: formatDetailValue(ecom?.payment_methods),
+              },
+              { label: "SEO title", value: ecom?.seo_title },
+              { label: "SEO description", value: ecom?.seo_description },
+              { label: "SEO keywords", value: ecom?.seo_keywords },
+              { label: "OG title", value: ecom?.og_title },
+              { label: "OG description", value: ecom?.og_description },
+              { label: "OG image", value: ecom?.og_image },
+              { label: "Twitter card", value: ecom?.twitter_card },
+              {
+                label: "Robots index",
+                value:
+                  ecom?.robots_index == null
+                    ? null
+                    : ecom.robots_index
+                      ? "Yes"
+                      : "No",
+              },
+            ]}
+          />
 
-          <div className="space-y-2">
-            <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+          <div>
+            <p className="mb-1 border-b border-border/70 pb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
               Operating hours
             </p>
             <OperatingHoursDisplay value={ecom?.operating_hours} />

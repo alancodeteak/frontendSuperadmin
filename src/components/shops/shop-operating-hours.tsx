@@ -345,26 +345,25 @@ export function OperatingHoursDisplay({ value }: { value: unknown }) {
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border">
-      <table className="w-full text-sm">
-        <tbody>
-          {OPERATING_DAY_KEYS.map((day) => {
-            const slots = hours[day];
-            return (
-              <tr key={day} className="border-b last:border-b-0">
-                <th className="w-28 bg-muted/30 px-3 py-2 text-left text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                  {DAY_LABELS[day]}
-                </th>
-                <td className="px-3 py-2 font-medium">
-                  {slots.length === 0
-                    ? "Closed"
-                    : slots.map((s) => `${s.open} – ${s.close}`).join(", ")}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+    <div>
+      {OPERATING_DAY_KEYS.map((day) => {
+        const slots = hours[day];
+        return (
+          <div
+            key={day}
+            className="flex items-center gap-4 border-b border-border/70 py-2.5 last:border-b-0"
+          >
+            <span className="w-40 shrink-0 text-sm text-muted-foreground sm:w-48">
+              {DAY_LABELS[day]}
+            </span>
+            <span className="min-w-0 flex-1 truncate text-sm font-medium">
+              {slots.length === 0
+                ? "Closed"
+                : slots.map((s) => `${s.open} – ${s.close}`).join(", ")}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }
