@@ -11,13 +11,18 @@ export const UAE_COUNTRY_CODE = "+971";
 
 export type UaePhoneType = "mobile" | "landline";
 
+export const SHOP_NAME_MAX_LENGTH = 50;
+
 export type CreateShopFormValues = {
   shop_name: string;
+  second_name: string;
   shop_id: string;
   password: string;
   user_id: string;
   phone_type: UaePhoneType;
   phone: string;
+  contact_person_number_type: UaePhoneType;
+  contact_person_number: string;
   email: string;
   ecom_slug: string;
   ecom_enabled: boolean;
@@ -26,6 +31,8 @@ export type CreateShopFormValues = {
   merge_order: boolean;
   return_option: boolean;
   customer_ticket: boolean;
+  is_msg_activated: boolean;
+  single_msg: boolean;
   address_line_1: string;
   address_line_2: string;
   locality: string;
@@ -57,8 +64,8 @@ export function getUaePhoneLocalPart(value: string) {
 }
 
 export function getUaePhoneDisplayPart(value: string) {
-  const localPart = getUaePhoneLocalPart(value);
-  return localPart ? `0${localPart}` : "";
+  // Shown next to the fixed +971 prefix — no leading national trunk 0.
+  return getUaePhoneLocalPart(value);
 }
 
 export function normalizeUaePhoneInput(value: string) {
@@ -125,7 +132,17 @@ export function validateCreateShopField(
     case "shop_name": {
       const name = String(value).trim();
       if (!name) return "Shop name is required";
-      if (name.length > 200) return "Shop name must be at most 200 characters";
+      if (name.length > SHOP_NAME_MAX_LENGTH) {
+        return `Shop name must be at most ${SHOP_NAME_MAX_LENGTH} characters`;
+      }
+      return null;
+    }
+    case "second_name": {
+      const name = String(value).trim();
+      if (!name) return null;
+      if (name.length > SHOP_NAME_MAX_LENGTH) {
+        return `Second name must be at most ${SHOP_NAME_MAX_LENGTH} characters`;
+      }
       return null;
     }
     case "shop_id": {
@@ -156,11 +173,17 @@ export function validateCreateShopField(
     }
     case "phone": {
       const raw = String(value).trim();
+      if (!raw || raw === UAE_COUNTRY_CODE) return "Shop phone is required";
+      if (!isValidUaePhone(raw, "mobile")) {
+        return "Enter a valid UAE mobile number";
+      }
+      return null;
+    }
+    case "contact_person_number": {
+      const raw = String(value).trim();
       if (!raw || raw === UAE_COUNTRY_CODE) return null;
-      if (!isValidUaePhone(raw, form.phone_type)) {
-        return form.phone_type === "landline"
-          ? "Enter a valid UAE landline number"
-          : "Enter a valid UAE mobile number";
+      if (!isValidUaePhone(raw, "mobile")) {
+        return "Enter a valid UAE mobile number";
       }
       return null;
     }
@@ -188,9 +211,15 @@ export function validateCreateShopField(
       }
       return null;
     }
+    case "single_msg": {
+      if (value === true && !form.is_msg_activated) {
+        return "Requires messaging to be activated";
+      }
+      return null;
+    }
     case "latitude": {
       const raw = String(value).trim();
-      if (!raw) return null;
+      if (!raw) return "Location pin or latitude is required";
       const n = Number(raw);
       if (!Number.isFinite(n) || n < -90 || n > 90) {
         return "Latitude must be between -90 and 90";
@@ -199,7 +228,7 @@ export function validateCreateShopField(
     }
     case "longitude": {
       const raw = String(value).trim();
-      if (!raw) return null;
+      if (!raw) return "Location pin or longitude is required";
       const n = Number(raw);
       if (!Number.isFinite(n) || n < -180 || n > 180) {
         return "Longitude must be between -180 and 180";
@@ -208,7 +237,9 @@ export function validateCreateShopField(
     }
     case "contact_number": {
       const raw = String(value).trim();
-      if (!raw || raw === UAE_COUNTRY_CODE) return null;
+      if (!raw || raw === UAE_COUNTRY_CODE) {
+        return "Address phone is required";
+      }
       if (!isValidUaePhone(raw, form.contact_number_type)) {
         return form.contact_number_type === "landline"
           ? "Enter a valid UAE landline number"
@@ -216,10 +247,20 @@ export function validateCreateShopField(
       }
       return null;
     }
-    case "address_line_1":
-    case "address_line_2":
-    case "locality":
+    case "address_line_1": {
+      const text = String(value).trim();
+      if (!text) return "Address line 1 is required";
+      if (text.length > 200) return "Must be at most 200 characters";
+      return null;
+    }
     case "city": {
+      const text = String(value).trim();
+      if (!text) return "City is required";
+      if (text.length > 200) return "Must be at most 200 characters";
+      return null;
+    }
+    case "address_line_2":
+    case "locality": {
       const text = String(value).trim();
       if (text.length > 200) return "Must be at most 200 characters";
       return null;
@@ -234,15 +275,20 @@ export function validateCreateShopForm(
 ): FieldErrors {
   const fields: Array<keyof CreateShopFormValues> = [
     "shop_name",
+    "second_name",
     "shop_id",
     "user_id",
     "password",
     "phone_type",
     "phone",
+    "contact_person_number_type",
+    "contact_person_number",
     "email",
     "ecom_slug",
     "ecom_order_confirmation_enabled",
     "customer_ticket",
+    "is_msg_activated",
+    "single_msg",
     "address_line_1",
     "address_line_2",
     "locality",
@@ -272,11 +318,14 @@ export const SHOP_CREATE_STEP_FIELDS: Record<
 > = {
   0: [
     "shop_name",
+    "second_name",
     "shop_id",
     "user_id",
     "password",
     "phone_type",
     "phone",
+    "contact_person_number_type",
+    "contact_person_number",
     "email",
     "ecom_slug",
   ],
@@ -293,6 +342,8 @@ export const SHOP_CREATE_STEP_FIELDS: Record<
   2: [
     "ecom_order_confirmation_enabled",
     "customer_ticket",
+    "is_msg_activated",
+    "single_msg",
   ],
   3: [],
 };
@@ -367,23 +418,43 @@ export function buildCreateShopPayload(
     merge_order: form.merge_order,
     return_option: form.return_option,
     customer_ticket: ecom_enabled ? form.customer_ticket : false,
+    // Integration is only enabled from shop edit (Features tab).
+    integration_enabled: false,
+    is_msg_activated: form.is_msg_activated,
+    single_msg: form.is_msg_activated ? form.single_msg : false,
   };
+
+  const second_name = form.second_name.trim();
+  if (second_name) payload.second_name = second_name;
 
   const phone = hasMeaningfulUaePhone(form.phone)
     ? normalizeUaePhoneInput(form.phone)
     : "";
   if (phone) payload.phone = phone;
 
+  const contact_person_number = hasMeaningfulUaePhone(form.contact_person_number)
+    ? normalizeUaePhoneInput(form.contact_person_number)
+    : "";
+  if (contact_person_number) {
+    payload.contact_person_number = contact_person_number;
+  }
+
   const email = form.email.trim();
   if (email) payload.email = email;
 
   const slug = form.ecom_slug.trim()
     ? normalizeEcomSlug(form.ecom_slug)
-    : slugFromShopId(shop_id);
+    : normalizeEcomSlug(form.shop_name);
   if (slug) payload.ecom_slug = slug;
 
   const address = buildAddress(form);
-  if (address) payload.address = address;
+  if (!address?.address_line_1 || !address.city) {
+    throw new Error("Address is required");
+  }
+  if (address.latitude == null || address.longitude == null) {
+    throw new Error("Address location is required");
+  }
+  payload.address = address;
 
   return payload;
 }

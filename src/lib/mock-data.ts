@@ -17,6 +17,7 @@ import type {
   ReportDataset,
   RestaurantPerformanceRow,
   Rider,
+  RotateIntegrationTokenResponse,
   ShopActivityResponse,
   ShopDeliverySettings,
   ShopDetail,
@@ -741,6 +742,52 @@ export async function mockPatchShop(
         }
       : {}),
     ...(integration_token ? { integration_token } : {}),
+  });
+}
+
+export async function mockRotateShopIntegrationToken(
+  shopId: string,
+): Promise<RotateIntegrationTokenResponse> {
+  const idx = mockShops.findIndex((s) => s.shop_id === shopId);
+  if (idx < 0) {
+    throw Object.assign(new Error("Shop not found"), { status: 404 });
+  }
+
+  const shop = mockShops[idx];
+  if (shop.is_deleted === true) {
+    throw Object.assign(new Error("Shop not found"), { status: 404 });
+  }
+
+  const extras = mockShopExtras[shopId] ?? (mockShopExtras[shopId] = {});
+  const features = {
+    ...(extras.features ?? {}),
+  } as Record<string, unknown>;
+  const integrationEnabled = Boolean(features.integration_enabled);
+
+  if (!integrationEnabled) {
+    throw Object.assign(new Error("integration_disabled"), {
+      status: 422,
+      body: { code: "integration_disabled", message: "integration_disabled" },
+    });
+  }
+
+  extras.has_integration_token = true;
+  features.integration_enabled = true;
+  features.has_integration_token = true;
+  extras.features = features;
+
+  const updated_at = new Date().toISOString();
+  const integration_token = `mock-token-${shopId}-${Date.now()}`;
+
+  return delay({
+    shop_id: shopId,
+    updated_at,
+    token_rotated: true,
+    features: {
+      integration_enabled: true,
+      has_integration_token: true,
+    },
+    integration_token,
   });
 }
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeftIcon, ArrowRightIcon } from "lucide-react";
+import { ArrowLeftIcon, ArrowRightIcon, EyeIcon, EyeOffIcon } from "lucide-react";
 
 import { PageShell } from "@/components/layout/page-shell";
 import { TopBarSlot } from "@/components/layout/top-bar-slot";
@@ -48,7 +48,7 @@ import {
   normalizeEcomSlug,
   normalizeShopId,
   normalizeUaePhoneInput,
-  slugFromShopId,
+  SHOP_NAME_MAX_LENGTH,
   validateCreateShopField,
   validateCreateShopForm,
   UAE_COUNTRY_CODE,
@@ -70,7 +70,7 @@ const STEPS = [
   {
     id: 1,
     title: "Address",
-    description: "Pin the shop on the map",
+    description: "Required shop location and map pin",
   },
   {
     id: 2,
@@ -97,11 +97,12 @@ function shopIdFromName(name: string, uniquePart: string): string {
     .toUpperCase()
     .replace(/[^A-Z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "");
+  if (!base) return "";
   const datePart = formatShopIdDatePart(new Date());
   const suffix = `${datePart}_${uniquePart}`;
   const maxBaseLength = Math.max(0, 50 - suffix.length - 1);
   const trimmedBase = base.slice(0, maxBaseLength);
-  return trimmedBase ? `${trimmedBase}_${suffix}` : suffix;
+  return trimmedBase ? `${trimmedBase}_${suffix}` : "";
 }
 
 function FormFieldsGrid({
@@ -184,7 +185,12 @@ function FormField({
         className="text-xs font-medium tracking-wide text-muted-foreground uppercase"
       >
         {label}
-        {required ? " *" : ""}
+        {required ? (
+          <span className="text-destructive" aria-hidden>
+            {" "}
+            *
+          </span>
+        ) : null}
       </Label>
       {children}
       {showFooter ? (
@@ -288,11 +294,14 @@ const STEP_FIELDS: Record<
 > = {
   0: [
     "shop_name",
+    "second_name",
     "shop_id",
     "user_id",
     "password",
     "phone_type",
     "phone",
+    "contact_person_number_type",
+    "contact_person_number",
     "email",
     "ecom_slug",
   ],
@@ -306,7 +315,12 @@ const STEP_FIELDS: Record<
     "longitude",
     "contact_number",
   ],
-  2: ["ecom_order_confirmation_enabled", "customer_ticket"],
+  2: [
+    "ecom_order_confirmation_enabled",
+    "customer_ticket",
+    "is_msg_activated",
+    "single_msg",
+  ],
   3: [],
 };
 
@@ -346,6 +360,7 @@ export function CreateShopWizard() {
   const [createError, setCreateError] = useState<string | null>(null);
   const [createdShopId, setCreatedShopId] = useState<string | null>(null);
   const [shopPhoto, setShopPhoto] = useState<ShopPhotoSelection | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
   const [shopIdStatus, setShopIdStatus] = useState<
     "idle" | "checking" | "available" | "taken" | "error"
   >("idle");
@@ -370,8 +385,17 @@ export function CreateShopWizard() {
       setForm((prev) => ({ ...prev, ...draft.form, password: "" }));
       setCurrentStep(draft.meta.currentStep);
       slugEditedRef.current = draft.meta.slugEdited;
-      shopIdEditedRef.current = draft.meta.shopIdEdited;
       shopIdUniquePartRef.current = draft.meta.shopIdUniquePart;
+      // Keep auto-gen unlocked unless the saved shop_id clearly diverged
+      // from the auto suffix (avoids blur-only "edited" locking drafts).
+      const unique = draft.meta.shopIdUniquePart;
+      const savedId = String(draft.form.shop_id ?? "");
+      shopIdEditedRef.current = Boolean(
+        draft.meta.shopIdEdited &&
+          savedId &&
+          unique &&
+          !savedId.endsWith(`_${unique}`),
+      );
     }
     setHydrated(true);
   }, []);
@@ -407,11 +431,18 @@ export function CreateShopWizard() {
   function update<K extends keyof CreateShopFormValues>(
     key: K,
     value: CreateShopFormValues[K],
+    options?: { manualShopId?: boolean },
   ) {
     setFormError(null);
     if (key === "user_id") setUserIdHint(null);
     if (key === "ecom_slug") slugEditedRef.current = true;
-    if (key === "shop_id") shopIdEditedRef.current = true;
+    if (key === "shop_id" && options?.manualShopId !== false) {
+      shopIdEditedRef.current = true;
+    }
+    if (key === "shop_name" && !String(value).trim()) {
+      // Clearing the name unlocks auto shop-id generation again.
+      shopIdEditedRef.current = false;
+    }
 
     setForm((prev) => {
       const next = { ...prev, [key]: value };
@@ -419,18 +450,38 @@ export function CreateShopWizard() {
         next.ecom_order_confirmation_enabled = false;
         next.customer_ticket = false;
       }
-      if (key === "shop_name" && !shopIdEditedRef.current) {
-        const generated = shopIdFromName(
-          String(value),
-          shopIdUniquePartRef.current,
-        );
-        next.shop_id = generated;
-        if (!slugEditedRef.current) {
-          next.ecom_slug = slugFromShopId(generated);
+      if (key === "is_msg_activated" && value === false) {
+        next.single_msg = false;
+      }
+      if (key === "shop_name") {
+        next.shop_name = String(value).slice(0, SHOP_NAME_MAX_LENGTH);
+        const trimmedName = next.shop_name.trim();
+        if (!trimmedName) {
+          next.shop_id = "";
+          if (!slugEditedRef.current) next.ecom_slug = "";
+        } else {
+          if (!shopIdEditedRef.current) {
+            next.shop_id = shopIdFromName(
+              next.shop_name,
+              shopIdUniquePartRef.current,
+            );
+          }
+          if (!slugEditedRef.current) {
+            // Spaces / special chars become "-" (e.g. "Marina Cafe" → "marina-cafe").
+            next.ecom_slug = normalizeEcomSlug(next.shop_name);
+          }
         }
       }
-      if (key === "shop_id" && !slugEditedRef.current) {
-        next.ecom_slug = slugFromShopId(String(value));
+      if (key === "second_name") {
+        next.second_name = String(value).slice(0, SHOP_NAME_MAX_LENGTH);
+      }
+      if (key === "phone") {
+        // Keep address phone in sync with shop phone.
+        next.contact_number = String(value);
+        next.contact_number_type = next.phone_type;
+      }
+      if (key === "phone_type") {
+        next.contact_number_type = value as CreateShopFormValues["phone_type"];
       }
       return next;
     });
@@ -554,11 +605,14 @@ export function CreateShopWizard() {
   function markStepTouched(step: ShopCreateWizardStep) {
     const fields = [
       "shop_name",
+      "second_name",
       "shop_id",
       "user_id",
       "password",
       "phone_type",
       "phone",
+      "contact_person_number_type",
+      "contact_person_number",
       "email",
       "ecom_slug",
       "address_line_1",
@@ -571,15 +625,22 @@ export function CreateShopWizard() {
       "contact_number",
       "ecom_order_confirmation_enabled",
       "customer_ticket",
+      "is_msg_activated",
+      "single_msg",
+      "ecom_order_confirmation_enabled",
     ] as const;
 
     const stepFields: Record<ShopCreateWizardStep, readonly string[]> = {
       0: [
         "shop_name",
+        "second_name",
         "shop_id",
         "user_id",
         "password",
+        "phone_type",
         "phone",
+        "contact_person_number_type",
+        "contact_person_number",
         "email",
         "ecom_slug",
       ],
@@ -588,11 +649,17 @@ export function CreateShopWizard() {
         "address_line_2",
         "locality",
         "city",
+        "contact_number_type",
         "latitude",
         "longitude",
         "contact_number",
       ],
-      2: ["ecom_order_confirmation_enabled", "customer_ticket"],
+      2: [
+        "ecom_order_confirmation_enabled",
+        "customer_ticket",
+        "is_msg_activated",
+        "single_msg",
+      ],
       3: fields,
     };
 
@@ -607,8 +674,23 @@ export function CreateShopWizard() {
 
   function goNext() {
     setFormError(null);
+
+    let nextForm = form;
+    if (currentStep === 0) {
+      // Address phone follows shop phone when entering the address step.
+      nextForm = {
+        ...form,
+        contact_number: form.phone,
+        contact_number_type: form.phone_type,
+      };
+      setForm(nextForm);
+    }
+
     markStepTouched(currentStep);
-    const errors = validateStep(currentStep);
+    const errors = validateWizardStep(currentStep, nextForm);
+    if (currentStep === 0 && shopIdStatus === "taken") {
+      errors.shop_id = "Shop ID already exists";
+    }
     setFieldErrors((prev) => ({ ...prev, ...errors }));
     if (Object.keys(errors).length > 0 || shopIdStatus === "checking") {
       setFormError("Fix the highlighted fields before continuing.");
@@ -830,6 +912,8 @@ export function CreateShopWizard() {
     { key: "merge_order", label: "Merge orders" },
     { key: "return_option", label: "Return option" },
     { key: "customer_ticket", label: "Customer tickets" },
+    { key: "is_msg_activated", label: "Messaging activated" },
+    { key: "single_msg", label: "Single message" },
   ];
 
   const activeStep = STEPS[currentStep];
@@ -906,16 +990,36 @@ export function CreateShopWizard() {
                   label="Shop name"
                   htmlFor="shop_name"
                   required
+                  hint={`${form.shop_name.length}/${SHOP_NAME_MAX_LENGTH}`}
                   error={showError("shop_name")}
-                  className="sm:col-span-2 xl:col-span-12"
+                  className="sm:col-span-2 xl:col-span-6"
                 >
                   <Input
                     id="shop_name"
                     value={form.shop_name}
+                    maxLength={SHOP_NAME_MAX_LENGTH}
                     aria-invalid={Boolean(showError("shop_name"))}
                     onBlur={() => markTouched("shop_name")}
                     onChange={(e) => update("shop_name", e.target.value)}
                     placeholder="Marina Cafe"
+                  />
+                </FormField>
+
+                <FormField
+                  label="Second name"
+                  htmlFor="second_name"
+                  hint={`${form.second_name.length}/${SHOP_NAME_MAX_LENGTH}`}
+                  error={showError("second_name")}
+                  className="sm:col-span-2 xl:col-span-6"
+                >
+                  <Input
+                    id="second_name"
+                    value={form.second_name}
+                    maxLength={SHOP_NAME_MAX_LENGTH}
+                    aria-invalid={Boolean(showError("second_name"))}
+                    onBlur={() => markTouched("second_name")}
+                    onChange={(e) => update("second_name", e.target.value)}
+                    placeholder="Arabic or alternate name"
                   />
                 </FormField>
 
@@ -948,9 +1052,13 @@ export function CreateShopWizard() {
                     className="font-mono text-xs"
                     onBlur={() => {
                       markTouched("shop_id");
-                      update("shop_id", normalizeShopId(form.shop_id));
+                      update("shop_id", normalizeShopId(form.shop_id), {
+                        manualShopId: false,
+                      });
                     }}
-                    onChange={(e) => update("shop_id", e.target.value)}
+                    onChange={(e) =>
+                      update("shop_id", e.target.value, { manualShopId: true })
+                    }
                     placeholder="MARINA_CAFE_20260727_A1B2"
                   />
                 </FormField>
@@ -1007,17 +1115,35 @@ export function CreateShopWizard() {
                   className="sm:col-span-2 xl:col-span-8"
                 >
                   <div className="flex gap-2">
-                    <Input
-                      id="password"
-                      type="password"
-                      autoComplete="new-password"
-                      value={form.password}
-                      aria-invalid={Boolean(showError("password"))}
-                      className="min-w-0 flex-1"
-                      onBlur={() => markTouched("password")}
-                      onChange={(e) => update("password", e.target.value)}
-                      placeholder="Min 8 characters"
-                    />
+                    <div className="relative min-w-0 flex-1">
+                      <Input
+                        id="password"
+                        type={showPassword ? "text" : "password"}
+                        autoComplete="new-password"
+                        value={form.password}
+                        aria-invalid={Boolean(showError("password"))}
+                        className="pr-10"
+                        onBlur={() => markTouched("password")}
+                        onChange={(e) => update("password", e.target.value)}
+                        placeholder="Min 8 characters"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        className="absolute top-1/2 right-1.5 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        aria-label={
+                          showPassword ? "Hide password" : "Show password"
+                        }
+                        onClick={() => setShowPassword((prev) => !prev)}
+                      >
+                        {showPassword ? (
+                          <EyeOffIcon className="size-4" />
+                        ) : (
+                          <EyeIcon className="size-4" />
+                        )}
+                      </Button>
+                    </div>
                     <CopyButton
                       value={form.password}
                       disabled={!form.password}
@@ -1030,58 +1156,73 @@ export function CreateShopWizard() {
 
             <WizardSection
               title="Contact"
-              description="Optional details for ops and ecommerce."
+              description="Shop phone is required. Contact number is optional."
             >
               <FormFieldsGrid>
                 <FormField
-                  label="Phone"
+                  label="Shop phone"
                   htmlFor="phone"
-                  hint={
-                    form.phone_type === "landline"
-                      ? "UAE landline number. Starts with +971."
-                      : "UAE mobile number. Starts with +971."
-                  }
+                  required
+                  hint="UAE mobile number. Starts with +971."
                   error={showError("phone")}
-                  className="xl:col-span-4"
+                  className="xl:col-span-6"
                 >
-                  <div className="flex gap-2">
-                    <Select
-                      value={form.phone_type}
-                      onValueChange={(value) =>
-                        update("phone_type", value as CreateShopFormValues["phone_type"])
-                      }
-                    >
-                      <SelectTrigger className="w-40">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="mobile">Mobile (+971)</SelectItem>
-                        <SelectItem value="landline">Landline</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <div className="flex min-w-0 flex-1 overflow-hidden rounded-md border border-input bg-background focus-within:ring-1 focus-within:ring-ring">
-                      <div className="flex items-center border-r border-input bg-muted px-3 text-sm text-muted-foreground">
-                        {UAE_COUNTRY_CODE}
-                      </div>
-                      <Input
-                        id="phone"
-                        value={getUaePhoneDisplayPart(form.phone)}
-                        aria-invalid={Boolean(showError("phone"))}
-                        className="min-w-0 flex-1 border-0 shadow-none focus-visible:ring-0"
-                        onBlur={() => {
-                          markTouched("phone");
-                          if (form.phone.trim()) {
-                            update("phone", normalizeUaePhoneInput(form.phone));
-                          }
-                        }}
-                        onChange={(e) =>
-                          update("phone", normalizeUaePhoneInput(e.target.value))
-                        }
-                        placeholder={
-                          form.phone_type === "landline" ? "042345678" : "0501234567"
-                        }
-                      />
+                  <div className="flex min-w-0 overflow-hidden rounded-md border border-input bg-background focus-within:ring-1 focus-within:ring-ring">
+                    <div className="flex items-center border-r border-input bg-muted px-3 text-sm text-muted-foreground">
+                      {UAE_COUNTRY_CODE}
                     </div>
+                    <Input
+                      id="phone"
+                      value={getUaePhoneDisplayPart(form.phone)}
+                      aria-invalid={Boolean(showError("phone"))}
+                      className="min-w-0 flex-1 border-0 shadow-none focus-visible:ring-0"
+                      onBlur={() => {
+                        markTouched("phone");
+                        if (form.phone.trim()) {
+                          update("phone", normalizeUaePhoneInput(form.phone));
+                        }
+                      }}
+                      onChange={(e) =>
+                        update("phone", normalizeUaePhoneInput(e.target.value))
+                      }
+                      placeholder="501234567"
+                    />
+                  </div>
+                </FormField>
+
+                <FormField
+                  label="Contact number"
+                  htmlFor="contact_person_number"
+                  hint="Optional contact person mobile."
+                  error={showError("contact_person_number")}
+                  className="xl:col-span-6"
+                >
+                  <div className="flex min-w-0 overflow-hidden rounded-md border border-input bg-background focus-within:ring-1 focus-within:ring-ring">
+                    <div className="flex items-center border-r border-input bg-muted px-3 text-sm text-muted-foreground">
+                      {UAE_COUNTRY_CODE}
+                    </div>
+                    <Input
+                      id="contact_person_number"
+                      value={getUaePhoneDisplayPart(form.contact_person_number)}
+                      aria-invalid={Boolean(showError("contact_person_number"))}
+                      className="min-w-0 flex-1 border-0 shadow-none focus-visible:ring-0"
+                      onBlur={() => {
+                        markTouched("contact_person_number");
+                        if (form.contact_person_number.trim()) {
+                          update(
+                            "contact_person_number",
+                            normalizeUaePhoneInput(form.contact_person_number),
+                          );
+                        }
+                      }}
+                      onChange={(e) =>
+                        update(
+                          "contact_person_number",
+                          normalizeUaePhoneInput(e.target.value),
+                        )
+                      }
+                      placeholder="501234567"
+                    />
                   </div>
                 </FormField>
 
@@ -1105,7 +1246,7 @@ export function CreateShopWizard() {
                 <FormField
                   label="Ecom slug"
                   htmlFor="ecom_slug"
-                  hint="Defaults from shop ID if left empty."
+                  hint="Auto from shop name. Spaces become -."
                   error={showError("ecom_slug")}
                   className="sm:col-span-2 xl:col-span-6"
                 >
@@ -1132,12 +1273,7 @@ export function CreateShopWizard() {
         {currentStep === 1 ? (
           <WizardSection
             title="Shop location"
-            description="Optional. Search a place, drag the pin, or enter the address manually."
-            action={
-              <span className="rounded-full border bg-muted/50 px-2.5 py-1 text-xs text-muted-foreground">
-                Skip anytime
-              </span>
-            }
+            description="Address and map pin are required. Address phone is filled from the shop phone."
           >
             <ShopLocationPicker
               value={toLocationValue(form)}
@@ -1207,6 +1343,22 @@ export function CreateShopWizard() {
                 error={showError("customer_ticket")}
                 onChange={(v) => update("customer_ticket", v)}
               />
+              <FeatureToggleRow
+                id="is_msg_activated"
+                label="Messaging activated"
+                description="Enable shop messaging / notification channel."
+                checked={form.is_msg_activated}
+                onChange={(v) => update("is_msg_activated", v)}
+              />
+              <FeatureToggleRow
+                id="single_msg"
+                label="Single message"
+                description="Send a single consolidated message instead of per-event messages. Requires messaging."
+                checked={form.single_msg}
+                disabled={!form.is_msg_activated}
+                error={showError("single_msg")}
+                onChange={(v) => update("single_msg", v)}
+              />
             </div>
           </WizardSection>
         ) : null}
@@ -1232,6 +1384,11 @@ export function CreateShopWizard() {
                   </div>
                   <div className="min-w-0">
                     <p className="font-semibold">{form.shop_name || "Untitled shop"}</p>
+                    {form.second_name ? (
+                      <p className="text-sm text-muted-foreground">
+                        {form.second_name}
+                      </p>
+                    ) : null}
                     <p className="font-mono text-xs text-muted-foreground">
                       {form.shop_id || "—"}
                     </p>
@@ -1239,7 +1396,11 @@ export function CreateShopWizard() {
                 </div>
                 <dl>
                   <PreviewRow label="Login ID" value={form.user_id} />
-                  <PreviewRow label="Phone" value={form.phone} />
+                  <PreviewRow label="Shop phone" value={form.phone} />
+                  <PreviewRow
+                    label="Contact number"
+                    value={form.contact_person_number}
+                  />
                   <PreviewRow label="Email" value={form.email} />
                   <PreviewRow label="Ecom slug" value={form.ecom_slug} />
                   <PreviewRow
@@ -1261,7 +1422,7 @@ export function CreateShopWizard() {
                         : ""
                     }
                   />
-                  <PreviewRow label="Contact" value={form.contact_number} />
+                  <PreviewRow label="Address phone" value={form.contact_number} />
                 </dl>
               </div>
             </WizardSection>

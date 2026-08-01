@@ -1,7 +1,7 @@
 import type { CreateShopFormValues } from "@/lib/shop-create-validation";
 
 const DRAFT_KEY = "yaadro:shop-create-draft";
-const DRAFT_VERSION = 1;
+const DRAFT_VERSION = 3;
 
 export type ShopCreateWizardStep = 0 | 1 | 2 | 3;
 
@@ -21,11 +21,14 @@ export type ShopCreateDraft = {
 
 export const INITIAL_CREATE_SHOP_FORM: CreateShopFormValues = {
   shop_name: "",
+  second_name: "",
   shop_id: "",
   password: "",
   user_id: "",
   phone_type: "mobile",
   phone: "+971",
+  contact_person_number_type: "mobile",
+  contact_person_number: "+971",
   email: "",
   ecom_slug: "",
   ecom_enabled: true,
@@ -34,11 +37,13 @@ export const INITIAL_CREATE_SHOP_FORM: CreateShopFormValues = {
   merge_order: false,
   return_option: false,
   customer_ticket: false,
+  is_msg_activated: false,
+  single_msg: false,
   address_line_1: "",
   address_line_2: "",
   locality: "",
   city: "",
-  contact_number_type: "landline",
+  contact_number_type: "mobile",
   latitude: "",
   longitude: "",
   contact_number: "+971",

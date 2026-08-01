@@ -27,7 +27,8 @@ export const SHOP_FIELD_LABELS: Record<string, string> = {
   customer_ticket: "Customer tickets",
   integration_enabled: "Integration enabled",
   integration_rate_limit: "Integration rate limit",
-  has_integration_token: "Integration token",
+  is_msg_activated: "Messaging activated",
+  single_msg: "Single message",
   delivery_time: "Delivery time",
   self_assigned: "Self assigned",
   pickup_disabled: "Pickup disabled",
@@ -86,6 +87,10 @@ function extractFieldKeys(text: string): string[] {
 export function humanizeApiMessage(raw: string): string {
   const text = raw.trim();
   if (!text) return "Something went wrong. Please try again.";
+
+  if (/^integration_disabled$/i.test(text)) {
+    return "Integration is not enabled. Enable integration first, then rotate the token.";
+  }
 
   // "X requires Y to be true"
   const requiresTrue = text.match(

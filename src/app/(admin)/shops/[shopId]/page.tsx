@@ -22,6 +22,7 @@ import {
   ShopConfirmDialog,
   type ShopConfirmPhase,
 } from "@/components/shops/shop-confirm-dialog";
+import { IntegrationTokenDialog } from "@/components/shops/integration-token-dialog";
 import { RiderEditDialog } from "@/components/shops/rider-edit-dialog";
 import { CopyButton } from "@/components/shared/copy-button";
 import { DetailList } from "@/components/shared/detail-list";
@@ -62,6 +63,7 @@ import {
   createSubscription,
   resetShopPassword,
   restoreShop,
+  rotateShopIntegrationToken,
   softDeleteShop,
   triggerShopLogoutEvent,
 } from "@/lib/api/shops";
@@ -1246,6 +1248,14 @@ function FeaturesTab({
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [highlightFields, setHighlightFields] = useState<string[]>([]);
+  const [integrationToken, setIntegrationToken] = useState<string | null>(null);
+  const [tokenDialogMode, setTokenDialogMode] = useState<"created" | "rotated">(
+    "created",
+  );
+  const [rotateOpen, setRotateOpen] = useState(false);
+  const [rotatePhase, setRotatePhase] =
+    useState<ShopConfirmPhase>("confirm");
+  const [rotateError, setRotateError] = useState<string | null>(null);
 
   useEffect(() => {
     setForm(readShopFeatures(shop));
@@ -1352,9 +1362,9 @@ function FeaturesTab({
         single_msg: form.single_msg,
       });
       if (result.integration_token) {
-        appToast.success(
-          `Feature flags saved. Integration token (copy now): ${result.integration_token}`,
-        );
+        setTokenDialogMode("created");
+        setIntegrationToken(result.integration_token);
+        appToast.success("Feature flags saved. Save your integration token now.");
       } else {
         appToast.success("Feature flags saved.");
       }
@@ -1366,11 +1376,49 @@ function FeaturesTab({
     }
   }
 
+  function openRotateConfirm() {
+    setRotateError(null);
+    setRotatePhase("confirm");
+    setRotateOpen(true);
+  }
+
+  function closeRotateConfirm() {
+    if (rotatePhase === "loading") return;
+    setRotateOpen(false);
+    setRotatePhase("confirm");
+    setRotateError(null);
+  }
+
+  async function confirmRotateToken() {
+    setRotatePhase("loading");
+    setRotateError(null);
+    try {
+      const result = await rotateShopIntegrationToken(shop.shop_id);
+      setRotateOpen(false);
+      setRotatePhase("confirm");
+      setTokenDialogMode("rotated");
+      setIntegrationToken(result.integration_token);
+      appToast.success("Integration token rotated. Save the new token now.");
+      await onSaved();
+    } catch (err) {
+      const parsed = parseApiFormError(err, "Failed to rotate integration token");
+      setRotatePhase("error");
+      setRotateError(parsed.message);
+    }
+  }
+
   function isHighlighted(field: string) {
     return highlightFields.includes(field) || Boolean(fieldErrors[field]);
   }
 
+  const shopDisplayName =
+    shop.shop_name ?? shop.profile?.shop_name ?? shop.shop_id;
+  const canRotateIntegrationToken = Boolean(
+    shop.features?.integration_enabled,
+  );
+
   return (
+    <>
     <ShopSection
       title="Feature flags"
       description="Shop feature toggles. Confirmation and tickets require ecom enabled."
@@ -1520,6 +1568,29 @@ function FeaturesTab({
               </p>
             ) : null}
           </Field>
+          {canRotateIntegrationToken ? (
+            <div className="rounded-xl border bg-muted/30 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">Rotate integration token</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Issues a new secret and invalidates the previous token. The
+                    new token is shown only once.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="shrink-0"
+                  disabled={saving || rotatePhase === "loading"}
+                  onClick={openRotateConfirm}
+                >
+                  <RefreshCwIcon className="size-4" />
+                  Rotate token
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </div>
 
         {error ? (
@@ -1536,6 +1607,39 @@ function FeaturesTab({
         </Button>
       </form>
     </ShopSection>
+
+    <IntegrationTokenDialog
+      open={Boolean(integrationToken)}
+      shopId={shop.shop_id}
+      shopName={shopDisplayName}
+      token={integrationToken ?? ""}
+      mode={tokenDialogMode}
+      onOpenChange={(open) => {
+        if (!open) setIntegrationToken(null);
+      }}
+    />
+
+    <ShopConfirmDialog
+      open={rotateOpen}
+      phase={rotatePhase}
+      title="Rotate integration token?"
+      description="This creates a new integration token and immediately invalidates the previous one. Any POS or third-party clients using the old token will stop working until you update them."
+      confirmLabel="Rotate token"
+      confirmVariant="destructive"
+      icon={RefreshCwIcon}
+      shopName={shopDisplayName}
+      shopId={shop.shop_id}
+      loadingTitle="Rotating token…"
+      loadingDescription="Issuing a new integration secret."
+      errorTitle="Could not rotate token"
+      errorMessage={rotateError}
+      onOpenChange={(open) => {
+        if (!open) closeRotateConfirm();
+      }}
+      onConfirm={() => void confirmRotateToken()}
+      onRetry={() => void confirmRotateToken()}
+    />
+    </>
   );
 }
 

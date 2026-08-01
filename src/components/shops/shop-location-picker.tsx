@@ -60,6 +60,7 @@ function FormField({
   htmlFor,
   hint,
   error,
+  required,
   children,
   className,
 }: {
@@ -67,6 +68,7 @@ function FormField({
   htmlFor: string;
   hint?: string;
   error?: string | null;
+  required?: boolean;
   children: React.ReactNode;
   className?: string;
 }) {
@@ -77,6 +79,12 @@ function FormField({
         className="text-xs font-medium tracking-wide text-muted-foreground uppercase"
       >
         {label}
+        {required ? (
+          <span className="text-destructive" aria-hidden>
+            {" "}
+            *
+          </span>
+        ) : null}
       </Label>
       {children}
       {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
@@ -297,6 +305,7 @@ export function ShopLocationPicker({
         <FormField
           label="Address line 1"
           htmlFor="address_line_1"
+          required
           error={fieldErrors?.address_line_1}
           className="sm:col-span-2"
         >
@@ -338,10 +347,16 @@ export function ShopLocationPicker({
           />
         </FormField>
 
-        <FormField label="City" htmlFor="city" error={fieldErrors?.city}>
+        <FormField
+          label="City"
+          htmlFor="city"
+          required
+          error={fieldErrors?.city}
+        >
           <Input
             id="city"
             value={value.city}
+            aria-invalid={Boolean(fieldErrors?.city)}
             onBlur={() => onFieldBlur?.("city")}
             onChange={(e) => updateField("city", e.target.value)}
             placeholder="Dubai"
@@ -351,6 +366,7 @@ export function ShopLocationPicker({
         <FormField
           label="Latitude"
           htmlFor="latitude"
+          required
           error={fieldErrors?.latitude}
         >
           <Input
@@ -367,6 +383,7 @@ export function ShopLocationPicker({
         <FormField
           label="Longitude"
           htmlFor="longitude"
+          required
           error={fieldErrors?.longitude}
         >
           <Input
@@ -382,13 +399,10 @@ export function ShopLocationPicker({
 
         {showContactNumber ? (
           <FormField
-            label="Contact number"
+            label="Address phone"
             htmlFor="contact_number"
-            hint={
-              value.contact_number_type === "landline"
-                ? "Shop landline number for delivery or support."
-                : "Shop mobile number for delivery or support."
-            }
+            required
+            hint="Auto-filled from shop phone. You can still edit it."
             error={fieldErrors?.contact_number}
             className="sm:col-span-2"
           >
@@ -426,7 +440,7 @@ export function ShopLocationPicker({
                     updateField("contact_number", normalizeUaePhoneInput(e.target.value))
                   }
                   placeholder={
-                    value.contact_number_type === "landline" ? "042345678" : "0501234567"
+                    value.contact_number_type === "landline" ? "42345678" : "501234567"
                   }
                 />
               </div>

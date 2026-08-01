@@ -215,6 +215,19 @@ export type PatchShopResponse = {
   integration_token?: string;
 };
 
+/** POST /v2/shops/:shop_id/rotate-integration-token */
+export type RotateIntegrationTokenResponse = {
+  shop_id: string;
+  updated_at?: string;
+  token_rotated: boolean;
+  features?: Pick<
+    ShopFeatures,
+    "integration_enabled" | "has_integration_token"
+  >;
+  /** One-time plaintext — previous token is invalid */
+  integration_token: string;
+};
+
 export type ShopDetail = ShopListItem & {
   status_reason?: string | null;
   group_id?: string | number | null;

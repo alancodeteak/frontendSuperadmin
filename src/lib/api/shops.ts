@@ -14,6 +14,7 @@ import {
   mockPatchShop,
   mockPutPromotion,
   mockRestoreShop,
+  mockRotateShopIntegrationToken,
   mockTriggerShopLogout,
 } from "@/lib/mock-data";
 import {
@@ -25,6 +26,7 @@ import type {
   Paginated,
   PatchShopInput,
   PatchShopResponse,
+  RotateIntegrationTokenResponse,
   ShopActivityResponse,
   ShopDeliverySettings,
   ShopDetail,
@@ -231,6 +233,15 @@ export function patchShop(shopId: string, input: PatchShopInput) {
     method: "PATCH",
     body: JSON.stringify(input),
   });
+}
+
+/** Re-issue integration token. Requires integration_enabled === true. */
+export function rotateShopIntegrationToken(shopId: string) {
+  if (isDevelopmentMode()) return mockRotateShopIntegrationToken(shopId);
+  return apiFetch<RotateIntegrationTokenResponse>(
+    `/v2/shops/${shopId}/rotate-integration-token`,
+    { method: "POST" },
+  );
 }
 
 /** Feature flags to keep intact across soft-delete (backend may clear them). */
