@@ -118,6 +118,11 @@ function formatDetailValue(value: unknown): string {
   }
 }
 
+function yesNo(value: boolean | null | undefined) {
+  if (value == null) return null;
+  return value ? "Yes" : "No";
+}
+
 function ecomFormFromData(ecom: ShopEcomSettings | null | undefined) {
   const paymentMethods = Array.isArray(ecom?.payment_methods)
     ? (ecom.payment_methods as unknown[]).map(String).join(", ")
@@ -130,6 +135,11 @@ function ecomFormFromData(ecom: ShopEcomSettings | null | undefined) {
       ecom?.min_order_amount != null ? String(ecom.min_order_amount) : "",
     delivery_radius_km:
       ecom?.delivery_radius_km != null ? String(ecom.delivery_radius_km) : "",
+    delivery_charge:
+      ecom?.delivery_charge != null ? String(ecom.delivery_charge) : "",
+    cooking_notes_enabled: Boolean(ecom?.cooking_notes_enabled),
+    delivery_instructions_enabled: Boolean(ecom?.delivery_instructions_enabled),
+    cutlery_enabled: Boolean(ecom?.cutlery_enabled),
     operating_hours: parseOperatingHours(ecom?.operating_hours),
     payment_methods: paymentMethods,
     whatsapp_order_template: String(ecom?.whatsapp_order_template ?? ""),
@@ -221,6 +231,12 @@ export function ShopEcomTab({
       delivery_radius_km: form.delivery_radius_km.trim()
         ? Number(form.delivery_radius_km)
         : null,
+      delivery_charge: form.delivery_charge.trim()
+        ? Number(form.delivery_charge)
+        : 0,
+      cooking_notes_enabled: form.cooking_notes_enabled,
+      delivery_instructions_enabled: form.delivery_instructions_enabled,
+      cutlery_enabled: form.cutlery_enabled,
       operating_hours: serializeOperatingHours(form.operating_hours),
       payment_methods: payment_methods.length ? payment_methods : null,
       whatsapp_order_template: form.whatsapp_order_template.trim() || null,
@@ -301,6 +317,25 @@ export function ShopEcomTab({
                     : null,
               },
               {
+                label: "Delivery charge",
+                value:
+                  ecom?.delivery_charge != null
+                    ? String(ecom.delivery_charge)
+                    : null,
+              },
+              {
+                label: "Cooking notes",
+                value: yesNo(ecom?.cooking_notes_enabled),
+              },
+              {
+                label: "Delivery instructions",
+                value: yesNo(ecom?.delivery_instructions_enabled),
+              },
+              {
+                label: "Cutlery",
+                value: yesNo(ecom?.cutlery_enabled),
+              },
+              {
                 label: "WhatsApp order template",
                 value: ecom?.whatsapp_order_template,
               },
@@ -317,12 +352,7 @@ export function ShopEcomTab({
               { label: "Twitter card", value: ecom?.twitter_card },
               {
                 label: "Robots index",
-                value:
-                  ecom?.robots_index == null
-                    ? null
-                    : ecom.robots_index
-                      ? "Yes"
-                      : "No",
+                value: yesNo(ecom?.robots_index),
               },
             ]}
           />
@@ -364,6 +394,13 @@ export function ShopEcomTab({
                 onChange={(e) => setField("delivery_radius_km", e.target.value)}
               />
             </Field>
+            <Field label="Delivery charge">
+              <Input
+                inputMode="decimal"
+                value={form.delivery_charge}
+                onChange={(e) => setField("delivery_charge", e.target.value)}
+              />
+            </Field>
             <Field label="Twitter card">
               <Input
                 value={form.twitter_card}
@@ -371,6 +408,30 @@ export function ShopEcomTab({
                 placeholder="summary_large_image"
               />
             </Field>
+          </div>
+
+          <div className="rounded-xl border border-border/70 px-3">
+            <FeatureToggleRow
+              id="ecom_cooking_notes"
+              label="Cooking notes"
+              description="Let customers add cooking notes on checkout."
+              checked={form.cooking_notes_enabled}
+              onChange={(v) => setField("cooking_notes_enabled", v)}
+            />
+            <FeatureToggleRow
+              id="ecom_delivery_instructions"
+              label="Delivery instructions"
+              description="Let customers add delivery instructions on checkout."
+              checked={form.delivery_instructions_enabled}
+              onChange={(v) => setField("delivery_instructions_enabled", v)}
+            />
+            <FeatureToggleRow
+              id="ecom_cutlery"
+              label="Cutlery"
+              description="Show cutlery option on the storefront checkout."
+              checked={form.cutlery_enabled}
+              onChange={(v) => setField("cutlery_enabled", v)}
+            />
           </div>
 
           <Field label="WhatsApp order template">

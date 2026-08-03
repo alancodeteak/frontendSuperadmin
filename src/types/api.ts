@@ -138,6 +138,11 @@ export type ShopEcomSettings = {
   domain?: string | null;
   min_order_amount?: string | number | null;
   delivery_radius_km?: string | number | null;
+  /** Flat delivery fee shown on the storefront checkout. */
+  delivery_charge?: string | number | null;
+  cooking_notes_enabled?: boolean | null;
+  delivery_instructions_enabled?: boolean | null;
+  cutlery_enabled?: boolean | null;
   /**
    * Week map: sun–sat → slots `{ open, close }` in HH:MM.
    * Empty array = closed that day.
