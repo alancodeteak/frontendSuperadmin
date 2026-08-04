@@ -7,12 +7,15 @@ import { CircleXIcon, PlusIcon, SearchIcon } from "lucide-react";
 
 import { PageShell } from "@/components/layout/page-shell";
 import { TopBarSlot } from "@/components/layout/top-bar-slot";
+import { PosPlaybook } from "@/components/pos/pos-playbook";
+import { PosScenarioMatrix } from "@/components/pos/pos-scenario-matrix";
 import {
   EmptyState,
   ErrorState,
   LoadingState,
   StatusBadge,
 } from "@/components/shared/states";
+import { POS_LANE_CHOOSER_PLAYBOOK } from "@/lib/pos/playbook-copy";
 import { Button } from "@/components/ui/button";
 import { DataTable, type ColumnDef } from "@/components/ui/data-table";
 import { Input } from "@/components/ui/input";
@@ -336,6 +339,11 @@ export default function PosPage() {
         ) : null}
       </TopBarSlot>
 
+      <div className="mb-6 space-y-3">
+        <PosPlaybook playbook={POS_LANE_CHOOSER_PLAYBOOK} />
+        <PosScenarioMatrix />
+      </div>
+
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <div className="flex gap-1 border-b">
           {(
@@ -374,6 +382,11 @@ export default function PosPage() {
               <DialogHeader>
                 <DialogTitle>Create POS template</DialogTitle>
               </DialogHeader>
+              <p className="rounded-lg border border-amber-500/25 bg-amber-500/5 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
+                Tip: match the provider to the lane guide above. If your case is
+                marked “Needs developer” in the scenario table, do not create a
+                fake generic template — open an engineering ticket instead.
+              </p>
               <form onSubmit={onCreate} className="space-y-3">
                 <div className="space-y-2">
                   <Label htmlFor="pos-name">Name</Label>

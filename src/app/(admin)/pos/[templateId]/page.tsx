@@ -15,12 +15,17 @@ import {
 
 import { PageShell } from "@/components/layout/page-shell";
 import { TopBarSlot } from "@/components/layout/top-bar-slot";
+import { PosPlaybook } from "@/components/pos/pos-playbook";
 import { CopyButton } from "@/components/shared/copy-button";
 import {
   ErrorState,
   LoadingState,
   StatusBadge,
 } from "@/components/shared/states";
+import {
+  POS_TEMPLATE_DETAIL_PLAYBOOK,
+  POS_TEMPLATE_LANE_CALLOUTS,
+} from "@/lib/pos/playbook-copy";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -329,6 +334,17 @@ export default function PosTemplateDetailPage() {
           {message}
         </pre>
       ) : null}
+
+      <div className="mb-8">
+        <PosPlaybook
+          playbook={POS_TEMPLATE_DETAIL_PLAYBOOK}
+          callout={
+            template.provider && POS_TEMPLATE_LANE_CALLOUTS[template.provider]
+              ? POS_TEMPLATE_LANE_CALLOUTS[template.provider]
+              : undefined
+          }
+        />
+      </div>
 
       <form onSubmit={onSave} className="space-y-12">
         <Section

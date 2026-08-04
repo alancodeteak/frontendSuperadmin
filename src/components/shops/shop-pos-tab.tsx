@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { RefreshCwIcon } from "lucide-react";
 
+import { PosPlaybook } from "@/components/pos/pos-playbook";
 import { DetailList } from "@/components/shared/detail-list";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +22,11 @@ import {
 } from "@/lib/api/pos";
 import { parseApiFormError } from "@/lib/api-form-error";
 import { appToast } from "@/lib/app-toast";
+import {
+  POS_SHOP_FALLBACK_PLAYBOOK,
+  POS_SHOP_OPERATE_PLAYBOOK,
+  POS_SHOP_PLAYBOOK,
+} from "@/lib/pos/playbook-copy";
 import { cn } from "@/lib/utils";
 import {
   shopDetailQuery,
@@ -303,9 +309,14 @@ export function ShopPosTab({ shopId }: { shopId: string }) {
 
   const flagDisabled = Boolean(preset?.flagsLocked);
   const templateOptions = useMemo(() => templates, [templates]);
+  const attachPlaybook =
+    (selectedProvider && POS_SHOP_PLAYBOOK[selectedProvider]) ||
+    POS_SHOP_FALLBACK_PLAYBOOK;
 
   return (
     <div className="space-y-12">
+      <PosPlaybook playbook={attachPlaybook} />
+
       <ShopSection
         title="POS link"
         description="Attach a mapping template. Saleculator requires Integration enabled; Cratis/Generic need vendor base URL when push is on."
@@ -524,6 +535,10 @@ export function ShopPosTab({ shopId }: { shopId: string }) {
           </div>
         </form>
       </ShopSection>
+
+      {link ? (
+        <PosPlaybook playbook={POS_SHOP_OPERATE_PLAYBOOK} defaultOpen={false} />
+      ) : null}
 
       {link ? (
         <ShopSection title="Current link" className="max-w-3xl">
