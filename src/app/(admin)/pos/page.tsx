@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CircleXIcon, PlusIcon, SearchIcon } from "lucide-react";
@@ -34,27 +34,19 @@ import {
 import { ApiError } from "@/lib/api";
 import { appToast } from "@/lib/app-toast";
 import {
+  connectorsForProvider,
   createPosTemplate,
+  defaultConnectorForProvider,
   defaultPosTemplateConfig,
+  POS_PROVIDER_LABELS,
+  POS_PROVIDERS,
+  POS_TEMPLATE_NAME_PATTERN,
   slugifyPosTemplateName,
   type PosConnectorType,
   type PosProvider,
 } from "@/lib/api/pos";
 import { posShopLinksQuery, posTemplatesQuery } from "@/lib/queries/pos";
 import type { PosShopLink, PosTemplateSummary } from "@/types/api";
-
-const NAME_PATTERN = /^[a-z0-9][a-z0-9_-]*$/i;
-
-const providers: { value: PosProvider; label: string }[] = [
-  { value: "cratis", label: "Cratis" },
-  { value: "generic", label: "Generic" },
-];
-
-const connectors: { value: PosConnectorType; label: string }[] = [
-  { value: "cratis", label: "cratis" },
-  { value: "generic_json", label: "generic_json" },
-  { value: "webhook_inbound", label: "webhook_inbound" },
-];
 
 type PosView = "templates" | "links";
 
@@ -74,10 +66,43 @@ const templateColumns: ColumnDef<PosTemplateSummary>[] = [
     meta: { label: "Provider" },
   },
   {
+    id: "connector",
+    accessorFn: (row) => row.connector_type ?? "",
+    header: "Connector",
+    cell: ({ row }) => row.original.connector_type ?? "—",
+    meta: { label: "Connector" },
+  },
+  {
+    id: "lane",
+    accessorFn: (row) => row.lane ?? "",
+    header: "Lane",
+    cell: ({ row }) => row.original.lane ?? "—",
+    meta: { label: "Lane" },
+  },
+  {
     accessorKey: "version",
     header: "Version",
     cell: ({ row }) => row.original.version ?? "—",
     meta: { label: "Version" },
+  },
+  {
+    id: "capabilities",
+    accessorFn: (row) =>
+      row.capabilities
+        ? `${row.capabilities.catalog ?? ""}/${row.capabilities.orders_out ?? ""}`
+        : "",
+    header: "Capabilities",
+    cell: ({ row }) => {
+      const caps = row.original.capabilities;
+      if (!caps) return "—";
+      return (
+        <span className="text-xs text-muted-foreground">
+          cat:{caps.catalog ?? "—"} · out:{caps.orders_out ?? "—"} · in:
+          {caps.orders_in ?? "—"}
+        </span>
+      );
+    },
+    meta: { label: "Capabilities" },
   },
   {
     id: "status",
@@ -104,19 +129,32 @@ const linkColumns: ColumnDef<PosShopLink>[] = [
   },
   {
     id: "template",
-    accessorFn: (row) => String(row.mapping_profile_id ?? ""),
+    accessorFn: (row) =>
+      String(row.mapping_profile_name ?? row.mapping_profile_id ?? ""),
     header: "Template",
-    cell: ({ row }) => String(row.original.mapping_profile_id ?? "—"),
+    cell: ({ row }) =>
+      String(
+        row.original.mapping_profile_name ??
+          row.original.mapping_profile_id ??
+          "—",
+      ),
     meta: { label: "Template" },
   },
   {
     id: "provider",
     accessorFn: (row) =>
-      String(row.provider ?? row.connector_type ?? ""),
+      `${row.provider ?? ""}/${row.connector_type ?? ""}`,
     header: "Provider",
     cell: ({ row }) =>
-      String(row.original.provider ?? row.original.connector_type ?? "—"),
+      `${row.original.provider ?? "—"} / ${row.original.connector_type ?? "—"}`,
     meta: { label: "Provider" },
+  },
+  {
+    id: "lane",
+    accessorFn: (row) => row.lane ?? "",
+    header: "Lane",
+    cell: ({ row }) => row.original.lane ?? "—",
+    meta: { label: "Lane" },
   },
   {
     id: "features",
@@ -164,22 +202,27 @@ export default function PosPage() {
   const [form, setForm] = useState({
     name: "",
     provider: "cratis" as PosProvider,
-    version: "1.0",
+    version: "1",
     connector_type: "cratis" as PosConnectorType,
     description: "",
   });
 
-  const templatesQuery = useQuery(posTemplatesQuery({ page: 1, limit: 50 }));
-  const linksQuery = useQuery(posShopLinksQuery({ page: 1, limit: 50 }));
+  const templatesQuery = useQuery(posTemplatesQuery({ page: 1, limit: 100 }));
+  const linksQuery = useQuery(posShopLinksQuery({ page: 1, limit: 100 }));
   const items = templatesQuery.data?.items ?? [];
   const links = linksQuery.data?.items ?? [];
   const loading =
     view === "templates" ? templatesQuery.isPending : linksQuery.isPending;
 
+  const connectorOptions = useMemo(
+    () => connectorsForProvider(form.provider),
+    [form.provider],
+  );
+
   const createMutation = useMutation({
     mutationFn: () => {
       const name = slugifyPosTemplateName(form.name);
-      if (!NAME_PATTERN.test(name)) {
+      if (!POS_TEMPLATE_NAME_PATTERN.test(name)) {
         throw new ApiError(
           400,
           "Name must start with a letter/number and only use letters, numbers, - or _",
@@ -193,7 +236,7 @@ export default function PosPage() {
         description: form.description.trim() || undefined,
         is_system: false,
         is_active: true,
-        config: defaultPosTemplateConfig(),
+        config: defaultPosTemplateConfig(form.provider),
       });
     },
     onSuccess: (created) => {
@@ -202,7 +245,7 @@ export default function PosPage() {
       setForm({
         name: "",
         provider: "cratis",
-        version: "1.0",
+        version: "1",
         connector_type: "cratis",
         description: "",
       });
@@ -366,8 +409,7 @@ export default function PosPage() {
                         setForm({
                           ...form,
                           provider,
-                          connector_type:
-                            provider === "cratis" ? "cratis" : "generic_json",
+                          connector_type: defaultConnectorForProvider(provider),
                         });
                       }}
                     >
@@ -375,9 +417,9 @@ export default function PosPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {providers.map((item) => (
-                          <SelectItem key={item.value} value={item.value}>
-                            {item.label}
+                        {POS_PROVIDERS.map((value) => (
+                          <SelectItem key={value} value={value}>
+                            {POS_PROVIDER_LABELS[value]}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -399,9 +441,9 @@ export default function PosPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {connectors.map((item) => (
-                          <SelectItem key={item.value} value={item.value}>
-                            {item.label}
+                        {connectorOptions.map((value) => (
+                          <SelectItem key={value} value={value}>
+                            {value}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -413,6 +455,7 @@ export default function PosPage() {
                   <Input
                     id="pos-version"
                     required
+                    maxLength={20}
                     value={form.version}
                     onChange={(e) =>
                       setForm({ ...form, version: e.target.value })
@@ -423,6 +466,7 @@ export default function PosPage() {
                   <Label htmlFor="pos-description">Description</Label>
                   <Textarea
                     id="pos-description"
+                    maxLength={2000}
                     value={form.description}
                     onChange={(e) =>
                       setForm({ ...form, description: e.target.value })

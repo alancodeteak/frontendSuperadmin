@@ -1,5 +1,6 @@
 import { queryOptions } from "@tanstack/react-query";
 
+import { ApiError } from "@/lib/api";
 import {
   getActiveSubscription,
   getDeliverySettings,
@@ -134,7 +135,20 @@ export function shopRiderQuery(shopId: string, dpId: string) {
 export function shopPosLinkQuery(shopId: string) {
   return queryOptions({
     queryKey: shopKeys.posLink(shopId),
-    queryFn: () => getShopLink(shopId),
+    queryFn: async () => {
+      try {
+        return await getShopLink(shopId);
+      } catch (err) {
+        const status =
+          err instanceof ApiError
+            ? err.status
+            : err && typeof err === "object" && "status" in err
+              ? Number((err as { status: unknown }).status)
+              : null;
+        if (status === 404) return null;
+        throw err;
+      }
+    },
     enabled: Boolean(shopId),
     retry: false,
   });

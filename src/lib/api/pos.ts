@@ -15,98 +15,87 @@ import {
   mockTestConnectionPosTemplate,
   mockTestMapPosTemplate,
 } from "@/lib/mock-data";
+import {
+  type PosConnectorType,
+  type PosEndpointKey,
+  type PosProvider,
+} from "@/lib/pos/contract";
 import type {
+  AttachPosShopLinkInput,
+  CreatePosTemplateInput,
   Paginated,
+  PatchPosLinkFeaturesInput,
   PosShopLink,
+  PosSyncStatus,
   PosTemplate,
   PosTemplateSummary,
+  PosTestConnectionInput,
+  PosTestConnectionResponse,
+  PosTestMapInput,
+  PosTestMapResponse,
+  UpdatePosTemplateInput,
 } from "@/types/api";
 
-export type PosProvider = "cratis" | "generic";
-export type PosConnectorType = "cratis" | "generic_json" | "webhook_inbound";
+export type { PosProvider, PosConnectorType, PosEndpointKey };
+export type {
+  CreatePosTemplateInput,
+  UpdatePosTemplateInput,
+  AttachPosShopLinkInput,
+  PatchPosLinkFeaturesInput,
+};
+export {
+  POS_PROVIDERS,
+  POS_CONNECTOR_TYPES,
+  POS_PROVIDER_CONNECTOR_PAIRS,
+  POS_PROVIDER_LABELS,
+  POS_ENDPOINT_KEYS,
+  POS_TEMPLATE_NAME_PATTERN,
+  POS_TEST_MAP_DEFAULT_SECTION,
+  POS_LANE_ATTACH_PRESETS,
+  attachPresetForProvider,
+  connectorsForProvider,
+  defaultConnectorForProvider,
+  defaultPosTemplateConfig,
+  isPosProvider,
+  isValidProviderConnectorPair,
+  laneForProvider,
+  slugifyPosTemplateName,
+} from "@/lib/pos/contract";
 
-export type CreatePosTemplateInput = {
-  name: string;
-  provider: PosProvider;
-  version: string;
-  connector_type: PosConnectorType;
-  description?: string;
+export type ListPosTemplatesParams = {
+  page?: number;
+  limit?: number;
+  search?: string;
+  provider?: PosProvider | string;
+  connector_type?: PosConnectorType | string;
+  is_active?: boolean;
   is_system?: boolean;
-  is_active?: boolean;
-  config: Record<string, unknown>;
 };
 
-/** Fields accepted by PATCH /v2/pos/templates/:id (strict schema). */
-export type UpdatePosTemplateInput = {
-  description?: string;
+export type ListShopLinksParams = {
+  page?: number;
+  limit?: number;
+  search?: string;
+  provider?: PosProvider | string;
+  connector_type?: PosConnectorType | string;
   is_active?: boolean;
-  version?: string;
-  config?: Record<string, unknown>;
+  catalog_sync_enabled?: boolean;
+  order_push_enabled?: boolean;
+  shop_id?: string;
 };
 
-/** Valid starter config matching admin-api Zod schema. */
-export function defaultPosTemplateConfig(): Record<string, unknown> {
-  return {
-    api: {
-      baseUrl: "https://pos.example.com",
-      auth: { type: "none" },
-      menuTenant: { account: "acc", location: "loc" },
-      orderTenant: { account: "acc", location: "loc" },
-      endpoints: {
-        menu: {
-          method: "GET",
-          path: "/menu",
-          query: {},
-          body: {},
-          inbound: false,
-        },
-        menuCategories: { method: "GET", path: "/menu/categories" },
-        menuProducts: { method: "GET", path: "/menu/products" },
-        orderCreate: { method: "POST", path: "/orders" },
-        orderStatus: { method: "GET", path: "/orders/status" },
-        riderSync: { method: "POST", path: "/riders" },
-        orderStatusWebhook: {
-          method: "POST",
-          path: "/webhook",
-          inbound: true,
-        },
-      },
-    },
-    capabilities: [
-      "order_inbound",
-      "order_outbound",
-      "status_outbound",
-      "status_inbound",
-      "catalog_sync",
-      "rider_sync",
-    ],
-    status_update: { mode: "api", realtime: false },
-    mappings: {
-      order_inbound: {
-        order_id: { paths: ["id"] },
-      },
-    },
-    value_maps: {},
-    transforms: {},
-    hooks: [],
-  };
-}
-
-/** API requires /^[a-z0-9][a-z0-9_-]*$/i */
-export function slugifyPosTemplateName(value: string) {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9_-]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .replace(/-+/g, "-")
-    .slice(0, 100);
-}
-
-export function listPosTemplates(params?: { page?: number; limit?: number }) {
-  if (isDevelopmentMode()) return mockListPosTemplates();
+export function listPosTemplates(params?: ListPosTemplatesParams) {
+  if (isDevelopmentMode()) return mockListPosTemplates(params);
   return apiFetch<Paginated<PosTemplateSummary>>("/v2/pos/templates", {
-    params,
+    params: {
+      page: params?.page ?? 1,
+      limit: params?.limit ?? 20,
+      search: params?.search,
+      provider: params?.provider,
+      connector_type: params?.connector_type,
+      is_active: params?.is_active,
+      is_system: params?.is_system,
+    },
   });
 }
 
@@ -143,13 +132,10 @@ export function clonePosTemplate(id: string | number) {
 
 export function testMapPosTemplate(
   id: string | number,
-  input: {
-    mapping_section?: string;
-    sample_payload: Record<string, unknown>;
-  },
+  input: PosTestMapInput,
 ) {
-  if (isDevelopmentMode()) return mockTestMapPosTemplate();
-  return apiFetch<unknown>(`/v2/pos/templates/${id}/test-map`, {
+  if (isDevelopmentMode()) return mockTestMapPosTemplate(input);
+  return apiFetch<PosTestMapResponse>(`/v2/pos/templates/${id}/test-map`, {
     method: "POST",
     body: JSON.stringify(input),
   });
@@ -157,38 +143,40 @@ export function testMapPosTemplate(
 
 export function testConnectionPosTemplate(
   id: string | number,
-  input: {
-    endpoint_key:
-      | "menu"
-      | "menuCategories"
-      | "menuProducts"
-      | "orderCreate"
-      | "orderStatus"
-      | "riderSync";
-    shop_id?: string;
-  },
+  input: PosTestConnectionInput,
 ) {
-  if (isDevelopmentMode()) return mockTestConnectionPosTemplate();
-  return apiFetch<unknown>(`/v2/pos/templates/${id}/test-connection`, {
-    method: "POST",
-    body: JSON.stringify(input),
-  });
+  if (isDevelopmentMode()) return mockTestConnectionPosTemplate(input);
+  return apiFetch<PosTestConnectionResponse>(
+    `/v2/pos/templates/${id}/test-connection`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
 }
 
 export function deletePosTemplate(id: string | number) {
   if (isDevelopmentMode()) return mockDeletePosTemplate(id);
-  return apiFetch<unknown>(`/v2/pos/templates/${id}`, {
+  return apiFetch<{ ok?: boolean }>(`/v2/pos/templates/${id}`, {
     method: "DELETE",
   });
 }
 
-export function listShopLinks(params?: {
-  page?: number;
-  limit?: number;
-  shop_id?: string;
-}) {
+export function listShopLinks(params?: ListShopLinksParams) {
   if (isDevelopmentMode()) return mockListShopLinks(params);
-  return apiFetch<Paginated<PosShopLink>>("/v2/pos/shop-links", { params });
+  return apiFetch<Paginated<PosShopLink>>("/v2/pos/shop-links", {
+    params: {
+      page: params?.page ?? 1,
+      limit: params?.limit ?? 20,
+      search: params?.search,
+      provider: params?.provider,
+      connector_type: params?.connector_type,
+      is_active: params?.is_active,
+      catalog_sync_enabled: params?.catalog_sync_enabled,
+      order_push_enabled: params?.order_push_enabled,
+      shop_id: params?.shop_id,
+    },
+  });
 }
 
 export function getShopLink(shopId: string) {
@@ -196,7 +184,7 @@ export function getShopLink(shopId: string) {
   return apiFetch<PosShopLink>(`/v2/pos/shops/${shopId}/link`);
 }
 
-export function attachShopLink(shopId: string, input: Record<string, unknown>) {
+export function attachShopLink(shopId: string, input: AttachPosShopLinkInput) {
   if (isDevelopmentMode()) return mockAttachShopLink(shopId, input);
   return apiFetch<PosShopLink>(`/v2/pos/shops/${shopId}/link`, {
     method: "PUT",
@@ -206,7 +194,7 @@ export function attachShopLink(shopId: string, input: Record<string, unknown>) {
 
 export function patchLinkFeatures(
   shopId: string,
-  input: Record<string, unknown>,
+  input: PatchPosLinkFeaturesInput,
 ) {
   if (isDevelopmentMode()) return mockPatchLinkFeatures(shopId, input);
   return apiFetch<PosShopLink>(`/v2/pos/shops/${shopId}/link/features`, {
@@ -217,7 +205,5 @@ export function patchLinkFeatures(
 
 export function getSyncStatus(shopId: string) {
   if (isDevelopmentMode()) return mockGetSyncStatus(shopId);
-  return apiFetch<Record<string, unknown>>(
-    `/v2/pos/shops/${shopId}/sync-status`,
-  );
+  return apiFetch<PosSyncStatus>(`/v2/pos/shops/${shopId}/sync-status`);
 }

@@ -11,10 +11,19 @@ import type {
   Paginated,
   PatchShopInput,
   PatchShopResponse,
+  AttachPosShopLinkInput,
+  CreatePosTemplateInput,
+  PatchPosLinkFeaturesInput,
   PosShopLink,
+  PosSyncStatus,
   PosTemplate,
   PosTemplateSummary,
+  PosTestConnectionInput,
+  PosTestConnectionResponse,
+  PosTestMapInput,
+  PosTestMapResponse,
   ReportDataset,
+  UpdatePosTemplateInput,
   RestaurantPerformanceRow,
   Rider,
   RotateIntegrationTokenResponse,
@@ -27,6 +36,14 @@ import type {
   TriggerShopLogoutResponse,
 } from "@/types/api";
 import { siteConfig } from "@/config/site";
+import {
+  defaultPosTemplateConfig,
+  isPosProvider,
+  laneForProvider,
+  POS_DEFAULT_CAPABILITIES,
+  POS_DEFAULT_EVENTS,
+  type PosProvider,
+} from "@/lib/pos/contract";
 import { SHOP_USER_ID_MAX, SHOP_USER_ID_MIN } from "@/lib/shop-create-validation";
 
 export function isDevelopmentMode() {
@@ -231,49 +248,106 @@ const mockRidersByShop: Record<string, Rider[]> = {
   ],
 };
 
-let mockPosTemplates: PosTemplate[] = [
-  {
-    id: 1,
-    name: "Cratis Default",
-    provider: "cratis",
-    version: "1.0",
-    connector_type: "cratis",
-    description: "Default Cratis mapping profile",
+function seededPosTemplate(
+  id: number,
+  name: string,
+  provider: PosProvider,
+  connector_type: string,
+  description: string,
+): PosTemplate {
+  const config = defaultPosTemplateConfig(provider);
+  const capabilities = POS_DEFAULT_CAPABILITIES[provider];
+  const events = POS_DEFAULT_EVENTS[provider];
+  return {
+    id,
+    name,
+    provider,
+    version: "1",
+    connector_type,
+    lane: laneForProvider(provider),
+    description,
     is_system: true,
     is_active: true,
-    config: {
-      api: {
-        baseUrl: "https://pos.example.com",
-        auth: { type: "none" },
-        endpoints: {},
-      },
-    },
-    created_at: "2026-01-01T00:00:00Z",
-  },
-  {
-    id: 2,
-    name: "Square Sync",
-    provider: "square",
-    version: "2.1",
-    connector_type: "square",
-    description: "Square catalog sync profile",
-    is_system: false,
-    is_active: true,
-    config: { api: { baseUrl: "https://connect.squareup.com" } },
-    created_at: "2026-04-01T00:00:00Z",
-  },
+    capabilities,
+    events,
+    status_maps: { outbound: {}, inbound: {} },
+    config,
+    created_at: "2026-08-04T09:58:20.142Z",
+    updated_at: "2026-08-04T09:58:20.142Z",
+  };
+}
+
+let mockPosTemplates: PosTemplate[] = [
+  seededPosTemplate(
+    1,
+    "saleculator-pull-v1",
+    "saleculator",
+    "saleculator_pull",
+    "Saleculator pull lane (Lane B)",
+  ),
+  seededPosTemplate(
+    2,
+    "cratis-v1",
+    "cratis",
+    "cratis",
+    "Cratis push lane (Lane A)",
+  ),
+  seededPosTemplate(
+    3,
+    "generic-v1",
+    "generic",
+    "generic_json",
+    "Plug-and-play generic JSON (Lane C)",
+  ),
+  seededPosTemplate(
+    4,
+    "gravity-v1",
+    "gravity",
+    "gravity",
+    "Gravity plug-and-play lane",
+  ),
+  seededPosTemplate(
+    5,
+    "topas-v1",
+    "topas",
+    "topas",
+    "Topas plug-and-play lane",
+  ),
 ];
 
+let mockShopLinkSeq = 10;
 const mockShopLinks: Record<string, PosShopLink> = {
   SHOP001: {
+    id: 10,
     shop_id: "SHOP001",
-    mapping_profile_id: 1,
+    mapping_profile_id: 2,
+    mapping_profile_name: "cratis-v1",
     provider: "cratis",
     connector_type: "cratis",
+    lane: "cratis",
     is_active: true,
+    config_overrides: {
+      api: {
+        baseUrl: "https://cratis-pos.example.com",
+        auth: { type: "bearer" },
+      },
+    },
+    config_version: 1,
+    has_credentials: false,
+    webhook_secret_configured: false,
+    integration_token_present: false,
+    integration_enabled: false,
+    capabilities: {},
+    events: POS_DEFAULT_EVENTS.cratis,
+    status_maps: { outbound: {}, inbound: {} },
     catalog_sync_enabled: true,
     order_push_enabled: true,
     order_pull_enabled: false,
+    last_catalog_sync_at: null,
+    last_order_sync_at: null,
+    sync_error: null,
+    created_at: "2026-08-04T10:00:00.000Z",
+    updated_at: "2026-08-04T10:00:00.000Z",
   },
 };
 
@@ -1062,133 +1136,466 @@ export async function mockDeleteRider(shopId: string, dpId: string, hard = false
   return delay({ ok: true, is_deleted: true, mode: "soft" });
 }
 
-export async function mockListPosTemplates(): Promise<
-  Paginated<PosTemplateSummary>
-> {
+function toPosTemplateSummary(template: PosTemplate): PosTemplateSummary {
+  const { config: _config, ...summary } = template;
+  return summary;
+}
+
+export async function mockListPosTemplates(params?: {
+  page?: number;
+  limit?: number;
+  search?: string;
+  provider?: string;
+  connector_type?: string;
+  is_active?: boolean;
+  is_system?: boolean;
+}): Promise<Paginated<PosTemplateSummary>> {
+  let items = mockPosTemplates.map(toPosTemplateSummary);
+  if (params?.search) {
+    const q = params.search.toLowerCase();
+    items = items.filter((t) => t.name.toLowerCase().includes(q));
+  }
+  if (params?.provider) {
+    items = items.filter((t) => t.provider === params.provider);
+  }
+  if (params?.connector_type) {
+    items = items.filter((t) => t.connector_type === params.connector_type);
+  }
+  if (typeof params?.is_active === "boolean") {
+    items = items.filter((t) => Boolean(t.is_active) === params.is_active);
+  }
+  if (typeof params?.is_system === "boolean") {
+    items = items.filter((t) => Boolean(t.is_system) === params.is_system);
+  }
+  const page = params?.page ?? 1;
+  const limit = params?.limit ?? 20;
+  const start = (page - 1) * limit;
   return delay({
-    items: mockPosTemplates.map(({ config: _c, ...rest }) => rest),
-    total: mockPosTemplates.length,
-    page: 1,
-    limit: 50,
+    items: items.slice(start, start + limit),
+    total: items.length,
+    page,
+    limit,
   });
 }
 
 export async function mockCreatePosTemplate(
-  input: Record<string, unknown>,
+  input: CreatePosTemplateInput,
 ): Promise<PosTemplate> {
+  if (mockPosTemplates.some((t) => t.name === input.name)) {
+    throw Object.assign(new Error(`Mapping profile '${input.name}' already exists`), {
+      status: 409,
+      body: {
+        code: "profile_name_exists",
+        message: `Mapping profile '${input.name}' already exists`,
+      },
+    });
+  }
+  const provider = isPosProvider(input.provider) ? input.provider : "generic";
+  const config = input.config;
+  const capabilities =
+    (config.capabilities as PosTemplate["capabilities"]) ??
+    POS_DEFAULT_CAPABILITIES[provider];
+  const events =
+    (config.events as PosTemplate["events"]) ?? POS_DEFAULT_EVENTS[provider];
   const created: PosTemplate = {
-    id: mockPosTemplates.length + 1,
-    name: String(input.name ?? "Untitled"),
-    provider: String(input.provider ?? "custom"),
-    version: String(input.version ?? "1.0"),
-    connector_type: String(input.connector_type ?? "custom"),
-    description: (input.description as string) ?? null,
+    id: Math.max(0, ...mockPosTemplates.map((t) => Number(t.id))) + 1,
+    name: input.name,
+    provider,
+    version: input.version,
+    connector_type: input.connector_type,
+    lane: laneForProvider(provider),
+    description: input.description ?? null,
     is_system: Boolean(input.is_system),
     is_active: input.is_active !== false,
-    config: (input.config as Record<string, unknown>) ?? {},
+    capabilities,
+    events,
+    status_maps:
+      (config.status_maps as PosTemplate["status_maps"]) ?? {
+        outbound: {},
+        inbound: {},
+      },
+    config,
     created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
   };
   mockPosTemplates = [created, ...mockPosTemplates];
   return delay(created);
 }
 
-export async function mockGetPosTemplate(id: string | number): Promise<PosTemplate> {
+export async function mockGetPosTemplate(
+  id: string | number,
+): Promise<PosTemplate> {
   const found = mockPosTemplates.find((t) => String(t.id) === String(id));
-  if (!found) throw Object.assign(new Error("Template not found"), { status: 404 });
+  if (!found) {
+    throw Object.assign(new Error("profile_not_found"), {
+      status: 404,
+      body: { code: "profile_not_found", message: "profile_not_found" },
+    });
+  }
   return delay(found);
 }
 
 export async function mockPatchPosTemplate(
   id: string | number,
-  input: Record<string, unknown>,
+  input: UpdatePosTemplateInput,
 ) {
   const idx = mockPosTemplates.findIndex((t) => String(t.id) === String(id));
-  if (idx >= 0) {
-    mockPosTemplates[idx] = { ...mockPosTemplates[idx], ...input };
-    return delay(mockPosTemplates[idx]);
+  if (idx < 0) {
+    throw Object.assign(new Error("profile_not_found"), {
+      status: 404,
+      body: { code: "profile_not_found", message: "profile_not_found" },
+    });
   }
-  return delay(input as PosTemplate);
+  const current = mockPosTemplates[idx];
+  const nextConfig = input.config ?? current.config;
+  const next: PosTemplate = {
+    ...current,
+    description:
+      input.description !== undefined ? input.description : current.description,
+    is_active:
+      input.is_active !== undefined ? input.is_active : current.is_active,
+    version: input.version !== undefined ? input.version : current.version,
+    config: nextConfig,
+    capabilities:
+      (nextConfig?.capabilities as PosTemplate["capabilities"]) ??
+      current.capabilities,
+    events: (nextConfig?.events as PosTemplate["events"]) ?? current.events,
+    status_maps:
+      (nextConfig?.status_maps as PosTemplate["status_maps"]) ??
+      current.status_maps,
+    updated_at: new Date().toISOString(),
+  };
+  mockPosTemplates[idx] = next;
+  return delay(next);
 }
 
 export async function mockClonePosTemplate(id: string | number) {
   const source = await mockGetPosTemplate(id);
+  const provider = isPosProvider(source.provider)
+    ? source.provider
+    : "generic";
   return mockCreatePosTemplate({
-    ...source,
     name: `${source.name}-clone-${Date.now()}`.slice(0, 100),
+    provider,
+    version: source.version,
+    connector_type: source.connector_type as CreatePosTemplateInput["connector_type"],
+    description: source.description ?? undefined,
     is_system: false,
+    is_active: true,
+    config: (source.config as Record<string, unknown>) ?? defaultPosTemplateConfig(provider),
   });
 }
 
-export async function mockTestMapPosTemplate() {
-  return delay({ ok: true, mapped_fields: 12, sample: { item: "Chicken Biryani" } });
+export async function mockTestMapPosTemplate(
+  input: PosTestMapInput,
+): Promise<PosTestMapResponse> {
+  return delay({
+    mapping_section: input.mapping_section,
+    mapped: {
+      order_id:
+        typeof input.sample_payload.id === "string" ||
+        typeof input.sample_payload.id === "number"
+          ? String(input.sample_payload.id)
+          : "POS-1001",
+    },
+  });
 }
 
-export async function mockTestConnectionPosTemplate() {
-  return delay({ ok: true, latency_ms: 120 });
+export async function mockTestConnectionPosTemplate(
+  input: PosTestConnectionInput,
+): Promise<PosTestConnectionResponse> {
+  return delay({
+    endpoint_key: input.endpoint_key,
+    url: `https://pos-vendor.example.com/api/${input.endpoint_key}`,
+    ok: true,
+    status_code: 200,
+    latency_ms: 120,
+    error: null,
+  });
 }
 
 export async function mockDeletePosTemplate(id: string | number) {
-  mockPosTemplates = mockPosTemplates.filter((t) => String(t.id) !== String(id));
+  const linked = Object.values(mockShopLinks).filter(
+    (link) =>
+      String(link.mapping_profile_id) === String(id) && link.is_active !== false,
+  );
+  if (linked.length > 0) {
+    throw Object.assign(
+      new Error(
+        `Cannot deactivate profile ${id}: ${linked.length} active shop link(s) remain`,
+      ),
+      {
+        status: 409,
+        body: {
+          code: "profile_has_active_shop_links",
+          message: `Cannot deactivate profile ${id}: ${linked.length} active shop link(s) remain`,
+        },
+      },
+    );
+  }
+  const idx = mockPosTemplates.findIndex((t) => String(t.id) === String(id));
+  if (idx >= 0) {
+    mockPosTemplates[idx] = {
+      ...mockPosTemplates[idx],
+      is_active: false,
+      updated_at: new Date().toISOString(),
+    };
+  }
   return delay({ ok: true });
 }
 
 export async function mockListShopLinks(params?: {
   page?: number;
   limit?: number;
+  search?: string;
+  provider?: string;
+  connector_type?: string;
+  is_active?: boolean;
+  catalog_sync_enabled?: boolean;
+  order_push_enabled?: boolean;
   shop_id?: string;
 }): Promise<Paginated<PosShopLink>> {
   let items = Object.values(mockShopLinks);
   if (params?.shop_id) {
     items = items.filter((link) => link.shop_id === params.shop_id);
   }
+  if (params?.search) {
+    const q = params.search.toLowerCase();
+    items = items.filter(
+      (link) =>
+        link.shop_id.toLowerCase().includes(q) ||
+        String(link.mapping_profile_name ?? "")
+          .toLowerCase()
+          .includes(q),
+    );
+  }
+  if (params?.provider) {
+    items = items.filter((link) => link.provider === params.provider);
+  }
+  if (params?.connector_type) {
+    items = items.filter((link) => link.connector_type === params.connector_type);
+  }
+  if (typeof params?.is_active === "boolean") {
+    items = items.filter((link) => Boolean(link.is_active) === params.is_active);
+  }
+  if (typeof params?.catalog_sync_enabled === "boolean") {
+    items = items.filter(
+      (link) =>
+        Boolean(link.catalog_sync_enabled) === params.catalog_sync_enabled,
+    );
+  }
+  if (typeof params?.order_push_enabled === "boolean") {
+    items = items.filter(
+      (link) => Boolean(link.order_push_enabled) === params.order_push_enabled,
+    );
+  }
+  const page = params?.page ?? 1;
+  const limit = params?.limit ?? 20;
+  const start = (page - 1) * limit;
   return delay({
-    items,
+    items: items.slice(start, start + limit),
     total: items.length,
-    page: params?.page ?? 1,
-    limit: params?.limit ?? 50,
+    page,
+    limit,
   });
 }
 
 export async function mockGetShopLink(shopId: string): Promise<PosShopLink> {
-  return delay(
-    mockShopLinks[shopId] ?? {
-      shop_id: shopId,
-      is_active: false,
-      catalog_sync_enabled: false,
-      order_push_enabled: false,
-      order_pull_enabled: false,
-    },
-  );
+  const found = mockShopLinks[shopId];
+  if (!found) {
+    throw Object.assign(new Error("integration_not_found"), {
+      status: 404,
+      body: { code: "integration_not_found", message: "integration_not_found" },
+    });
+  }
+  return delay(found);
 }
 
 export async function mockAttachShopLink(
   shopId: string,
-  input: Record<string, unknown>,
+  input: AttachPosShopLinkInput,
 ) {
-  mockShopLinks[shopId] = {
+  const profile = mockPosTemplates.find(
+    (t) => Number(t.id) === Number(input.mapping_profile_id) && t.is_active !== false,
+  );
+  if (!profile) {
+    throw Object.assign(new Error("profile_not_found"), {
+      status: 404,
+      body: { code: "profile_not_found", message: "profile_not_found" },
+    });
+  }
+  if (profile.provider !== input.provider) {
+    throw Object.assign(new Error("profile_provider_mismatch"), {
+      status: 400,
+      body: {
+        code: "profile_provider_mismatch",
+        message: "profile_provider_mismatch",
+      },
+    });
+  }
+  if (profile.connector_type !== input.connector_type) {
+    throw Object.assign(new Error("profile_connector_mismatch"), {
+      status: 400,
+      body: {
+        code: "profile_connector_mismatch",
+        message: "profile_connector_mismatch",
+      },
+    });
+  }
+
+  const provider = isPosProvider(input.provider) ? input.provider : "generic";
+  const extras = mockShopExtras[shopId];
+  const integrationEnabled = Boolean(
+    extras?.features?.integration_enabled ?? false,
+  );
+
+  if (provider === "saleculator" && !integrationEnabled) {
+    throw Object.assign(
+      new Error(
+        "integration_enabled must be true on the shop before attaching Saleculator lane",
+      ),
+      {
+        status: 400,
+        body: {
+          code: "integration_disabled",
+          message:
+            "integration_enabled must be true on the shop before attaching Saleculator lane",
+        },
+      },
+    );
+  }
+
+  let catalog_sync_enabled = Boolean(input.catalog_sync_enabled);
+  let order_push_enabled = Boolean(input.order_push_enabled);
+  let order_pull_enabled = Boolean(input.order_pull_enabled);
+  if (provider === "saleculator") {
+    catalog_sync_enabled = false;
+    order_push_enabled = false;
+    order_pull_enabled = true;
+  } else if (provider === "cratis") {
+    catalog_sync_enabled = true;
+    order_push_enabled = true;
+    order_pull_enabled = false;
+  } else {
+    catalog_sync_enabled = input.catalog_sync_enabled ?? false;
+    order_push_enabled = input.order_push_enabled ?? true;
+    order_pull_enabled = input.order_pull_enabled ?? false;
+  }
+
+  const overrides = (input.config_overrides ?? {}) as Record<string, unknown>;
+  const api = (overrides.api ?? {}) as Record<string, unknown>;
+  const baseUrl = typeof api.baseUrl === "string" ? api.baseUrl.trim() : "";
+  if (order_push_enabled && !baseUrl) {
+    throw Object.assign(
+      new Error(
+        "config_overrides.api.baseUrl is required when order push is enabled for this lane",
+      ),
+      {
+        status: 400,
+        body: {
+          code: "pos_base_url_required",
+          message:
+            "config_overrides.api.baseUrl is required when order push is enabled for this lane",
+        },
+      },
+    );
+  }
+
+  const existing = mockShopLinks[shopId];
+  const now = new Date().toISOString();
+  const link: PosShopLink = {
+    id: existing?.id ?? ++mockShopLinkSeq,
     shop_id: shopId,
-    ...mockShopLinks[shopId],
-    ...input,
-    is_active: true,
+    mapping_profile_id: Number(input.mapping_profile_id),
+    mapping_profile_name: profile.name,
+    provider: input.provider,
+    connector_type: input.connector_type,
+    lane: laneForProvider(provider),
+    is_active: input.is_active !== false,
+    config_overrides: overrides,
+    config_version: (existing?.config_version ?? 0) + 1,
+    has_credentials: Boolean(input.credentials_plaintext),
+    webhook_secret_configured: Boolean(input.webhook_secret),
+    integration_token_present: Boolean(extras?.has_integration_token),
+    integration_enabled: integrationEnabled,
+    capabilities: input.capabilities ?? {},
+    events: profile.events ?? POS_DEFAULT_EVENTS[provider],
+    status_maps: profile.status_maps ?? { outbound: {}, inbound: {} },
+    catalog_sync_enabled,
+    order_push_enabled,
+    order_pull_enabled,
+    last_catalog_sync_at: existing?.last_catalog_sync_at ?? null,
+    last_order_sync_at: existing?.last_order_sync_at ?? null,
+    sync_error: null,
+    created_at: existing?.created_at ?? now,
+    updated_at: now,
   };
-  return delay(mockShopLinks[shopId]);
+  mockShopLinks[shopId] = link;
+  return delay(link);
 }
 
 export async function mockPatchLinkFeatures(
   shopId: string,
-  input: Record<string, unknown>,
+  input: PatchPosLinkFeaturesInput,
 ) {
-  mockShopLinks[shopId] = { ...mockShopLinks[shopId], shop_id: shopId, ...input };
+  const existing = mockShopLinks[shopId];
+  if (!existing) {
+    throw Object.assign(new Error("integration_not_found"), {
+      status: 404,
+      body: { code: "integration_not_found", message: "integration_not_found" },
+    });
+  }
+  if (
+    existing.provider === "saleculator" &&
+    input.catalog_sync_enabled === true
+  ) {
+    throw Object.assign(
+      new Error("Catalog sync is not supported for Saleculator pull lane"),
+      {
+        status: 400,
+        body: {
+          code: "saleculator_catalog_disabled",
+          message: "Catalog sync is not supported for Saleculator pull lane",
+        },
+      },
+    );
+  }
+  mockShopLinks[shopId] = {
+    ...existing,
+    ...input,
+    updated_at: new Date().toISOString(),
+  };
   return delay(mockShopLinks[shopId]);
 }
 
-export async function mockGetSyncStatus(shopId: string) {
+export async function mockGetSyncStatus(shopId: string): Promise<PosSyncStatus> {
+  const link = mockShopLinks[shopId];
+  const extras = mockShopExtras[shopId];
+  const integrationEnabled = Boolean(
+    extras?.features?.integration_enabled ?? link?.integration_enabled,
+  );
+  const warnings: string[] = [];
+  if (link?.provider === "saleculator" && !integrationEnabled) {
+    warnings.push(
+      "integration_enabled is false; Saleculator poll requires enabled integration and a valid token.",
+    );
+  }
   return delay({
     shop_id: shopId,
-    last_sync_at: "2026-07-22T12:00:00Z",
-    catalog_status: "ok",
-    order_status: "ok",
-    pending_items: 0,
+    provider: link?.provider ?? null,
+    connector_type: link?.connector_type ?? null,
+    lane: link?.lane ?? null,
+    is_active: Boolean(link?.is_active),
+    integration_enabled: integrationEnabled,
+    integration_token_present: Boolean(extras?.has_integration_token),
+    catalog_sync_enabled: Boolean(link?.catalog_sync_enabled),
+    order_push_enabled: Boolean(link?.order_push_enabled),
+    order_pull_enabled: Boolean(link?.order_pull_enabled),
+    last_catalog_sync_at: link?.last_catalog_sync_at ?? null,
+    last_order_sync_at: link?.last_order_sync_at ?? "2026-08-04T11:30:00.000Z",
+    sync_error: link?.sync_error ?? null,
+    config_version: link?.config_version ?? null,
+    warnings,
   });
 }
 

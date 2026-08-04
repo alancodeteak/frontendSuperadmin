@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -18,6 +18,7 @@ import {
 import { ShopLocationModal } from "@/components/shops/shop-location-modal";
 import { ShopProfileHero } from "@/components/shops/shop-profile-hero";
 import { ShopEcomTab } from "@/components/shops/shop-ecom-tab";
+import { ShopPosTab } from "@/components/shops/shop-pos-tab";
 import {
   ShopConfirmDialog,
   type ShopConfirmPhase,
@@ -76,15 +77,12 @@ import {
   restoreRider,
   unblockRider,
 } from "@/lib/api/riders";
-import { attachShopLink, patchLinkFeatures } from "@/lib/api/pos";
 import {
   shopDetailQuery,
-  shopPosLinkQuery,
   shopPromotionQuery,
   shopProductsQuery,
   shopRidersQuery,
   shopSubscriptionQuery,
-  shopSyncStatusQuery,
 } from "@/lib/queries/shops";
 import {
   digitsOnly,
@@ -92,10 +90,8 @@ import {
   normalizeUaePhoneInput,
   UAE_COUNTRY_CODE,
 } from "@/lib/shop-create-validation";
-import { posTemplatesQuery } from "@/lib/queries/pos";
 import { cn, formatCurrency } from "@/lib/utils";
 import type {
-  PosShopLink,
   Rider,
   ShopDeliverySettings,
   ShopDetail,
@@ -189,7 +185,7 @@ function SubscriptionDetailRow({
     <div className="flex items-start justify-between gap-4 border-b border-border py-3 text-sm last:border-b-0">
       <dt className="shrink-0 text-muted-foreground">{label}</dt>
       <dd className="min-w-0 text-right font-medium break-words">
-        {value || <span className="font-normal text-muted-foreground">—</span>}
+        {value || <span className="font-normal text-muted-foreground">â€”</span>}
       </dd>
     </div>
   );
@@ -295,7 +291,7 @@ export default function ShopDetailPage() {
         await restoreShop(shopId);
         setConfirmPhase("success");
         appToast.success(
-          "Shop restored. Status is inactive — activate if needed.",
+          "Shop restored. Status is inactive â€” activate if needed.",
         );
         await loadShop();
         window.setTimeout(() => {
@@ -311,7 +307,7 @@ export default function ShopDetailPage() {
       setLogoutNote(null);
       const res = await triggerShopLogoutEvent(shopId);
       setLogoutNote(
-        `Logout alert accepted · event ${res.event_id} · ${new Date(res.occurred_at).toLocaleString("en-AE", { timeZone: "Asia/Dubai" })}`,
+        `Logout alert accepted Â· event ${res.event_id} Â· ${new Date(res.occurred_at).toLocaleString("en-AE", { timeZone: "Asia/Dubai" })}`,
       );
       setConfirmPhase("success");
       appToast.success("Logout alert sent to online sessions.");
@@ -325,7 +321,7 @@ export default function ShopDetailPage() {
       let msg: string;
       if (err instanceof ApiError && confirmAction === "force-logout") {
         if (err.status === 404) {
-          msg = "Shop not found — cannot send logout alert.";
+          msg = "Shop not found â€” cannot send logout alert.";
         } else if (err.status === 403) {
           msg = "You need superadmin access to send logout alerts.";
         } else if (err.status >= 500) {
@@ -385,7 +381,7 @@ export default function ShopDetailPage() {
           confirmVariant: "destructive" as const,
           icon: Trash2Icon,
           iconClassName: "bg-destructive/10 text-destructive",
-          loadingTitle: "Soft-deleting shop…",
+          loadingTitle: "Soft-deleting shopâ€¦",
           loadingDescription: "Marking this shop as deleted.",
           successTitle: "Shop soft-deleted",
           successDescription:
@@ -402,7 +398,7 @@ export default function ShopDetailPage() {
             confirmVariant: "destructive" as const,
             icon: Trash2Icon,
             iconClassName: "bg-destructive/10 text-destructive",
-            loadingTitle: "Deleting shop…",
+            loadingTitle: "Deleting shopâ€¦",
             loadingDescription: "Permanently removing this shop.",
             successTitle: "Shop permanently deleted",
             successDescription:
@@ -414,16 +410,16 @@ export default function ShopDetailPage() {
           ? {
               title: "Restore this shop?",
               description:
-                "Clears the deleted flag. Status stays inactive — re-activate the shop if needed. Feature flags are left as they were.",
+                "Clears the deleted flag. Status stays inactive â€” re-activate the shop if needed. Feature flags are left as they were.",
               confirmLabel: "Restore shop",
               confirmVariant: "default" as const,
               icon: RotateCcwIcon,
               iconClassName: "bg-primary/10 text-primary",
-              loadingTitle: "Restoring shop…",
+              loadingTitle: "Restoring shopâ€¦",
               loadingDescription: "Clearing the deleted flag.",
               successTitle: "Shop restored",
               successDescription:
-                "Status is inactive — activate if needed.",
+                "Status is inactive â€” activate if needed.",
               successActionLabel: "Done",
               errorTitle: "Could not restore shop",
             }
@@ -436,7 +432,7 @@ export default function ShopDetailPage() {
                 confirmVariant: "default" as const,
                 icon: BanIcon,
                 iconClassName: "bg-primary/10 text-primary",
-                loadingTitle: "Sending logout alert…",
+                loadingTitle: "Sending logout alertâ€¦",
                 loadingDescription: "Notifying online sessions.",
                 successTitle: "Logout alert sent",
                 successDescription:
@@ -453,7 +449,7 @@ export default function ShopDetailPage() {
       <div className="px-6 pt-4 pb-8 sm:px-8">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <Button variant="ghost" size="sm" className="-ml-2" render={<Link href="/shops" />}>
-            ← Shops
+            â† Shops
           </Button>
           <div className="flex flex-wrap items-center gap-2">
             {shop.is_deleted ? (
@@ -465,7 +461,7 @@ export default function ShopDetailPage() {
               disabled={logoutBusy || Boolean(shop.is_deleted)}
               onClick={() => openConfirm("force-logout")}
             >
-              {logoutBusy ? "Sending…" : "Force logout"}
+              {logoutBusy ? "Sendingâ€¦" : "Force logout"}
             </Button>
             {shop.is_deleted ? (
               <Button
@@ -539,7 +535,7 @@ export default function ShopDetailPage() {
           <PromotionTab shopId={shopId} shop={shop} />
         ) : null}
         {tab === "riders" ? <RidersTab shopId={shopId} /> : null}
-        {tab === "pos" ? <PosLinkTab shopId={shopId} /> : null}
+        {tab === "pos" ? <ShopPosTab shopId={shopId} /> : null}
       </div>
 
       {confirmConfig ? (
@@ -1079,7 +1075,7 @@ function OverviewTab({
                 Cancel
               </Button>
               <Button type="submit" disabled={saving}>
-                {saving ? "Saving…" : "Save changes"}
+                {saving ? "Savingâ€¦" : "Save changes"}
               </Button>
             </div>
           </form>
@@ -1603,7 +1599,7 @@ function FeaturesTab({
         ) : null}
 
         <Button type="submit" disabled={saving}>
-          {saving ? "Saving…" : "Save feature flags"}
+          {saving ? "Savingâ€¦" : "Save feature flags"}
         </Button>
       </form>
     </ShopSection>
@@ -1629,7 +1625,7 @@ function FeaturesTab({
       icon={RefreshCwIcon}
       shopName={shopDisplayName}
       shopId={shop.shop_id}
-      loadingTitle="Rotating token…"
+      loadingTitle="Rotating tokenâ€¦"
       loadingDescription="Issuing a new integration secret."
       errorTitle="Could not rotate token"
       errorMessage={rotateError}
@@ -1648,7 +1644,7 @@ const productColumns: ColumnDef<ShopProduct>[] = [
     accessorKey: "id",
     header: "ID",
     cell: ({ row }) => (
-      <span className="font-mono text-xs">{row.original.id ?? "—"}</span>
+      <span className="font-mono text-xs">{row.original.id ?? "â€”"}</span>
     ),
     meta: { label: "ID" },
     size: 80,
@@ -1658,7 +1654,7 @@ const productColumns: ColumnDef<ShopProduct>[] = [
     accessorFn: (row) => row.product_name ?? row.name ?? "",
     header: "Product",
     cell: ({ row }) => {
-      const name = row.original.product_name ?? row.original.name ?? "—";
+      const name = row.original.product_name ?? row.original.name ?? "â€”";
       const alt = row.original.product_name_alt;
       return (
         <div className="min-w-0">
@@ -1677,7 +1673,7 @@ const productColumns: ColumnDef<ShopProduct>[] = [
     header: "Price",
     cell: ({ row }) => {
       const price = row.original.price;
-      if (price == null || price === "") return "—";
+      if (price == null || price === "") return "â€”";
       const amount = Number(price);
       return (
         <span className="tabular-nums">
@@ -1695,7 +1691,7 @@ const productColumns: ColumnDef<ShopProduct>[] = [
     header: "VAT %",
     cell: ({ row }) => {
       const rate = row.original.vat_rate;
-      if (rate == null || rate === "") return "—";
+      if (rate == null || rate === "") return "â€”";
       return <span className="tabular-nums">{String(rate)}%</span>;
     },
     meta: { label: "VAT %" },
@@ -1721,7 +1717,7 @@ const productColumns: ColumnDef<ShopProduct>[] = [
     header: "Availability",
     cell: ({ row }) => (
       <span className="capitalize">
-        {String(row.original.availability ?? "—").replaceAll("_", " ")}
+        {String(row.original.availability ?? "â€”").replaceAll("_", " ")}
       </span>
     ),
     meta: { label: "Availability" },
@@ -1730,7 +1726,7 @@ const productColumns: ColumnDef<ShopProduct>[] = [
   {
     accessorKey: "category_id",
     header: "Category",
-    cell: ({ row }) => row.original.category_id ?? "—",
+    cell: ({ row }) => row.original.category_id ?? "â€”",
     meta: { label: "Category" },
     size: 90,
   },
@@ -1740,7 +1736,7 @@ const productColumns: ColumnDef<ShopProduct>[] = [
     cell: ({ row }) =>
       row.original.diet_type
         ? String(row.original.diet_type).replaceAll("_", " ")
-        : "—",
+        : "â€”",
     meta: { label: "Diet" },
     size: 100,
   },
@@ -1750,7 +1746,7 @@ const productColumns: ColumnDef<ShopProduct>[] = [
     header: "POS ID",
     cell: ({ row }) => (
       <span className="font-mono text-xs">
-        {row.original.pos_product_id ?? row.original.pos_id ?? "—"}
+        {row.original.pos_product_id ?? row.original.pos_id ?? "â€”"}
       </span>
     ),
     meta: { label: "POS ID" },
@@ -1760,7 +1756,7 @@ const productColumns: ColumnDef<ShopProduct>[] = [
     accessorKey: "seo_slug",
     header: "Slug",
     cell: ({ row }) => (
-      <span className="font-mono text-xs">{row.original.seo_slug ?? "—"}</span>
+      <span className="font-mono text-xs">{row.original.seo_slug ?? "â€”"}</span>
     ),
     meta: { label: "Slug" },
     size: 160,
@@ -1768,7 +1764,7 @@ const productColumns: ColumnDef<ShopProduct>[] = [
   {
     accessorKey: "sort_order",
     header: "Sort",
-    cell: ({ row }) => row.original.sort_order ?? "—",
+    cell: ({ row }) => row.original.sort_order ?? "â€”",
     meta: { label: "Sort" },
     size: 70,
   },
@@ -1777,7 +1773,7 @@ const productColumns: ColumnDef<ShopProduct>[] = [
     header: "Description",
     cell: ({ row }) => (
       <span className="line-clamp-2 max-w-[14rem] text-muted-foreground">
-        {row.original.description || "—"}
+        {row.original.description || "â€”"}
       </span>
     ),
     meta: { label: "Description" },
@@ -1789,7 +1785,7 @@ const productColumns: ColumnDef<ShopProduct>[] = [
     cell: ({ row }) =>
       row.original.created_at
         ? new Date(row.original.created_at).toLocaleDateString("en-AE")
-        : "—",
+        : "â€”",
     meta: { label: "Created" },
     size: 110,
   },
@@ -1799,7 +1795,7 @@ const productColumns: ColumnDef<ShopProduct>[] = [
     cell: ({ row }) =>
       row.original.updated_at
         ? new Date(row.original.updated_at).toLocaleDateString("en-AE")
-        : "—",
+        : "â€”",
     meta: { label: "Updated" },
     size: 110,
   },
@@ -1823,7 +1819,7 @@ function ProductsTab({ shopId }: { shopId: string }) {
       title="Products"
       description={
         loading
-          ? "Loading catalog…"
+          ? "Loading catalogâ€¦"
           : `${items.length} product${items.length === 1 ? "" : "s"}`
       }
       className="max-w-none"
@@ -1840,7 +1836,7 @@ function ProductsTab({ shopId }: { shopId: string }) {
         <DataTable
           columns={productColumns}
           data={items}
-          searchPlaceholder="Search products…"
+          searchPlaceholder="Search productsâ€¦"
           emptyMessage="No products match this search."
           getRowId={(row, index) => String(row.id ?? index)}
           initialPageSize={25}
@@ -2089,7 +2085,7 @@ function DeliveryTab({
           </div>
         ) : null}
         <Button type="submit" disabled={saving}>
-          {saving ? "Saving…" : "Save delivery settings"}
+          {saving ? "Savingâ€¦" : "Save delivery settings"}
         </Button>
       </form>
     </ShopSection>
@@ -2269,7 +2265,7 @@ function SubscriptionTab({
           </div>
         ) : null}
           <Button type="submit" disabled={saving}>
-            {saving ? "Creating…" : "Create"}
+            {saving ? "Creatingâ€¦" : "Create"}
           </Button>
         </form>
       </ShopSection>
@@ -2444,7 +2440,7 @@ function PromotionTab({
               Cancel
             </Button>
             <Button type="submit" disabled={saving}>
-              {saving ? "Saving…" : "Save promotion"}
+              {saving ? "Savingâ€¦" : "Save promotion"}
             </Button>
           </div>
         </form>
@@ -2497,7 +2493,7 @@ function RidersTab({ shopId }: { shopId: string }) {
       header: "ID",
       cell: ({ row }) => {
         const id = String(row.original.delivery_partner_id ?? "");
-        if (!id) return "—";
+        if (!id) return "â€”";
         return (
           <div className="flex min-w-0 items-center gap-1">
             <span className="truncate font-mono text-xs">{id}</span>
@@ -2525,7 +2521,7 @@ function RidersTab({ shopId }: { shopId: string }) {
           .join(" ");
         return (
           <div className="min-w-0">
-            <p className="truncate font-medium">{name || "—"}</p>
+            <p className="truncate font-medium">{name || "â€”"}</p>
             {row.original.age != null ? (
               <p className="text-xs text-muted-foreground">
                 Age {row.original.age}
@@ -2542,7 +2538,7 @@ function RidersTab({ shopId }: { shopId: string }) {
       header: "Phone",
       cell: ({ row }) => {
         const phone = row.original.phone1;
-        if (!phone) return "—";
+        if (!phone) return "â€”";
         return (
           <div className="flex min-w-0 items-center gap-1">
             <span className="truncate tabular-nums">{phone}</span>
@@ -2565,7 +2561,7 @@ function RidersTab({ shopId }: { shopId: string }) {
       header: "Vehicle",
       cell: ({ row }) => (
         <span className="truncate text-muted-foreground">
-          {row.original.vehicle_detail || "—"}
+          {row.original.vehicle_detail || "â€”"}
         </span>
       ),
       meta: { label: "Vehicle" },
@@ -2938,7 +2934,7 @@ function RidersTab({ shopId }: { shopId: string }) {
                 disabled={nextIdLoading || creating}
                 onClick={() => void prefillsNextId()}
               >
-                {nextIdLoading ? "Loading…" : "Next ID"}
+                {nextIdLoading ? "Loadingâ€¦" : "Next ID"}
               </Button>
             </div>
           </Field>
@@ -2971,7 +2967,7 @@ function RidersTab({ shopId }: { shopId: string }) {
           </Field>
           <div className="sm:col-span-2">
             <Button type="submit" disabled={creating}>
-              {creating ? "Creating rider…" : "Create rider"}
+              {creating ? "Creating riderâ€¦" : "Create rider"}
             </Button>
           </div>
         </form>
@@ -3002,7 +2998,7 @@ function RidersTab({ shopId }: { shopId: string }) {
           <DataTable
             columns={riderColumns}
             data={items}
-            searchPlaceholder="Search riders…"
+            searchPlaceholder="Search ridersâ€¦"
             emptyMessage="No riders yet."
             getRowId={(row, index) =>
               String(row.delivery_partner_id ?? index)
@@ -3021,322 +3017,6 @@ function RidersTab({ shopId }: { shopId: string }) {
         }}
         onChanged={load}
       />
-    </div>
-  );
-}
-
-function PosLinkTab({ shopId }: { shopId: string }) {
-  const [form, setForm] = useState({
-    mapping_profile_id: "",
-    provider: "cratis",
-    connector_type: "cratis",
-    is_active: true,
-    catalog_sync_enabled: true,
-    order_push_enabled: true,
-    order_pull_enabled: false,
-  });
-  const [error, setError] = useState<string | null>(null);
-
-  const templatesQuery = useQuery(posTemplatesQuery({ page: 1, limit: 100 }));
-  const linkQuery = useQuery(shopPosLinkQuery(shopId));
-  const syncQuery = useQuery(shopSyncStatusQuery(shopId));
-
-  const templates = templatesQuery.data?.items ?? [];
-  const link = (linkQuery.data as PosShopLink | undefined) ?? null;
-  const sync = (syncQuery.data as Record<string, unknown> | undefined) ?? null;
-
-  const [syncLoading, setSyncLoading] = useState(false);
-
-  const load = async () => {
-    await Promise.all([
-      templatesQuery.refetch(),
-      linkQuery.refetch(),
-      syncQuery.refetch(),
-    ]);
-  };
-
-  async function onRefreshSync() {
-    setSyncLoading(true);
-    try {
-      await syncQuery.refetch();
-      appToast.success("Sync status refreshed.");
-    } catch {
-      appToast.error("Failed to refresh sync status.");
-    } finally {
-      setSyncLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    const existing = linkQuery.data as PosShopLink | undefined;
-    if (!existing) return;
-    setForm({
-      mapping_profile_id: String(existing.mapping_profile_id ?? ""),
-      provider: String(existing.provider ?? "cratis"),
-      connector_type: String(existing.connector_type ?? "cratis"),
-      is_active: Boolean(existing.is_active ?? true),
-      catalog_sync_enabled: Boolean(existing.catalog_sync_enabled ?? true),
-      order_push_enabled: Boolean(existing.order_push_enabled ?? true),
-      order_pull_enabled: Boolean(existing.order_pull_enabled ?? false),
-    });
-  }, [linkQuery.data]);
-
-  const templateOptions = useMemo(() => templates, [templates]);
-
-  async function onAttach(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    try {
-      await attachShopLink(shopId, {
-        mapping_profile_id: Number(form.mapping_profile_id),
-        provider: form.provider,
-        connector_type: form.connector_type,
-        is_active: form.is_active,
-        catalog_sync_enabled: form.catalog_sync_enabled,
-        order_push_enabled: form.order_push_enabled,
-        order_pull_enabled: form.order_pull_enabled,
-      });
-      appToast.success("POS link attached.");
-      await load();
-    } catch (err) {
-      const msg = parseApiFormError(err, "Attach failed").message;
-      setError(msg);
-      appToast.error(msg);
-    }
-  }
-
-  async function onFeatures() {
-    setError(null);
-    try {
-      await patchLinkFeatures(shopId, {
-        catalog_sync_enabled: form.catalog_sync_enabled,
-        order_push_enabled: form.order_push_enabled,
-        order_pull_enabled: form.order_pull_enabled,
-        is_active: form.is_active,
-      });
-      appToast.success("POS link features updated.");
-      await load();
-    } catch (err) {
-      const msg = parseApiFormError(err, "Update failed").message;
-      setError(msg);
-      appToast.error(msg);
-    }
-  }
-
-  return (
-    <div className="space-y-12">
-      <ShopSection
-        title="POS link"
-        description="Attach a mapping template and toggle sync features."
-      >
-        <form onSubmit={onAttach} className="max-w-xl space-y-4">
-          <Field label="Template">
-            <select
-              className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm"
-              value={form.mapping_profile_id}
-              onChange={(e) =>
-                setForm({ ...form, mapping_profile_id: e.target.value })
-              }
-              required
-            >
-              <option value="">Select template…</option>
-              {templateOptions.map((t) => (
-                <option key={String(t.id)} value={String(t.id)}>
-                  {t.name} ({t.provider})
-                </option>
-              ))}
-            </select>
-          </Field>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Provider">
-              <Input
-                value={form.provider}
-                onChange={(e) => setForm({ ...form, provider: e.target.value })}
-              />
-            </Field>
-            <Field label="Connector type">
-              <Input
-                value={form.connector_type}
-                onChange={(e) => setForm({ ...form, connector_type: e.target.value })}
-              />
-            </Field>
-          </div>
-          <div className="divide-y border-y">
-            <label className="flex items-center gap-2 py-3 text-sm">
-              <input
-                type="checkbox"
-                className="size-4 accent-primary"
-                checked={form.catalog_sync_enabled}
-                onChange={(e) =>
-                  setForm({ ...form, catalog_sync_enabled: e.target.checked })
-                }
-              />
-              Catalog sync
-            </label>
-            <label className="flex items-center gap-2 py-3 text-sm">
-              <input
-                type="checkbox"
-                className="size-4 accent-primary"
-                checked={form.order_push_enabled}
-                onChange={(e) =>
-                  setForm({ ...form, order_push_enabled: e.target.checked })
-                }
-              />
-              Order push
-            </label>
-            <label className="flex items-center gap-2 py-3 text-sm">
-              <input
-                type="checkbox"
-                className="size-4 accent-primary"
-                checked={form.order_pull_enabled}
-                onChange={(e) =>
-                  setForm({ ...form, order_pull_enabled: e.target.checked })
-                }
-              />
-              Order pull
-            </label>
-          </div>
-          {error ? (
-          <div
-            role="alert"
-            className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
-          >
-            {error}
-          </div>
-        ) : null}
-          <div className="flex gap-2">
-            <Button type="submit">Save link</Button>
-            <Button type="button" variant="outline" onClick={() => void onFeatures()}>
-              Update features
-            </Button>
-          </div>
-        </form>
-      </ShopSection>
-
-      {link ? (
-        <ShopSection title="Current link" className="max-w-3xl">
-          <pre className="overflow-auto rounded-lg bg-muted/50 p-4 text-xs leading-relaxed">
-            {JSON.stringify(link, null, 2)}
-          </pre>
-        </ShopSection>
-      ) : null}
-      {sync ? (
-        <ShopSection title="Sync status" className="max-w-3xl">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <p className="text-sm text-muted-foreground">
-              Live POS sync state for this shop.
-            </p>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={syncLoading || syncQuery.isFetching}
-              onClick={() => void onRefreshSync()}
-            >
-              <RefreshCwIcon
-                className={cn(
-                  "size-3.5",
-                  (syncLoading || syncQuery.isFetching) && "animate-spin",
-                )}
-              />
-              {syncLoading || syncQuery.isFetching
-                ? "Refreshing…"
-                : "Refresh sync status"}
-            </Button>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            {(
-              [
-                ["shop_id", "Shop ID"],
-                ["last_sync_at", "Last synced"],
-                ["catalog_status", "Catalog status"],
-                ["order_status", "Order status"],
-                ["pending_items", "Pending items"],
-              ] as const
-            ).map(([key, label]) => {
-              const raw = (sync as Record<string, unknown>)[key];
-              let display = raw != null ? String(raw) : "—";
-              if (key === "last_sync_at" && raw) {
-                try {
-                  display = new Date(String(raw)).toLocaleString("en-AE", {
-                    timeZone: "Asia/Dubai",
-                    dateStyle: "medium",
-                    timeStyle: "short",
-                  });
-                } catch {
-                  // keep raw value
-                }
-              }
-              const isStatus = key === "catalog_status" || key === "order_status";
-              const tone =
-                isStatus && display === "ok"
-                  ? "text-emerald-700 bg-emerald-500/10"
-                  : isStatus && display !== "—"
-                    ? "text-destructive bg-destructive/10"
-                    : "text-foreground";
-
-              return (
-                <div
-                  key={key}
-                  className="flex flex-col gap-1 rounded-xl border bg-card p-3"
-                >
-                  <span className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-                    {label}
-                  </span>
-                  <span
-                    className={cn(
-                      "text-sm font-semibold",
-                      isStatus
-                        ? `inline-flex w-fit items-center rounded-full px-2 py-0.5 text-xs capitalize ${tone}`
-                        : "font-mono text-xs",
-                    )}
-                  >
-                    {display}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-
-          {Object.keys(sync).some(
-            (k) =>
-              !["shop_id", "last_sync_at", "catalog_status", "order_status", "pending_items"].includes(k),
-          ) ? (
-            <details className="mt-4">
-              <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
-                Show full sync payload
-              </summary>
-              <pre className="mt-2 max-h-64 overflow-auto rounded-xl bg-muted/50 p-4 text-xs leading-relaxed">
-                {JSON.stringify(sync, null, 2)}
-              </pre>
-            </details>
-          ) : null}
-        </ShopSection>
-      ) : (
-        <ShopSection title="Sync status" className="max-w-3xl">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm text-muted-foreground">
-              No sync data loaded yet.
-            </p>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={syncLoading || syncQuery.isFetching}
-              onClick={() => void onRefreshSync()}
-            >
-              <RefreshCwIcon
-                className={cn(
-                  "size-3.5",
-                  (syncLoading || syncQuery.isFetching) && "animate-spin",
-                )}
-              />
-              {syncLoading || syncQuery.isFetching ? "Loading…" : "Load sync status"}
-            </Button>
-          </div>
-        </ShopSection>
-      )}
     </div>
   );
 }

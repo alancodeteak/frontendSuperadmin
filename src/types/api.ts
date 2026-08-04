@@ -341,34 +341,164 @@ export type CreateRiderInput = {
   delivery_partner_id?: string;
 };
 
+/** Flattened on list; full `config` only on GET by id / create / patch / clone. */
 export type PosTemplateSummary = {
-  id: number | string;
+  id: number;
   name: string;
-  provider?: string;
-  version?: string;
-  connector_type?: string;
+  provider: string;
+  version: string;
+  connector_type: string;
+  lane?: string | null;
   description?: string | null;
   is_system?: boolean;
   is_active?: boolean;
+  capabilities?: {
+    catalog?: string;
+    orders_out?: string;
+    orders_in?: string;
+    status_out?: string;
+    status_in?: string;
+    riders?: string;
+  } | null;
+  events?: {
+    order_create_on?: string[];
+    status_out_on?: string[];
+  } | null;
+  status_maps?: {
+    outbound?: Record<string, unknown>;
+    inbound?: Record<string, unknown>;
+    export?: Record<string, unknown>;
+  } | null;
   created_at?: string;
   updated_at?: string;
 };
 
 export type PosTemplate = PosTemplateSummary & {
+  /** Present on detail / write responses only. */
   config?: Record<string, unknown>;
-  [key: string]: unknown;
 };
 
 export type PosShopLink = {
-  shop_id?: string;
-  mapping_profile_id?: number | string;
-  provider?: string;
-  connector_type?: string;
+  id?: number;
+  shop_id: string;
+  mapping_profile_id: number;
+  mapping_profile_name?: string | null;
+  provider: string;
+  connector_type: string;
+  lane?: string | null;
+  is_active?: boolean;
+  config_overrides?: Record<string, unknown> | null;
+  config_version?: number | null;
+  has_credentials?: boolean;
+  webhook_secret_configured?: boolean;
+  integration_token_present?: boolean;
+  integration_enabled?: boolean;
+  capabilities?: Record<string, unknown> | null;
+  events?: {
+    order_create_on?: string[];
+    status_out_on?: string[];
+  } | null;
+  status_maps?: Record<string, unknown> | null;
+  catalog_sync_enabled?: boolean;
+  order_push_enabled?: boolean;
+  order_pull_enabled?: boolean;
+  last_catalog_sync_at?: string | null;
+  last_order_sync_at?: string | null;
+  sync_error?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+/** GET /v2/pos/shops/:shopId/sync-status */
+export type PosSyncStatus = {
+  shop_id: string;
+  provider?: string | null;
+  connector_type?: string | null;
+  lane?: string | null;
+  is_active?: boolean;
+  integration_enabled?: boolean;
+  integration_token_present?: boolean;
+  catalog_sync_enabled?: boolean;
+  order_push_enabled?: boolean;
+  order_pull_enabled?: boolean;
+  last_catalog_sync_at?: string | null;
+  last_order_sync_at?: string | null;
+  sync_error?: string | null;
+  config_version?: number | null;
+  warnings?: string[];
+};
+
+/** POST /v2/pos/templates — required fields locked to API contract. */
+export type CreatePosTemplateInput = {
+  name: string;
+  provider: string;
+  version: string;
+  connector_type: string;
+  description?: string;
+  is_system?: boolean;
+  is_active?: boolean;
+  config: Record<string, unknown>;
+};
+
+/** PATCH /v2/pos/templates/:id — only these keys are accepted. */
+export type UpdatePosTemplateInput = {
+  description?: string;
+  is_active?: boolean;
+  version?: string;
+  config?: Record<string, unknown>;
+};
+
+/** PUT /v2/pos/shops/:shopId/link — attach / upsert body. */
+export type AttachPosShopLinkInput = {
+  mapping_profile_id: number;
+  provider: string;
+  connector_type: string;
+  is_active?: boolean;
+  config_overrides?: Record<string, unknown>;
+  credentials_plaintext?: string;
+  webhook_secret?: string;
+  catalog_sync_enabled?: boolean;
+  order_push_enabled?: boolean;
+  order_pull_enabled?: boolean;
+  capabilities?: Record<string, unknown>;
+};
+
+/** PATCH /v2/pos/shops/:shopId/link/features — at least one field required. */
+export type PatchPosLinkFeaturesInput = {
   is_active?: boolean;
   catalog_sync_enabled?: boolean;
   order_push_enabled?: boolean;
   order_pull_enabled?: boolean;
-  [key: string]: unknown;
+};
+
+export type PosTestMapInput = {
+  mapping_section: string;
+  sample_payload: Record<string, unknown>;
+};
+
+export type PosTestMapResponse = {
+  mapping_section: string;
+  mapped: Record<string, unknown>;
+};
+
+export type PosTestConnectionInput = {
+  endpoint_key:
+    | "menu"
+    | "menuCategories"
+    | "menuProducts"
+    | "orderCreate"
+    | "orderStatus"
+    | "riderSync";
+  shop_id?: string;
+};
+
+export type PosTestConnectionResponse = {
+  endpoint_key: string;
+  url?: string | null;
+  ok: boolean;
+  status_code?: number | null;
+  latency_ms?: number | null;
+  error?: string | null;
 };
 
 export type AuthVerifyResponse = {

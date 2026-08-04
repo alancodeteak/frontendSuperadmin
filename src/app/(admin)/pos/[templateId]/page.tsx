@@ -38,27 +38,15 @@ import {
   clonePosTemplate,
   deletePosTemplate,
   patchPosTemplate,
+  POS_ENDPOINT_KEYS,
+  POS_TEST_MAP_DEFAULT_SECTION,
   testConnectionPosTemplate,
   testMapPosTemplate,
+  type PosEndpointKey,
 } from "@/lib/api/pos";
 import { posKeys, posTemplateQuery } from "@/lib/queries/pos";
 
-type EndpointKey =
-  | "menu"
-  | "menuCategories"
-  | "menuProducts"
-  | "orderCreate"
-  | "orderStatus"
-  | "riderSync";
-
-const endpointKeys: EndpointKey[] = [
-  "menu",
-  "menuCategories",
-  "menuProducts",
-  "orderCreate",
-  "orderStatus",
-  "riderSync",
-];
+const endpointKeys = POS_ENDPOINT_KEYS;
 
 function Field({
   label,
@@ -109,7 +97,7 @@ export default function PosTemplateDetailPage() {
   const queryClient = useQueryClient();
   const [configText, setConfigText] = useState("{}");
   const [message, setMessage] = useState<string | null>(null);
-  const [endpointKey, setEndpointKey] = useState<EndpointKey>("menu");
+  const [endpointKey, setEndpointKey] = useState<PosEndpointKey>("menu");
   const [form, setForm] = useState({
     version: "",
     description: "",
@@ -187,8 +175,12 @@ export default function PosTemplateDetailPage() {
     setMessage(null);
     try {
       const res = await testMapPosTemplate(id, {
-        mapping_section: "order_inbound",
-        sample_payload: { id: "POS-1001", status: "NEW" },
+        mapping_section: POS_TEST_MAP_DEFAULT_SECTION,
+        sample_payload: {
+          id: "POS-1001",
+          status: "NEW",
+          items: [{ sku: "A1", qty: 2 }],
+        },
       });
       setMessage(`Test map: ${JSON.stringify(res, null, 2)}`);
     } catch (err) {
@@ -278,7 +270,9 @@ export default function PosTemplateDetailPage() {
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
             {template.provider ?? "—"} · {template.connector_type ?? "—"}
+            {template.lane ? ` · ${template.lane}` : ""}
             {template.version ? ` · v${template.version}` : ""}
+            {template.is_system ? " · system" : ""}
           </p>
         </div>
 
@@ -295,7 +289,7 @@ export default function PosTemplateDetailPage() {
             <Select
               value={endpointKey}
               onValueChange={(value) => {
-                if (value) setEndpointKey(value as EndpointKey);
+                if (value) setEndpointKey(value as PosEndpointKey);
               }}
             >
               <SelectTrigger className="h-7 w-36 border-0 shadow-none">
@@ -362,6 +356,9 @@ export default function PosTemplateDetailPage() {
                 disabled
                 readOnly
               />
+            </Field>
+            <Field label="Lane">
+              <Input value={template.lane ?? ""} disabled readOnly />
             </Field>
             <div className="sm:col-span-2">
               <Field label="Description">
