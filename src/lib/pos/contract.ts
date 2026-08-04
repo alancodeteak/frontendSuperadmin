@@ -99,8 +99,41 @@ export type PosStatusMaps = {
   export?: Record<string, unknown>;
 };
 
-export const POS_AUTH_TYPES = ["none", "bearer", "integration_token"] as const;
+export const POS_AUTH_TYPES = [
+  "none",
+  "bearer",
+  "integration_token",
+  "oauth2_client_credentials",
+] as const;
 export type PosAuthType = (typeof POS_AUTH_TYPES)[number];
+
+/** Auth types that require a `headerName` (static header injection). */
+export const POS_AUTH_TYPES_NEEDING_HEADER = [
+  "bearer",
+  "integration_token",
+  "oauth2_client_credentials",
+] as const satisfies readonly PosAuthType[];
+
+/** Auth types that require a `tokenUrl` (OAuth/login exchange). */
+export const POS_AUTH_TYPES_NEEDING_TOKEN_URL = [
+  "oauth2_client_credentials",
+] as const satisfies readonly PosAuthType[];
+
+/** Default header name per auth type when the vendor doesn't specify one. */
+export const POS_AUTH_HEADER_DEFAULTS: Record<PosAuthType, string | undefined> = {
+  none: undefined,
+  bearer: "Authorization",
+  integration_token: "X-Integration-Token",
+  oauth2_client_credentials: "Authorization",
+};
+
+export function authTypeNeedsHeader(type: PosAuthType): boolean {
+  return (POS_AUTH_TYPES_NEEDING_HEADER as readonly string[]).includes(type);
+}
+
+export function authTypeNeedsTokenUrl(type: PosAuthType): boolean {
+  return (POS_AUTH_TYPES_NEEDING_TOKEN_URL as readonly string[]).includes(type);
+}
 
 export const POS_STATUS_UPDATE_MODES = [
   "api",
