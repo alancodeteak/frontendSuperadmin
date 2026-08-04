@@ -93,14 +93,15 @@ export function PosScenarioMatrix({
       {open ? (
         <div className="space-y-3 border-t px-4 py-4">
           <p className="max-w-3xl leading-relaxed text-muted-foreground">
-            Use this before inventing a new template.{" "}
-            <strong className="font-medium text-foreground">UI only</strong>{" "}
-            means Super Admin is enough.{" "}
+            Fresh users: match your situation in the left column.{" "}
+            <strong className="font-medium text-foreground">UI only</strong> =
+            follow the Beginner guide Examples page and fill those values
+            yourself.{" "}
             <strong className="font-medium text-foreground">
               Needs developer
             </strong>{" "}
-            means open a backend ticket — do not fake it with a generic
-            template.
+            = stop — open an engineering ticket with vendor docs. Do not invent
+            a fake generic template.
           </p>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[720px] border-collapse text-left text-xs">
