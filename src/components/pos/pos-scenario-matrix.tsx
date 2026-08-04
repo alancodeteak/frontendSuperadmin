@@ -1,6 +1,14 @@
 "use client";
 
+import { useState } from "react";
+import {
+  ChevronDownIcon,
+  ChevronUpIcon,
+  ListChecksIcon,
+} from "lucide-react";
+
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   POS_SCENARIO_MATRIX,
   type PosPlaybookSeverity,
@@ -31,69 +39,115 @@ function severityBadge(severity: PosPlaybookSeverity) {
 
 export function PosScenarioMatrix({
   className,
-  defaultOpen = true,
+  defaultOpen = false,
 }: {
   className?: string;
   defaultOpen?: boolean;
 }) {
+  const [open, setOpen] = useState(defaultOpen);
+
   return (
-    <details
-      open={defaultOpen}
+    <div
       className={cn(
         "overflow-hidden rounded-xl border border-border bg-muted/30 text-sm shadow-sm",
         className,
       )}
     >
-      <summary className="cursor-pointer list-none px-4 py-3 font-semibold tracking-tight [&::-webkit-details-marker]:hidden">
-        <span className="inline-flex flex-wrap items-center gap-2">
-          <span className="rounded-md bg-slate-500/15 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200">
-            Scenarios
-          </span>
-          <span>When can I configure in the UI vs when do we need code?</span>
-          <span className="text-xs font-normal text-muted-foreground">
-            (click to collapse)
-          </span>
-        </span>
-      </summary>
-
-      <div className="border-t px-4 py-3">
-        <p className="mb-3 max-w-3xl leading-relaxed text-muted-foreground">
-          Use this before inventing a new template.{" "}
-          <strong className="font-medium text-foreground">UI only</strong> means
-          Super Admin is enough.{" "}
-          <strong className="font-medium text-foreground">Needs developer</strong>{" "}
-          means open a backend ticket — do not fake it with a generic template.
-        </p>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] border-collapse text-left text-xs">
-            <thead>
-              <tr className="border-b text-muted-foreground">
-                <th className="py-2 pr-3 font-medium">Situation</th>
-                <th className="py-2 pr-3 font-medium">Can do in Super Admin?</th>
-                <th className="py-2 pr-3 font-medium">Need a developer?</th>
-                <th className="py-2 font-medium">Badge</th>
-              </tr>
-            </thead>
-            <tbody>
-              {POS_SCENARIO_MATRIX.map((row) => (
-                <tr
-                  key={row.scenario}
-                  className="border-b border-border/60 align-top"
-                >
-                  <td className="py-2.5 pr-3 leading-relaxed">{row.scenario}</td>
-                  <td className="py-2.5 pr-3 leading-relaxed text-muted-foreground">
-                    {row.configOnly}
-                  </td>
-                  <td className="py-2.5 pr-3 leading-relaxed text-muted-foreground">
-                    {row.needsCode}
-                  </td>
-                  <td className="py-2.5">{severityBadge(row.severity)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+        <div className="min-w-0 flex items-start gap-2.5">
+          <ListChecksIcon
+            className="mt-0.5 size-4 shrink-0 text-slate-600 dark:text-slate-300"
+            aria-hidden
+          />
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-200">
+              Scenarios
+            </p>
+            <p className="font-semibold tracking-tight">
+              When can I configure in the UI vs when do we need code?
+            </p>
+          </div>
         </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="shrink-0 bg-background/70"
+          aria-expanded={open}
+          onClick={() => setOpen((prev) => !prev)}
+        >
+          {open ? (
+            <>
+              <ChevronUpIcon className="size-3.5" />
+              Collapse
+            </>
+          ) : (
+            <>
+              <ChevronDownIcon className="size-3.5" />
+              Open scenarios
+            </>
+          )}
+        </Button>
       </div>
-    </details>
+
+      {open ? (
+        <div className="space-y-3 border-t px-4 py-4">
+          <p className="max-w-3xl leading-relaxed text-muted-foreground">
+            Use this before inventing a new template.{" "}
+            <strong className="font-medium text-foreground">UI only</strong>{" "}
+            means Super Admin is enough.{" "}
+            <strong className="font-medium text-foreground">
+              Needs developer
+            </strong>{" "}
+            means open a backend ticket — do not fake it with a generic
+            template.
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] border-collapse text-left text-xs">
+              <thead>
+                <tr className="border-b text-muted-foreground">
+                  <th className="py-2 pr-3 font-medium">Situation</th>
+                  <th className="py-2 pr-3 font-medium">
+                    Can do in Super Admin?
+                  </th>
+                  <th className="py-2 pr-3 font-medium">Need a developer?</th>
+                  <th className="py-2 font-medium">Badge</th>
+                </tr>
+              </thead>
+              <tbody>
+                {POS_SCENARIO_MATRIX.map((row) => (
+                  <tr
+                    key={row.scenario}
+                    className="border-b border-border/60 align-top"
+                  >
+                    <td className="py-2.5 pr-3 leading-relaxed">
+                      {row.scenario}
+                    </td>
+                    <td className="py-2.5 pr-3 leading-relaxed text-muted-foreground">
+                      {row.configOnly}
+                    </td>
+                    <td className="py-2.5 pr-3 leading-relaxed text-muted-foreground">
+                      {row.needsCode}
+                    </td>
+                    <td className="py-2.5">{severityBadge(row.severity)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex justify-end border-t pt-3">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setOpen(false)}
+            >
+              <ChevronUpIcon className="size-3.5" />
+              Collapse
+            </Button>
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 }
