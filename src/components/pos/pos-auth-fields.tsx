@@ -4,6 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   POS_AUTH_TYPES,
+  authTypeNeedsHeader,
+  authTypeNeedsTokenUrl,
   type PosAuthType,
 } from "@/lib/pos/contract";
 
@@ -22,11 +24,8 @@ export function PosAuthFields({
   onChange: (next: PosAuthFieldsValue) => void;
   showCredentialsHint?: string;
 }) {
-  const needsHeader =
-    value.type === "bearer" ||
-    value.type === "integration_token" ||
-    value.type === "oauth2_client_credentials";
-  const needsTokenUrl = value.type === "oauth2_client_credentials";
+  const needsHeader = authTypeNeedsHeader(value.type);
+  const needsTokenUrl = authTypeNeedsTokenUrl(value.type);
 
   return (
     <div className="space-y-3">
