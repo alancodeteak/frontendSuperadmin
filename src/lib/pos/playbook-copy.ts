@@ -5,19 +5,30 @@ export type PosPlaybookStep = {
   detail?: string;
 };
 
+/**
+ * Every field answers the 5Ws + How in simple words for fresh users.
+ * what / why / who / when / where / how are required.
+ */
 export type PosPlaybookField = {
   name: string;
+  /** One-line summary on the closed card */
   meaning: string;
-  /** Where the user finds this on screen */
-  where?: string;
-  /** Plain steps to fill it */
-  howToFill: string;
-  /** Concrete example value */
+  /** What is this field? */
+  what: string;
+  /** Why does it matter in the real workflow? */
+  why: string;
+  /** Who fills it / who uses the result? */
+  who: string;
+  /** When do you set or change it? */
+  when: string;
+  /** Where do you find it on screen / in the journey? */
+  where: string;
+  /** How to fill, check, analyse, and update it */
+  how: string;
+  /** Short real-life story of the work day */
+  workflow: string;
   example: string;
-  /** Another common variant */
   exampleAlt?: string;
-  /** When a fresh user should change it */
-  whenToChange: string;
   commonMistakes?: string;
 };
 
@@ -49,273 +60,396 @@ export type PosScenarioRow = {
   severity: PosPlaybookSeverity;
 };
 
-/** Shared shop attach field explanations (fresh-user depth). */
+/** Shop → POS attach fields */
 export const POS_SHOP_FIELD_GLOSSARY: PosPlaybookField[] = [
   {
     name: "Template",
-    meaning:
-      "The shared POS recipe (URLs, mappings, events) this shop will use. Every shop on the same brand usually shares one template.",
-    where: "Shop → POS → Template dropdown",
-    howToFill:
-      "Open the dropdown and pick the template whose provider matches the vendor (cratis, saleculator, gravity, topas, or generic). Name often looks like cratis-v1.",
+    meaning: "Which shared POS “recipe” this shop will follow.",
+    what: "A saved recipe for one POS brand: API paths, field mappings, and which events send orders. Many shops of the same brand share one template.",
+    why: "Without a template, Yaadro does not know how to talk to that POS. The template is the common rulebook; the shop only adds its own address and passwords.",
+    who: "Super Admin / ops creates or picks the template. Shop managers usually only select it when attaching a shop. Developers create a new template only when the POS shape is new.",
+    when: "Pick it when you first connect a shop. Change it only if you switch POS brand, or ops published a new recipe (e.g. gravity-v2) for a different API.",
+    where: "Shop → POS tab → Template dropdown. List of templates also lives under main menu → POS.",
+    how: "1) Ask “which POS brand is this shop?” 2) Open the dropdown. 3) Choose the matching name (cratis-v1, saleculator-v1, gravity-v1…). 4) If unsure, open that template’s Beginner guide first. 5) After save, confirm Current link shows the same template name.",
+    workflow:
+      "Monday: vendor says “we are on Gravity”. You open POS list, confirm gravity-v1 exists and was tested. Tuesday: on the shop POS tab you select gravity-v1 — you do not rebuild mappings for every shop.",
     example: "cratis-v1",
     exampleAlt: "gravity-uae-v1",
-    whenToChange:
-      "Only when switching POS brand or when ops created a new template version for a different API shape.",
     commonMistakes:
-      "Picking generic for Cratis/Saleculator. Always use the dedicated template for those lanes.",
+      "Choosing “generic” for Cratis or Saleculator. Those brands already have their own lane — wrong template breaks orders.",
   },
   {
     name: "Vendor base URL",
-    meaning:
-      "The website address of this shop’s POS API. Yaadro calls this host to push orders or pull the menu.",
-    where: "Shop → POS → Vendor base URL",
-    howToFill:
-      "Ask the vendor for the API base (usually starts with https://). Paste the full host without a trailing path like /orders — paths live on the template.",
+    meaning: "The POS website address Yaadro will call for this shop.",
+    what: "The https:// host of this shop’s POS API (the front door). Paths like /orders stay on the template; here you only put the host.",
+    why: "Orders and menu sync must reach the correct store’s POS server. Wrong URL = silence or errors; right URL = messages arrive at the kitchen POS.",
+    who: "Ops / Super Admin pastes it. Vendor support usually emails or portals the URL. Yaadro worker uses it every time it pushes or pulls.",
+    when: "At first attach, and again if the vendor migrates servers or gives a new subdomain for this branch.",
+    where: "Shop → POS → Vendor base URL (shown when the lane needs push/catalog).",
+    how: "1) Ask vendor for “API base URL”. 2) It must start with https://. 3) Remove trailing /api/orders if they pasted a full path. 4) Save. 5) Analyse: if Sync status shows connection errors, re-check spelling and https. 6) Update by pasting the new host and saving — no template change needed if only the host changed.",
+    workflow:
+      "Branch Marina opens. Vendor sends https://marina.gravity-pos.ae. You paste that on the shop, keep the shared gravity template. Downtown branch gets a different URL on its own shop card.",
     example: "https://pos.cratis.example.com",
     exampleAlt: "https://api.gravity-pos.ae",
-    whenToChange:
-      "Every shop usually has its own URL, or at least its own subdomain. Change when the vendor gives a new host.",
     commonMistakes:
-      "Putting the full order path here (e.g. …/api/orders). Use only the host; keep paths on the template endpoints.",
+      "Pasting the full order path into this box. Keep only the host; paths belong in template endpoints.",
   },
   {
     name: "Auth type",
-    meaning: "How Yaadro proves identity when calling the POS.",
-    where: "Shop → POS → Auth type (or template api.auth.type)",
-    howToFill:
-      "Ask the vendor: static API token → bearer or integration_token; OAuth login → oauth2_client_credentials; public/no auth → none.",
+    meaning: "Which “password style” Yaadro uses to prove itself to the POS.",
+    what: "A choice: none, bearer (API key in a header), integration_token, or oauth2_client_credentials (login to get a short-lived token).",
+    why: "Most POS systems reject calls without the right auth. Wrong type = 401 errors and orders stuck.",
+    who: "Ops sets it from vendor docs. Saleculator pull customers mainly use Features Integration token instead of this for pull. Worker applies auth on every outbound call.",
+    when: "At attach, and if the vendor moves from API key to OAuth (or the reverse).",
+    where: "Shop → POS → Auth type (and template default api.auth.type).",
+    how: "1) Read vendor “Authentication” page. 2) Static key → bearer (or integration_token if they name that header). 3) Client id + secret + token URL → oauth2_client_credentials. 4) No auth in sandbox → none (rare in production). 5) Analyse failed sync: 401/403 usually means type or credentials mismatch — fix type first, then secret.",
+    workflow:
+      "Vendor PDF says “Send Bearer token in Authorization”. You set auth type = bearer, header = Authorization, paste the key in Credentials. Later they move to OAuth — you switch type and add token URL.",
     example: "bearer",
     exampleAlt: "oauth2_client_credentials",
-    whenToChange:
-      "When the vendor changes how they authenticate (e.g. from API key to OAuth).",
     commonMistakes:
-      "Using integration_token on Cratis push, or bearer on Saleculator pull. Saleculator uses Features Integration token, not this field for pull.",
+      "Using shop Credentials for Saleculator’s Integration token. That token is created under Features and given to the POS so they can call Yaadro.",
   },
   {
     name: "Header name",
-    meaning: "HTTP header that carries the token when we call the POS.",
-    where: "Shop overrides / template api.auth.headerName",
-    howToFill:
-      "If vendor says “put the key in Authorization”, leave Authorization. If they say X-Api-Key or X-Integration-Token, type that exact name.",
+    meaning: "Which HTTP header carries the secret when we call the POS.",
+    what: "The label on the envelope, e.g. Authorization or X-Integration-Token. The value inside is your credential.",
+    why: "If the POS looks in X-Api-Key but you send Authorization, it ignores your key and rejects the call.",
+    who: "Ops types the exact name from vendor docs. Template can set a default; shop can override.",
+    when: "When vendor docs name a non-standard header, or when they change it.",
+    where: "Template api.auth.headerName or shop auth override fields (when shown).",
+    how: "1) Copy header name exactly (spelling and capitals). 2) Common: Authorization. 3) Some vendors: X-Api-Key, X-Integration-Token. 4) Analyse: auth errors with a “valid” key often mean wrong header name. 5) Update only the header string — keep the same token unless they rotated it too.",
+    workflow:
+      "Support chat: “Put the key in header X-Store-Key”. You change header name from Authorization to X-Store-Key, save, retry Test connection.",
     example: "Authorization",
     exampleAlt: "X-Integration-Token",
-    whenToChange: "Only when the vendor documentation names a different header.",
-    commonMistakes:
-      "Changing the header without changing auth type. The pair must match vendor docs.",
+    commonMistakes: "Changing header without matching auth type to vendor docs.",
   },
   {
     name: "Credentials",
-    meaning:
-      "Secret password/token from the vendor. Stored encrypted. Used at send time (not frozen forever in the outbox).",
-    where: "Shop → POS → Credentials (plaintext)",
-    howToFill:
-      "For bearer: paste the API key string, or JSON like {\"token\":\"…\"} if your team’s convention is JSON. For OAuth: paste {\"client_id\":\"…\",\"client_secret\":\"…\"}. Leave blank to keep the existing secret.",
+    meaning: "The secret key or OAuth client JSON for this shop.",
+    what: "The password Yaadro stores encrypted and opens only when sending to the POS. Can be a raw token or JSON like {\"token\":\"…\"} or {\"client_id\":\"…\",\"client_secret\":\"…\"}.",
+    why: "Without the correct secret, the POS will not accept orders or menu calls. Leaving blank on update keeps the old secret (safe when you only change URL).",
+    who: "Ops pastes from vendor portal. Never put production secrets in chat/docs. Worker reads them at send time.",
+    when: "First attach, and whenever the vendor rotates keys. Leave empty if you are only editing other fields and the old key still works.",
+    where: "Shop → POS → Credentials (plaintext) box.",
+    how: "1) Get the key from vendor. 2) For bearer: paste key or {\"token\":\"key\"}. 3) For OAuth: paste {\"client_id\":\"…\",\"client_secret\":\"…\"}. 4) Save once — UI will not show the secret again. 5) Analyse: after rotate, if errors continue, confirm you saved new credentials and auth type still matches. 6) Update: paste new secret, save; blank = keep previous.",
+    workflow:
+      "Vendor emails “new API key from Friday”. Friday morning you open the shop POS tab, paste the new key into Credentials, save, watch Sync status go clean.",
     example: '{"token":"sk_live_abc123"}',
     exampleAlt: '{"client_id":"yaadro-app","client_secret":"s3cret"}',
-    whenToChange: "When the vendor rotates keys, or first attach.",
     commonMistakes:
-      "Putting Saleculator Integration token here. That token is created on Features and given to the POS vendor.",
+      "Pasting Saleculator Integration token here. That belongs on Features, then shared with the POS vendor.",
   },
   {
     name: "Webhook secret",
-    meaning:
-      "Shared password so Yaadro trusts inbound webhooks from this shop’s POS (Lane C).",
-    where: "Shop → POS → Webhook secret",
-    howToFill:
-      "Agree a long random string with the vendor (min 8 chars). Configure the same value on their webhook settings.",
+    meaning: "Shared password so we trust messages the POS sends to us.",
+    what: "A long string both sides know. When Gravity/Topas/generic POS sends a webhook into Yaadro, we can check this secret.",
+    why: "Stops random internet traffic from creating fake orders. Protects inbound Lane C flows.",
+    who: "Ops agrees the string with the vendor and configures both sides. Yaadro checks it on inbound webhooks.",
+    when: "When enabling inbound webhooks, or when rotating after a leak.",
+    where: "Shop → POS → Webhook secret (Lane C providers).",
+    how: "1) Generate a long random string (8+ chars). 2) Paste same value in Yaadro and in vendor webhook settings. 3) Analyse inbound failures: mismatched secret is a common cause. 4) Update both sides together — changing only Yaadro breaks webhooks.",
+    workflow:
+      "You and Gravity support pick whsec_shop42_…. You save it on the shop; they paste it on their webhook config. Test order from POS appears in Yaadro.",
     example: "whsec_shop42_gravity_9f3a",
-    whenToChange: "If you suspect the secret leaked, or vendor asks to rotate.",
-    commonMistakes: "Leaving it empty when the POS sends signed/secret webhooks.",
+    commonMistakes: "Setting it only in Yaadro and forgetting the vendor portal.",
   },
   {
     name: "menuTenant.account / location",
-    meaning:
-      "Branch codes the POS uses when we fetch the menu/catalog for this shop.",
-    where: "Shop config override or template api.menuTenant",
-    howToFill:
-      "Copy account and location exactly from the vendor’s portal for this branch. Often same as orderTenant.",
+    meaning: "Branch codes used when fetching this shop’s menu from the POS.",
+    what: "Two codes the POS uses to mean “this store’s catalog”: account (company/chain) and location (branch).",
+    why: "Wrong codes pull another branch’s menu — customers see wrong items/prices. Right codes keep Marina’s menu on Marina’s shop.",
+    who: "Ops copies from vendor back-office for that branch. Catalog sync job sends them on menu calls.",
+    when: "At attach for every shop. Update if the vendor renumbers branches or you fix a mix-up.",
+    where: "Shop overrides / template api.menuTenant (account + location).",
+    how: "1) Open vendor portal → store settings. 2) Copy account and location exactly (case matters). 3) Paste into menuTenant. 4) Often same as orderTenant — still fill both. 5) Analyse: empty/wrong menu after sync → re-check these codes. 6) Update on the shop only; do not put live codes into the shared template if many shops share it.",
+    workflow:
+      "Vendor sheet: Marina = ACC001 / DXB-MARINA. You set menuTenant to those values on Marina’s shop. Downtown shop gets ACC001 / DXB-DT.",
     example: 'account = "ACC001", location = "DXB-MARINA"',
     exampleAlt: 'account = "10045", location = "LOC-12"',
-    whenToChange: "Per shop/branch. Wrong codes → empty or wrong menu.",
-    commonMistakes: "Using demo codes from the template on a live shop.",
+    commonMistakes: "Leaving template demo codes (ACC001/LOC001) on a live shop.",
   },
   {
     name: "orderTenant.account / location",
-    meaning:
-      "Branch codes sent with order push/status so the POS knows which store the order belongs to.",
-    where: "Shop config override or template api.orderTenant",
-    howToFill:
-      "Same as menuTenant unless the vendor gave separate order codes. Paste exactly (case-sensitive).",
+    meaning: "Branch codes sent with orders so the POS knows which store kitchen should cook.",
+    what: "Same idea as menuTenant, but for order create/status calls. Account + location identify the store on the POS.",
+    why: "If orderTenant is wrong, tickets print in the wrong branch or the POS rejects the order.",
+    who: "Ops sets per shop. Outbound order worker attaches these when pushing.",
+    when: "At attach, and when orders land in the wrong store or vendor changes codes.",
+    where: "Shop overrides / template api.orderTenant.",
+    how: "1) Confirm with vendor which codes apply to orders (sometimes same as menu). 2) Paste account + location. 3) Place a test order. 4) Analyse: wrong kitchen → fix orderTenant first. 5) Update shop values; keep template as demo defaults only.",
+    workflow:
+      "Test order appears in Downtown POS by mistake. You compare orderTenant on Marina shop, fix location to DXB-MARINA, send another test — ticket prints in Marina.",
     example: 'account = "ACC001", location = "DXB-MARINA"',
-    whenToChange: "Per shop. Change if orders land in the wrong store on the POS.",
     commonMistakes: "Updating menuTenant but forgetting orderTenant (or the reverse).",
   },
   {
     name: "Catalog sync",
-    meaning: "On = Yaadro periodically/on-demand pulls menu from the POS.",
-    where: "Shop → POS → Catalog sync checkbox",
-    howToFill:
-      "Turn on only if the vendor supports catalog pull and the template has menu endpoints. Lane presets may lock this.",
+    meaning: "Switch: pull menu/products from the POS into Yaadro.",
+    what: "On/off flag. On means Yaadro may sync catalog from the POS for this shop.",
+    why: "Keeps Yaadro menu aligned with the POS. Off if menu is managed only in Yaadro or the lane does not support pull.",
+    who: "Ops toggles when unlocked. Some lanes (Cratis/Saleculator) lock this to a preset.",
+    when: "Turn on when POS is the menu source. Turn off for Saleculator-style or menu-only-in-Yaadro shops.",
+    where: "Shop → POS → Catalog sync checkbox.",
+    how: "1) Check lane: Cratis often on; Saleculator usually off/locked. 2) Ensure template has menu endpoints. 3) Toggle, save. 4) Analyse: after sync, compare a few products. 5) Update flag only when the business changes menu ownership.",
+    workflow:
+      "New Cratis shop: catalog sync already on. You run sync, spot-check three items against POS. Saleculator shop: leave catalog off — not that lane’s job.",
     example: "On for Cratis; Off for Saleculator",
-    whenToChange: "When you start/stop using POS as the menu source of truth.",
-    commonMistakes: "Enabling on Saleculator (pull-orders lane) — usually locked off.",
+    commonMistakes: "Fighting a locked checkbox — lane preset owns it.",
   },
   {
     name: "Order push",
-    meaning: "On = Yaadro sends new/updated orders to the POS.",
-    where: "Shop → POS → Order push checkbox",
-    howToFill: "On for Cratis / Lane C push. Off for Saleculator (they pull from us).",
+    meaning: "Switch: Yaadro sends orders to the POS.",
+    what: "On = we push new/updated orders out. Off = we do not push (e.g. Saleculator pulls instead).",
+    why: "This is how kitchen gets Yaadro orders on push lanes. Wrong setting = kitchen never sees the order, or you push when you should not.",
+    who: "Usually locked by lane. Ops only changes it on unlocked Lane C templates.",
+    when: "Follow lane defaults. Change only if product/eng says this Lane C shop should stop/start pushing.",
+    where: "Shop → POS → Order push checkbox.",
+    how: "1) Cratis/Lane C push → expect On. 2) Saleculator → Off. 3) Analyse missing tickets: confirm push On, link active, credentials OK. 4) Do not force On for pull-only vendors.",
+    workflow:
+      "Customer orders on the app → Yaadro creates order → with Order push On, worker sends it to Cratis → kitchen screen lights up.",
     example: "On for Cratis",
-    whenToChange: "Almost never manually on locked lanes; server preset decides.",
     commonMistakes: "Turning push on for Saleculator.",
   },
   {
     name: "Order pull",
-    meaning: "On = POS is allowed to fetch orders from Yaadro (Saleculator-style).",
-    where: "Shop → POS → Order pull checkbox",
-    howToFill: "On for Saleculator. Off for push lanes.",
+    meaning: "Switch: POS is allowed to fetch orders from Yaadro.",
+    what: "On = Saleculator-style: POS calls Yaadro to download orders. Off on push lanes.",
+    why: "Pull lane cannot work without this (and the Features token). Push lanes should keep it off.",
+    who: "Lane preset usually locks it. Ops enables Integration on Features for Saleculator.",
+    when: "When attaching Saleculator. Rarely changed afterward.",
+    where: "Shop → POS → Order pull checkbox.",
+    how: "1) Saleculator: Features token first, then attach with pull On. 2) Analyse: vendor cannot list orders → check Integration enabled + token + pull On. 3) Do not use pull to “fake” a new pull POS — that needs engineering.",
+    workflow:
+      "Saleculator store opens till → their POS pulls open orders from Yaadro using the Integration token you created on Features.",
     example: "On for Saleculator",
-    whenToChange: "Locked by lane in most cases.",
     commonMistakes: "Expecting Yaadro to push when only pull is on.",
   },
   {
     name: "Link active",
-    meaning: "Master switch for this shop’s POS link.",
-    where: "Shop → POS → Link active",
-    howToFill: "Keep On for live shops. Turn Off to pause sync without deleting the link.",
+    meaning: "Master on/off for this shop’s POS connection.",
+    what: "When Off, Yaadro pauses POS sync for the shop without deleting history.",
+    why: "Safe way to pause during outages or cutovers without losing the configuration.",
+    who: "Ops toggles. Support may ask you to turn Off while vendor fixes their API.",
+    when: "Live shops stay On. Turn Off to pause; turn On when ready again.",
+    where: "Shop → POS → Link active.",
+    how: "1) Uncheck to pause. 2) Fix URL/credentials as needed. 3) Check On and save. 4) Analyse with Sync status. 5) Detach only when changing brand — Off is enough for a pause.",
+    workflow:
+      "Vendor announces 2-hour maintenance. You set Link active Off. After maintenance, On again and confirm sync times update.",
     example: "On",
-    whenToChange: "Pause during vendor outages or before cutover.",
   },
   {
     name: "Integration token (Features tab)",
-    meaning:
-      "One-time token Saleculator uses to call Yaadro. Not stored on the POS template.",
-    where: "Shop → Features → Integration → Create / rotate token",
-    howToFill:
-      "Enable Integration, create token, copy immediately, send securely to the POS vendor. Then attach Saleculator on the POS tab.",
-    example: "mock-token-shopId-1710000000 (shown once)",
-    whenToChange: "When vendor loses the token or you rotate for security.",
-    commonMistakes:
-      "Looking for the token on the POS tab or inside template JSON — it is only on Features.",
+    meaning: "One-time token Saleculator uses to call Yaadro.",
+    what: "A secret created under Shop → Features → Integration. Shown once. The POS vendor stores it to pull orders / post status.",
+    why: "Lane B security door. Without it, Saleculator cannot talk to Yaadro. It is not the same as Cratis bearer credentials.",
+    who: "Ops creates/rotates on Features. POS vendor configures it on their side. Never store it in the POS template JSON.",
+    when: "Before first Saleculator attach, and whenever you rotate for security or the vendor lost the token.",
+    where: "Shop → Features → Integration (not on the POS template page).",
+    how: "1) Enable Integration. 2) Create/rotate token. 3) Copy immediately. 4) Send securely to vendor. 5) Attach Saleculator on POS tab. 6) Analyse poll failures → rotate token, update vendor, retry. 7) Update = rotate (old token dies).",
+    workflow:
+      "Day 1 Features: create token, WhatsApp securely to Saleculator partner. Day 1 POS tab: attach template. Day 2: their till shows Yaadro orders.",
+    example: "(token shown once — copy immediately)",
+    commonMistakes: "Searching for this token inside template config JSON.",
   },
 ];
 
+/** Template config fields */
 export const POS_TEMPLATE_FIELD_GLOSSARY: PosPlaybookField[] = [
   {
     name: "Name",
-    meaning: "Stable ID of the template. Used in lists and attach dropdowns.",
-    where: "Create dialog (locked after create)",
-    howToFill:
-      "Use lowercase letters, numbers, hyphen or underscore. No spaces. Pick a name you can recognize in 6 months.",
+    meaning: "Permanent ID of this POS recipe.",
+    what: "A short code name for the template (letters, numbers, - or _). You will see it in lists and shop dropdowns forever.",
+    why: "Teams need a stable name to talk about (“use gravity-v1”). Changing identity later is not allowed — avoids breaking shops.",
+    who: "Ops/eng choose at create time. Everyone else only reads it.",
+    when: "Only when creating. After that it is locked.",
+    where: "POS → Create template dialog. Read-only on the template page.",
+    how: "1) Pick a clear name: brand + version. 2) No spaces. 3) Create. 4) If wrong name, create a new template and deactivate the old one — do not fight the lock.",
+    workflow:
+      "You create gravity-v1 once. Six shops attach gravity-v1. Nobody renames it; a breaking API change becomes gravity-v2 as a new template.",
     example: "cratis-v1",
     exampleAlt: "gravity-marina-v2",
-    whenToChange: "Never after create — clone/create a new template instead.",
-    commonMistakes: "Spaces or special characters → create fails validation.",
+    commonMistakes: "Spaces or symbols → create validation error.",
   },
   {
     name: "Provider + Connector + Lane",
-    meaning:
-      "Provider = brand. Connector = which backend code runs. Lane = A (Cratis), B (Saleculator), C (JSON plug-and-play).",
-    where: "Create dialog / read-only on template page",
-    howToFill:
-      "Match vendor: Cratis→cratis, Saleculator→saleculator, similar JSON→generic/gravity/topas. Connector is auto-suggested from provider.",
+    meaning: "Which brand, which backend code, which lane (A/B/C).",
+    what: "Provider = brand label. Connector = which Yaadro code path runs. Lane A Cratis, B Saleculator, C JSON plug-and-play.",
+    why: "Picking the wrong trio sends traffic through the wrong engine. That is the #1 beginner mistake.",
+    who: "Ops selects on create. Eng owns new providers. Locked afterward.",
+    when: "At create only. Wrong choice → new template, not an edit.",
+    where: "Create dialog; read-only on template header.",
+    how: "1) Match vendor brand. 2) Accept suggested connector. 3) Confirm lane in the Beginner guide. 4) Analyse odd behaviour: verify provider/lane before editing JSON for hours.",
+    workflow:
+      "Email: “We use Cratis”. You create/use cratis + Lane A — never a generic clone. Email: “JSON like Gravity” → Lane C gravity/generic.",
     example: "provider=gravity, connector=generic_json, lane=C",
-    whenToChange: "Cannot change after create. Wrong pair → new template.",
   },
   {
     name: "Config JSON → api.baseUrl",
-    meaning: "Default POS host for shops that do not override URL.",
-    where: "Template → Config JSON",
-    howToFill:
-      "Set a placeholder https host for docs, or leave for shops to override. Prefer shop-level URL for real shops.",
+    meaning: "Default POS host stored on the template.",
+    what: "Optional default https host. Real shops usually override with their own Vendor base URL.",
+    why: "Handy for demos/tests. Dangerous if you put one live shop’s URL here and attach many shops without overrides.",
+    who: "Template editor sets default. Shop attach should override per branch.",
+    when: "When creating a template for docs/sandbox. Prefer shop-level URL for production branches.",
+    where: "Template page → Config JSON → api.baseUrl.",
+    how: "1) Set a placeholder host for documentation. 2) On each shop, set Vendor base URL. 3) Analyse: all shops hitting one host → check they overrode base URL. 4) Update shop URLs for moves; only change template default if all shops share one host on purpose.",
+    workflow:
+      "Template keeps https://pos-vendor.example.com as a sample. Marina shop overrides to https://marina…. Downtown overrides to https://dt….",
     example: '"baseUrl": "https://pos-vendor.example.com"',
-    whenToChange: "When all shops share one host; otherwise override per shop.",
   },
   {
     name: "Config JSON → api.auth",
-    meaning: "Default auth for outbound calls.",
-    where: "Template → Config JSON → api.auth",
-    howToFill:
-      'Set "type" to bearer | integration_token | oauth2_client_credentials | none. Add "headerName" when needed. Add "tokenUrl" for OAuth.',
-    example:
-      '{"type":"bearer","headerName":"Authorization"}',
+    meaning: "Default login style for shops using this template.",
+    what: "Object with type, optional headerName, optional tokenUrl for OAuth.",
+    why: "Shops inherit a sensible default so ops only pastes secrets per shop.",
+    who: "Template owner sets type/header/tokenUrl. Shop owner pastes credentials.",
+    when: "When the brand’s auth method is known; update if vendor changes auth for all shops on this recipe.",
+    where: "Template → Config JSON → api.auth.",
+    how: "1) Set type from vendor docs. 2) Add headerName. 3) For OAuth add tokenUrl. 4) Do not put live client_secret in the shared template if shops differ — put secrets on the shop. 5) Analyse 401s across all shops → template auth type/header wrong. One shop only → that shop’s credentials.",
+    workflow:
+      "All Gravity shops use bearer. You set auth.type=bearer once on the template. Each shop pastes its own token in Credentials.",
+    example: '{"type":"bearer","headerName":"Authorization"}',
     exampleAlt:
       '{"type":"oauth2_client_credentials","headerName":"Authorization","tokenUrl":"https://pos.example.com/oauth/token"}',
-    whenToChange: "When the vendor’s auth method changes for all shops on this template.",
-    commonMistakes: "Sealing secrets in the template for Saleculator Integration — use Features instead.",
   },
   {
     name: "Config JSON → menuTenant / orderTenant",
-    meaning: "Default account/location if the shop does not override.",
-    where: "Template → Config JSON",
-    howToFill:
-      'Use demo-looking codes in the template. Real shops must override on attach.\n{"account":"ACC001","location":"LOC001"}',
+    meaning: "Default account/location codes on the recipe.",
+    what: "Demo or shared defaults for account + location. Live shops should override.",
+    why: "Template needs a valid shape; shops need real branch codes so tickets and menus hit the right store.",
+    who: "Template editor sets placeholders. Shop ops sets real codes.",
+    when: "Placeholders at template create. Real values at every shop attach.",
+    where: "Template config api.menuTenant / api.orderTenant; shop overrides.",
+    how: "1) Leave ACC001/LOC001 style demos on template. 2) On shop, replace with vendor codes. 3) Analyse wrong-store issues → shop tenants first. 4) Update per shop when branches change.",
+    workflow:
+      "Template shows sample tenants for training. Production Marina shop overrides to ACC001/DXB-MARINA before go-live.",
     example: '{"account":"ACC001","location":"LOC001"}',
-    whenToChange: "Defaults only; always set real values on the shop.",
   },
   {
     name: "Config JSON → endpoints",
-    meaning: "HTTP method + path for each action (menu, orderCreate, …).",
-    where: "Template → Config JSON → endpoints",
-    howToFill:
-      "Copy paths from vendor API docs. Only fill endpoints for capabilities you enable.",
-    example:
-      '{"orderCreate":{"method":"POST","path":"/api/orders"}}',
+    meaning: "Which URL paths to call for menu, create order, status, etc.",
+    what: "Map of actions → HTTP method + path (e.g. POST /api/orders).",
+    why: "Yaadro must hit the vendor’s real paths. Wrong path = 404 and no orders.",
+    who: "Ops/eng copy from vendor API docs onto the template. Shops usually do not change paths.",
+    when: "When building the template, and when vendor version upgrades paths.",
+    where: "Template → Config JSON → endpoints.",
+    how: "1) From vendor docs, fill only actions you enabled in capabilities. 2) Test connection per key. 3) Analyse 404 → path typo. 4) Update template paths once; all shops inherit.",
+    workflow:
+      "Docs say create order is POST /v1/orders. You set endpoints.orderCreate accordingly, Test connection, then attach shops.",
+    example: '{"orderCreate":{"method":"POST","path":"/api/orders"}}',
     exampleAlt:
       '{"menu":{"method":"GET","path":"/api/menu"},"menuCategories":{"method":"GET","path":"/api/menu/categories"}}',
-    whenToChange: "When vendor changes API paths, or you switch combined vs split menu.",
   },
   {
     name: "Config JSON → capabilities",
-    meaning: "What this POS can do: catalog, orders_out, orders_in, status, riders.",
-    where: "Template → Config JSON → capabilities",
-    howToFill:
-      "Set each to the mode the vendor supports (e.g. catalog: pull | none, orders_out: push | none, orders_in: webhook | none).",
+    meaning: "What this POS is allowed to do in Yaadro’s eyes.",
+    what: "Flags/modes for catalog, orders out/in, status, riders — e.g. push vs none, webhook vs none.",
+    why: "Turns features on only when the vendor supports them. Avoids calling endpoints that do not exist.",
+    who: "Template owner. Lane presets may constrain Cratis/Saleculator.",
+    when: "At template setup; again when vendor enables a new feature (e.g. webhooks).",
+    where: "Template → Config JSON → capabilities.",
+    how: "1) Ask vendor what they support. 2) Set matching modes. 3) Add matching endpoints/mappings. 4) Analyse: capability on but endpoint missing → failures. 5) Update carefully and re-test.",
+    workflow:
+      "Gravity can push orders and send webhooks, no catalog. You set orders_out=push, orders_in=webhook, catalog=none.",
     example:
       '{"catalog":"pull","orders_out":"push","orders_in":"webhook"}',
-    whenToChange: "When the vendor enables a new feature (e.g. starts sending webhooks).",
   },
   {
     name: "Config JSON → events",
-    meaning: "Which Yaadro events trigger a POS push.",
-    where: "Template → Config JSON → events",
-    howToFill:
-      "List event names under order_create_on / status_out_on only if push is enabled. Start with customer_order_created.",
-    example:
-      '{"order_create_on":["customer_order_created"]}',
-    whenToChange: "When ops wants push on accept/dispatch instead of create.",
+    meaning: "Which Yaadro moments trigger a push to the POS.",
+    what: "Lists like order_create_on: [customer_order_created]. Only for push capabilities.",
+    why: "Controls timing: send when customer orders, or later when kitchen accepts — business choice.",
+    who: "Ops with product. Eng if new event names are required (may need code).",
+    when: "After capabilities enable push; tweak when ops wants different timing.",
+    where: "Template → Config JSON → events.",
+    how: "1) Start with customer_order_created. 2) Save and place a test order. 3) Analyse: push too early/late → adjust list within known events. 4) Unknown event names → ask eng.",
+    workflow:
+      "Kitchen wants tickets only after payment confirm. You change events from created to the agreed status event, retest one order.",
+    example: '{"order_create_on":["customer_order_created"]}',
   },
   {
     name: "Config JSON → mappings.order_inbound",
-    meaning:
-      "Rules that translate a vendor webhook JSON into Yaadro’s order fields.",
-    where: "Template → Config JSON → mappings.order_inbound",
-    howToFill:
-      "For each Yaadro field, point to the vendor path. Use Test map with a real sample payload until every required field maps.",
+    meaning: "Translator from POS webhook JSON → Yaadro order fields.",
+    what: "Rules that say “vendor’s order.id becomes our external order id”, etc.",
+    why: "Every POS names fields differently. Mapping is how Lane C understands their webhook without new code.",
+    who: "Ops/eng on the template. Test map is your lab. Shops do not each keep a mapping.",
+    when: "When orders_in=webhook; update when vendor renames fields.",
+    where: "Template → Config JSON → mappings.order_inbound + Test map button.",
+    how: "1) Get one real sample webhook JSON. 2) Open Test map. 3) Adjust paths until id, status, lines appear. 4) Save. 5) Analyse failed inbound → compare latest payload to mapping. 6) Update mapping once for all shops on this template.",
+    workflow:
+      "POS upgrade renames order.id to orderCode. Inbound breaks. You paste new sample into Test map, point externalOrderId to the new path, save — all Gravity shops work again.",
     example:
       '{"externalOrderId":"$.order.id","status":"$.order.state","lines":"$.order.items"}',
-    whenToChange:
-      "Whenever the vendor renames webhook fields or adds required data.",
-    commonMistakes: "Leaving starter mapping unchanged while vendor payload differs → inbound fails.",
+    commonMistakes: "Never running Test map before go-live.",
   },
   {
     name: "Test map",
-    meaning: "Safe dry-run: paste vendor JSON → see what Yaadro would store.",
-    where: "Template page → Test map button",
-    howToFill:
-      "Ask vendor for one sample webhook body. Paste into Test map for order_inbound. Fix mappings until output looks right.",
-    example: "Sample: {\"order\":{\"id\":\"P-99\",\"state\":\"NEW\",\"items\":[…]}}",
-    whenToChange: "Re-run after every mapping edit.",
+    meaning: "Safe practice tool: sample JSON in → Yaadro shape out.",
+    what: "A dry-run. It does not call the vendor; it only checks your mapping.",
+    why: "Lets a fresh user learn mappings without breaking production.",
+    who: "Anyone configuring the template. Do this before attaching shops.",
+    when: "After every mapping edit, and before go-live.",
+    where: "Template page → Test map.",
+    how: "1) Paste vendor sample. 2) Run. 3) Read output — missing fields mean fix mapping. 4) Repeat until complete. 5) Then save template.",
+    workflow:
+      "Before Friday launch you spend 20 minutes with Test map and one sample file from the vendor until the preview looks like a normal Yaadro order.",
+    example: "Paste {\"order\":{\"id\":\"P-99\",…}} into Test map",
   },
   {
     name: "Test connection",
-    meaning: "Live call to the vendor using a shop’s URL/credentials.",
-    where: "Template page → endpoint select + Test",
-    howToFill:
-      "Pick an endpoint key (e.g. menu or orderCreate), optionally pass shop_id, click Test. Fix URL/auth if it fails.",
-    example: "endpoint=menu, shop_id=<uuid of a test shop>",
-    whenToChange: "Before attaching production shops.",
+    meaning: "Live ping to the vendor using a shop’s URL and credentials.",
+    what: "Real HTTP call to an endpoint key (menu, orderCreate, …), optionally as a shop.",
+    why: "Proves network, URL, and auth work before customers order.",
+    who: "Ops on template page with a test shop_id.",
+    when: "After auth/URL filled; before production attach.",
+    where: "Template page → endpoint dropdown → Test.",
+    how: "1) Pick endpoint. 2) Provide test shop_id if asked. 3) Run. 4) Analyse failures: URL, auth type, credentials, path. 5) Fix, re-test, then attach real shops.",
+    workflow:
+      "You attach a sandbox shop, Test connection on menu, get 200, then attach the live Marina shop with confidence.",
+    example: "endpoint=menu, shop_id=<test shop uuid>",
+  },
+];
+
+const LANE_FIELD_EXTRAS: PosPlaybookField[] = [
+  {
+    name: "Lane A — Cratis",
+    meaning: "Dedicated Yaadro↔Cratis connector (push + catalog).",
+    what: "A ready-made path for Cratis only. Not a generic JSON toy.",
+    why: "Cratis has special behaviour. Using generic will fail in subtle ways.",
+    who: "Ops attaches cratis template per shop. Eng maintains the connector.",
+    when: "Whenever the vendor is Cratis.",
+    where: "Main POS guide + shop attach with cratis template.",
+    how: "Use seeded cratis template. Fill shop URL, bearer, tenants. Do not clone generic.",
+    workflow:
+      "Cratis brand onboards → pick cratis-v1 → per store URL + codes → test order prints on Cratis.",
+    example: "Template cratis-v1 + shop https://api.cratis…",
+  },
+  {
+    name: "Lane B — Saleculator",
+    meaning: "POS pulls orders from Yaadro using an Integration token.",
+    what: "Pull lane: we do not push orders out; their till fetches from us.",
+    why: "Matches how Saleculator works in real stores.",
+    who: "Ops creates Features token; vendor configures till; ops attaches saleculator template.",
+    when: "Saleculator (or approved same-lane) vendors only.",
+    where: "Shop → Features then Shop → POS.",
+    how: "Token on Features first, then attach. No base URL needed for classic pull.",
+    workflow:
+      "Enable Integration → copy token to vendor → attach saleculator → till starts pulling.",
+    example: "Features token + template saleculator-v1",
+  },
+  {
+    name: "Lane C — generic / gravity / topas",
+    meaning: "Configurable JSON over HTTP with mappings.",
+    what: "Plug-and-play lane: you configure paths and field maps in Super Admin.",
+    why: "Many POS brands share similar JSON; you onboard without waiting for a new connector — until the scenario table says needs developer.",
+    who: "Ops configures template + shops. Eng only if XML/HMAC/new brand.",
+    when: "JSON HTTP vendors close to our mapping engine.",
+    where: "POS templates + shop attach overrides.",
+    how: "Edit template endpoints/mappings → Test map → attach shops with URL/auth/tenants.",
+    workflow:
+      "New Gravity branch: reuse gravity-v1, only change shop URL and location codes.",
+    example: "gravity-v1 + shop URL/tenants",
   },
 ];
 
@@ -324,13 +458,13 @@ const LANE_EXAMPLES: PosPlaybookExample[] = [
     title: "New Cratis shop (UI only)",
     situation: "Vendor is Cratis. Template cratis-v1 already exists.",
     whatToDo:
-      "Do not create a new template. Open the shop → POS, attach cratis-v1, fill URL + bearer + tenants, save, test.",
+      "Do not create a new template. Shop → POS → attach cratis-v1 → fill URL, bearer, tenants → save → test order.",
     values: [
       { field: "Template", value: "cratis-v1" },
       { field: "Vendor base URL", value: "https://api.cratis.example.com" },
       { field: "Auth type", value: "bearer" },
       { field: "Credentials", value: '{"token":"cratis-shop-key"}' },
-      { field: "orderTenant", value: 'account=ACC778 location=DXB-01' },
+      { field: "orderTenant", value: "account=ACC778 location=DXB-01" },
       { field: "Order push", value: "On (usually locked on)" },
     ],
   },
@@ -338,7 +472,7 @@ const LANE_EXAMPLES: PosPlaybookExample[] = [
     title: "New Saleculator shop (UI only)",
     situation: "POS pulls orders from Yaadro.",
     whatToDo:
-      "Features → enable Integration → create token → copy to vendor. Then POS tab → attach saleculator template. No base URL needed.",
+      "Features → Integration → create token → give to vendor → POS tab → attach saleculator template.",
     values: [
       { field: "Features → Integration", value: "Enabled" },
       { field: "Integration token", value: "(copy once, give to vendor)" },
@@ -349,34 +483,33 @@ const LANE_EXAMPLES: PosPlaybookExample[] = [
   },
   {
     title: "Gravity shop, same JSON as template (UI only)",
-    situation: "New branch; same Gravity API shape, different URL and location.",
-    whatToDo:
-      "Reuse gravity template. Only override shop URL + tenants (+ credentials if different).",
+    situation: "New branch; same Gravity API; different URL and location.",
+    whatToDo: "Reuse gravity template. Override shop URL + tenants (+ credentials if needed).",
     values: [
       { field: "Template", value: "gravity-v1" },
       { field: "Vendor base URL", value: "https://branch2.gravity.example.com" },
       { field: "menuTenant / orderTenant", value: "ACC001 / BR-02" },
-      { field: "Webhook secret", value: "agree with vendor, same on both sides" },
+      { field: "Webhook secret", value: "same string on Yaadro and vendor portal" },
     ],
   },
   {
     title: "Vendor renamed webhook fields (UI only)",
     situation: "Inbound mapping broke after POS upgrade.",
     whatToDo:
-      "Open template → edit mappings.order_inbound → Test map with new sample → Save. No shop re-attach if URL/auth unchanged.",
+      "Template → mappings.order_inbound → Test map with new sample → Save. Shops keep same URL if unchanged.",
     values: [
       {
         field: "mappings.order_inbound.externalOrderId",
         value: "was $.order.id → now $.payload.orderCode",
       },
-      { field: "Test map", value: "Paste new sample until mapped output is complete" },
+      { field: "Test map", value: "Paste new sample until output is complete" },
     ],
   },
   {
     title: "XML / HMAC / brand-new POS (needs developer)",
-    situation: "Vendor is not JSON HTTP, or not in the provider list.",
+    situation: "Not JSON HTTP, or brand not in the list.",
     whatToDo:
-      "Stop. Do not invent a generic template. Open engineering ticket with vendor docs. See Scenarios table on main POS page.",
+      "Stop. Do not fake generic. Open eng ticket with docs + samples. See Scenarios panel.",
     values: [
       { field: "Super Admin action", value: "None for connector work" },
       { field: "Ticket should include", value: "sample payloads, auth docs, sandbox URL" },
@@ -386,100 +519,63 @@ const LANE_EXAMPLES: PosPlaybookExample[] = [
 
 const LANE_FAQS: PosPlaybookFaq[] = [
   {
+    q: "What are the 5Ws on each field?",
+    a: "What (is it), Why (it matters), Who (sets/uses it), When (to set/change), Where (on screen / in the journey). How explains fill, check, analyse, and update. Open Fields & values → Open 5Ws on a field.",
+  },
+  {
     q: "I am new — where do I start?",
-    a: "1) Read Overview. 2) Find your vendor in Examples. 3) If it says UI only, open the matching template or shop POS tab and copy the example values. 4) If it says needs developer, stop and ticket eng.",
+    a: "1) Overview. 2) Examples — find your vendor story. 3) Fields & values — open 5Ws for each box you will fill. 4) If Scenarios says needs developer, stop and ticket eng.",
   },
   {
     q: "Template vs shop — what goes where?",
-    a: "Template = shared recipe (paths, mappings, events). Shop = this branch’s URL, secrets, account/location. Never put one shop’s password in the shared template if other shops share it.",
-  },
-  {
-    q: "Why did create template fail?",
-    a: "Name must be letters/numbers/-/_ only. Provider/connector pair must be allowed (e.g. saleculator + pull connector).",
+    a: "Template = shared recipe (paths, mappings, events). Shop = this branch’s URL, secrets, account/location. Think: recipe book vs one restaurant’s address and keys.",
   },
   {
     q: "Orders not reaching POS?",
-    a: "Check link active, order push on, base URL, credentials, orderTenant, and Sync status errors on the shop POS tab.",
+    a: "Check Link active, Order push, base URL, Credentials, orderTenant, then Sync status error text. Use each field’s How → analyse tips.",
+  },
+  {
+    q: "How do I analyse if a value is wrong?",
+    a: "Sync status + Test connection + Test map. One shop broken → shop fields. All shops on a template broken → template auth/endpoints/mappings.",
   },
 ];
 
-/** Main /pos page */
 export const POS_LANE_CHOOSER_PLAYBOOK: PosPlaybookDef = {
-  title: "POS beginner guide — pick a lane & fill values",
+  title: "POS beginner guide — 5Ws, lanes, and when to call eng",
   description:
-    "Use the page buttons inside this guide: Overview → Steps → Fields & values → Examples → FAQ. Start with Examples if you already know the vendor name.",
+    "Fresh user path: Overview → Examples (pick your story) → Fields & values (open 5Ws on each field) → Steps. Use simple words: template = recipe, shop = one store’s address and keys. If Scenarios says “Needs developer”, stop.",
   steps: [
     {
-      title: "Identify the vendor",
-      detail: "Cratis, Saleculator, Gravity, Topas, or “other JSON HTTP”.",
+      title: "Name the vendor (Cratis / Saleculator / Gravity / Topas / other)",
     },
     {
-      title: "Open Examples page in this guide",
-      detail: "Copy the example field values for that situation.",
+      title: "Open Examples page — copy the value table for that story",
     },
     {
-      title: "If “needs developer” — stop",
-      detail: "Do not create a fake generic template. Use the Scenarios panel below.",
+      title: "Open Fields & values — read 5Ws before typing",
+      detail: "What / Why / Who / When / Where / How + workflow story.",
     },
     {
-      title: "Otherwise configure template (if new recipe) then attach shop",
-      detail: "Template page for mappings/endpoints; Shop → POS for URL/secrets/tenants.",
+      title: "If needs developer — ticket eng; else configure template then shop",
     },
   ],
-  fields: [
-    {
-      name: "Lane A — Cratis",
-      meaning: "Dedicated push + catalog connector.",
-      howToFill: "Use seeded cratis template. Attach per shop with URL + bearer + tenants.",
-      example: "Template cratis-v1 + shop URL https://…",
-      whenToChange: "N/A — always Cratis template for Cratis vendors.",
-    },
-    {
-      name: "Lane B — Saleculator",
-      meaning: "POS pulls orders from Yaadro.",
-      howToFill: "Features token first, then attach saleculator template.",
-      example: "Integration enabled + token copied to vendor",
-      whenToChange: "Only for Saleculator-style pull vendors (not generic).",
-    },
-    {
-      name: "Lane C — generic / gravity / topas",
-      meaning: "Configurable JSON HTTP plug-and-play.",
-      howToFill:
-        "Edit template endpoints + mappings, Test map, then attach shops with URL/auth/tenants.",
-      example: "gravity-v1 template + shop overrides",
-      whenToChange: "When vendor JSON shape is close to our mapping engine.",
-    },
-    ...POS_SHOP_FIELD_GLOSSARY.slice(0, 4),
-  ],
+  fields: [...LANE_FIELD_EXTRAS, ...POS_SHOP_FIELD_GLOSSARY.slice(0, 6)],
   examples: LANE_EXAMPLES,
   faqs: LANE_FAQS,
 };
 
-/** Template detail page */
 export const POS_TEMPLATE_DETAIL_PLAYBOOK: PosPlaybookDef = {
-  title: "Template config guide — fields, values, examples",
+  title: "Template guide — every config field with 5Ws",
   description:
-    "This page edits the shared recipe. Use the buttons: Overview, Steps, Fields & values (with examples), Examples by scenario, FAQ. Shop secrets belong on Shop → POS, not here.",
+    "This screen edits the shared recipe. Read 5Ws on each field before changing JSON. Shop passwords and live branch codes belong on Shop → POS.",
   steps: [
+    { title: "Confirm provider / connector / lane (locked)" },
     {
-      title: "Confirm provider / connector / lane (read-only)",
-      detail: "Wrong? Create a new template — do not force JSON.",
+      title: "Open Fields & values — 5Ws for auth, tenants, endpoints, mappings",
     },
-    {
-      title: "Open Fields & values page",
-      detail: "Fill config JSON keys using the examples (auth, tenants, endpoints, mappings).",
-    },
-    {
-      title: "Set capabilities + events",
-      detail: "Only enable what the vendor supports; start order_create_on with customer_order_created.",
-    },
-    {
-      title: "Edit mappings.order_inbound if webhooks are on",
-      detail: "Paste vendor sample into Test map until required fields appear.",
-    },
-    {
-      title: "Save → Test connection with a test shop_id → then attach real shops",
-    },
+    { title: "Set capabilities + events to match the vendor" },
+    { title: "Test map (inbound) then Test connection (live)" },
+    { title: "Save — attach shops only after tests look good" },
   ],
   fields: POS_TEMPLATE_FIELD_GLOSSARY,
   examples: [
@@ -487,7 +583,7 @@ export const POS_TEMPLATE_DETAIL_PLAYBOOK: PosPlaybookDef = {
       title: "First-time Gravity template",
       situation: "New Lane C vendor, JSON HTTP, webhooks + order push.",
       whatToDo:
-        "Create template provider=gravity. Edit config: baseUrl placeholder, bearer auth, endpoints, capabilities, starter order_inbound. Test map. Save.",
+        "Create gravity template. Fill auth, endpoints, capabilities, starter order_inbound. Test map. Save.",
       values: [
         {
           field: "api.auth",
@@ -505,22 +601,15 @@ export const POS_TEMPLATE_DETAIL_PLAYBOOK: PosPlaybookDef = {
           field: "events.order_create_on",
           value: '["customer_order_created"]',
         },
-        {
-          field: "mappings.order_inbound",
-          value: "Start from seeded mapping; adjust paths to vendor sample",
-        },
       ],
     },
     {
       title: "OAuth2 vendor on Lane C",
-      situation: "Vendor needs client_id/secret + token URL; refresh on 401.",
+      situation: "Client id/secret + token URL; refresh on 401.",
       whatToDo:
-        "Set auth type oauth2_client_credentials + tokenUrl on template/shop. Seal client JSON in shop credentials. Worker refreshes once on 401.",
+        "Set oauth2_client_credentials + tokenUrl. Seal client JSON on shop credentials.",
       values: [
-        {
-          field: "api.auth.type",
-          value: "oauth2_client_credentials",
-        },
+        { field: "api.auth.type", value: "oauth2_client_credentials" },
         {
           field: "api.auth.tokenUrl",
           value: "https://pos.example.com/oauth/token",
@@ -531,31 +620,17 @@ export const POS_TEMPLATE_DETAIL_PLAYBOOK: PosPlaybookDef = {
         },
       ],
     },
-    {
-      title: "Only field names changed on webhook",
-      situation: "Existing template; vendor renamed JSON keys.",
-      whatToDo: "Edit mappings only. Re-run Test map. No need to change endpoints if paths same.",
-      values: [
-        {
-          field: "mappings.order_inbound",
-          value: "Update JSONPath / keys to match new sample",
-        },
-      ],
-    },
-    ...LANE_EXAMPLES.filter((e) => e.title.includes("developer")),
+    LANE_EXAMPLES[3]!,
+    LANE_EXAMPLES[4]!,
   ],
   faqs: [
     {
       q: "Do I put the shop password in config JSON?",
-      a: "No for multi-shop templates. Put secrets on Shop → POS credentials. Template holds auth type + header defaults.",
+      a: "No for multi-shop templates. Secrets on Shop → POS. Template holds auth type + header defaults.",
     },
     {
-      q: "What does a minimal order_inbound look like?",
-      a: "Map at least external order id, status, and line items from the vendor payload. Use Test map — if output misses lines/id, mapping is incomplete.",
-    },
-    {
-      q: "Advanced JSON broke save",
-      a: "JSON must be valid (commas, quotes). Copy out, validate in a JSON formatter, paste back.",
+      q: "How do I know mapping is good enough?",
+      a: "Test map output must show external id, status, and lines. If any are empty, keep editing 5Ws→How on mappings.order_inbound.",
     },
     ...LANE_FAQS,
   ],
@@ -563,41 +638,40 @@ export const POS_TEMPLATE_DETAIL_PLAYBOOK: PosPlaybookDef = {
 
 export const POS_TEMPLATE_LANE_CALLOUTS: Record<string, string> = {
   cratis:
-    "Lane A — prefer seeded Cratis. Shop page: URL + bearer + tenants. Do not clone generic for Cratis.",
+    "Lane A — seeded Cratis. Shop: URL + bearer + tenants. Do not use generic for Cratis.",
   saleculator:
-    "Lane B — Integration token on Features only. Template has no push/catalog. Attach after token exists.",
+    "Lane B — Integration token on Features only. Attach after token exists.",
   generic:
-    "Lane C — endpoints + mappings are the main work. Use Fields & values + Test map before attaching shops.",
+    "Lane C — endpoints + mappings are the main work. Use Fields → Open 5Ws + Test map.",
   gravity:
-    "Lane C — same as generic. Shop overrides URL/tenants; template holds paths/mappings.",
+    "Lane C — shop overrides URL/tenants; template holds paths/mappings. Read 5Ws before editing JSON.",
   topas:
-    "Lane C — same as generic. Shop overrides URL/tenants; template holds paths/mappings.",
+    "Lane C — shop overrides URL/tenants; template holds paths/mappings. Read 5Ws before editing JSON.",
 };
 
 export const POS_SCENARIO_MATRIX: PosScenarioRow[] = [
   {
     scenario:
-      "New shop on an existing Cratis / Saleculator / Gravity / Topas / generic template",
-    configOnly: "Yes — attach + URL / tenants / token (see Examples in the guide)",
+      "New shop on existing Cratis / Saleculator / Gravity / Topas / generic template",
+    configOnly: "Yes — attach + URL / tenants / token (see Examples + field 5Ws)",
     needsCode: "No",
     severity: "config_only",
   },
   {
-    scenario:
-      "Same POS JSON shape, different URL / header / account-location",
+    scenario: "Same JSON shape, different URL / header / account-location",
     configOnly: "Yes — shop overrides only",
     needsCode: "No",
     severity: "config_only",
   },
   {
-    scenario: "Webhook field names changed → map to Yaadro fields",
+    scenario: "Webhook field names changed",
     configOnly: "Yes — mappings.order_inbound + Test map",
     needsCode: "No",
     severity: "config_only",
   },
   {
     scenario: "Change when we push (created vs accepted)",
-    configOnly: "Yes — template events list",
+    configOnly: "Yes — template events",
     needsCode: "No",
     severity: "config_only",
   },
@@ -615,8 +689,8 @@ export const POS_SCENARIO_MATRIX: PosScenarioRow[] = [
   },
   {
     scenario: "OAuth2 / login JWT with refresh-on-401",
-    configOnly: "Partly — tokenUrl + sealed client JSON in UI",
-    needsCode: "Maybe — first new OAuth vendor may need eng check",
+    configOnly: "Partly — tokenUrl + sealed client JSON",
+    needsCode: "Maybe — first new OAuth vendor may need eng",
     severity: "partial",
   },
   {
@@ -632,7 +706,7 @@ export const POS_SCENARIO_MATRIX: PosScenarioRow[] = [
     severity: "needs_code",
   },
   {
-    scenario: "Identity in path/body beyond menuTenant/orderTenant query",
+    scenario: "Identity beyond menuTenant/orderTenant query support",
     configOnly: "No",
     needsCode: "Yes — connector change",
     severity: "needs_code",
@@ -658,7 +732,7 @@ export const POS_SCENARIO_MATRIX: PosScenarioRow[] = [
   {
     scenario: "Multi-POS per shop / non-HTTP transport",
     configOnly: "No",
-    needsCode: "Yes — architecture (out of hybrid scope)",
+    needsCode: "Yes — out of hybrid scope",
     severity: "needs_code",
   },
 ];
@@ -681,66 +755,55 @@ function shopPlaybook(
 
 export const POS_SHOP_PLAYBOOK: Record<string, PosPlaybookDef> = {
   cratis: shopPlaybook(
-    "Shop POS guide — Cratis (Lane A)",
-    "Open guide → use Fields & values and Examples. Fill URL, bearer credentials, and account/location for this branch.",
+    "Shop POS — Cratis (Lane A) with full 5Ws",
+    "Open Fields & values → Open 5Ws on Template, URL, Auth, Credentials, tenants. Follow Examples for copy-paste values.",
     [
       { title: "Select Cratis template" },
-      {
-        title: "Paste vendor base URL",
-        detail: "Example: https://api.cratis.example.com",
-      },
-      {
-        title: "Auth = bearer + paste token in Credentials",
-        detail: 'Example: {"token":"…"} or raw key per your ops convention',
-      },
-      {
-        title: "Set menuTenant and orderTenant",
-        detail: "Exact account + location from vendor for this branch",
-      },
-      { title: "Save → check Sync status → place a test order" },
+      { title: "Paste vendor base URL (https host only)" },
+      { title: "Auth bearer + Credentials token" },
+      { title: "Set menuTenant and orderTenant for this branch" },
+      { title: "Save → Sync status → test order" },
     ],
     [LANE_EXAMPLES[0]!],
   ),
   saleculator: shopPlaybook(
-    "Shop POS guide — Saleculator (Lane B)",
-    "Token first on Features, then attach here. Use Examples page for the exact order of clicks.",
+    "Shop POS — Saleculator (Lane B) with full 5Ws",
+    "Read 5Ws on Integration token first (Features). Then attach on this tab. Examples page shows the exact order.",
     [
-      {
-        title: "Features → Integration → create/rotate token → copy once",
-      },
-      { title: "Give token to POS vendor securely" },
-      { title: "Return to POS tab → select Saleculator template → Save" },
-      { title: "Confirm vendor can poll orders and post status" },
+      { title: "Features → Integration → create token → copy once" },
+      { title: "Give token to POS vendor" },
+      { title: "POS tab → Saleculator template → Save" },
+      { title: "Confirm till can pull orders" },
     ],
     [LANE_EXAMPLES[1]!],
   ),
   generic: shopPlaybook(
-    "Shop POS guide — Lane C (generic)",
-    "Template must already be tested. Here you only set this shop’s URL, auth, tenants, webhook secret.",
+    "Shop POS — Lane C generic with full 5Ws",
+    "Template must be tested first. Here you only set this store’s address, keys, and branch codes — open 5Ws on each.",
     [
-      { title: "Confirm template Test map + endpoints are done" },
-      { title: "Select template → base URL → auth → credentials" },
-      { title: "Set menuTenant & orderTenant for this branch" },
-      { title: "Optional webhook secret → Save → Test / place order" },
+      { title: "Confirm template Test map passed" },
+      { title: "Template → URL → auth → credentials" },
+      { title: "menuTenant & orderTenant for this branch" },
+      { title: "Webhook secret if inbound → Save" },
     ],
     [LANE_EXAMPLES[2]!, LANE_EXAMPLES[3]!],
   ),
   gravity: shopPlaybook(
-    "Shop POS guide — Gravity (Lane C)",
-    "Same as generic plug-and-play. Copy values from Examples; override URL and tenants per branch.",
+    "Shop POS — Gravity with full 5Ws",
+    "Same as Lane C. Open 5Ws for URL and tenants; reuse gravity template mappings.",
     [
       { title: "Select gravity template" },
-      { title: "Set base URL + auth + tenants for this branch" },
+      { title: "Set base URL + auth + tenants" },
       { title: "Save and verify sync / webhook" },
     ],
     [LANE_EXAMPLES[2]!, LANE_EXAMPLES[3]!],
   ),
   topas: shopPlaybook(
-    "Shop POS guide — Topas (Lane C)",
-    "Same as generic plug-and-play. Copy values from Examples; override URL and tenants per branch.",
+    "Shop POS — Topas with full 5Ws",
+    "Same as Lane C. Open 5Ws for URL and tenants; reuse topas template mappings.",
     [
       { title: "Select topas template" },
-      { title: "Set base URL + auth + tenants for this branch" },
+      { title: "Set base URL + auth + tenants" },
       { title: "Save and verify sync / webhook" },
     ],
     [LANE_EXAMPLES[2]!, LANE_EXAMPLES[3]!],
@@ -748,13 +811,13 @@ export const POS_SHOP_PLAYBOOK: Record<string, PosPlaybookDef> = {
 };
 
 export const POS_SHOP_FALLBACK_PLAYBOOK: PosPlaybookDef = {
-  title: "Shop POS guide — pick a template first",
+  title: "Shop POS — pick a template, then read 5Ws",
   description:
-    "Select a template in the form below. This guide will switch to Cratis / Saleculator / Lane C with field examples.",
+    "Select a template below. The guide switches to that lane. Until then, browse Fields & values 5Ws to learn each box.",
   steps: [
     { title: "Choose a template that matches the vendor" },
-    { title: "Re-open Fields & values for that lane’s examples" },
-    { title: "Fill only the fields shown for that lane" },
+    { title: "Open Fields & values → Open 5Ws before typing" },
+    { title: "Copy values from Examples for your story" },
   ],
   fields: POS_SHOP_FIELD_GLOSSARY,
   examples: LANE_EXAMPLES,
@@ -762,20 +825,17 @@ export const POS_SHOP_FALLBACK_PLAYBOOK: PosPlaybookDef = {
 };
 
 export const POS_SHOP_OPERATE_PLAYBOOK: PosPlaybookDef = {
-  title: "After attach — operate & troubleshoot",
+  title: "After attach — operate with 5Ws",
   description:
-    "Day-2 tasks: rotate secrets, read sync errors, when to detach. Use Examples if cutover fails.",
+    "Day-2: rotate secrets, read sync errors, pause vs detach. Open 5Ws on Link active, Credentials, Integration token.",
   steps: [
-    {
-      title: "Rotate credentials or Integration token when vendor rotates keys",
-    },
+    { title: "Rotate credentials / Integration token when vendor rotates keys" },
     {
       title: "Use Sync status",
-      detail: "Last sync times + sync error text are the first place to look.",
+      detail: "Last sync + error text — first place to analyse.",
     },
     {
-      title: "Detach only when replacing POS brand",
-      detail: "Stops outbox for this shop.",
+      title: "Link active Off to pause; Detach only when changing brand",
     },
   ],
   fields: POS_SHOP_FIELD_GLOSSARY.filter((f) =>
@@ -788,7 +848,7 @@ export const POS_SHOP_OPERATE_PLAYBOOK: PosPlaybookDef = {
       title: "Orders stuck / sync error",
       situation: "Sync status shows auth or tenant error.",
       whatToDo:
-        "Re-check base URL, credentials, orderTenant. For 401 after OAuth, confirm tokenUrl + client JSON. Re-save credentials to refresh.",
+        "Re-check base URL, credentials, orderTenant using each field’s How → analyse. Re-save rotated credentials.",
       values: [
         { field: "Sync error", value: "Read exact message on this tab" },
         { field: "Credentials", value: "Re-paste rotated key, save" },

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   BookOpenIcon,
   ChevronDownIcon,
@@ -36,8 +36,32 @@ const PAGE_META: {
   { id: "faq", label: "5. FAQ", short: "FAQ" },
 ];
 
-function FieldCard({ field }: { field: PosPlaybookField }) {
+function FieldCard({
+  field,
+  forceOpen,
+}: {
+  field: PosPlaybookField;
+  forceOpen?: boolean | null;
+}) {
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (forceOpen === true) setOpen(true);
+    if (forceOpen === false) setOpen(false);
+  }, [forceOpen]);
+
+  const fives: { label: string; q: string; a: string }[] = [
+    { label: "What", q: "What is this?", a: field.what },
+    { label: "Why", q: "Why does it matter?", a: field.why },
+    { label: "Who", q: "Who sets or uses it?", a: field.who },
+    { label: "When", q: "When do I set or change it?", a: field.when },
+    { label: "Where", q: "Where do I find it?", a: field.where },
+    {
+      label: "How",
+      q: "How do I fill, check, analyse, and update it?",
+      a: field.how,
+    },
+  ];
 
   return (
     <div className="rounded-xl border border-border/80 bg-background/70">
@@ -58,12 +82,12 @@ function FieldCard({ field }: { field: PosPlaybookField }) {
           {open ? (
             <>
               <ChevronUpIcon className="size-3.5" />
-              Hide how-to
+              Hide 5Ws
             </>
           ) : (
             <>
               <ChevronDownIcon className="size-3.5" />
-              How to fill
+              Open 5Ws
             </>
           )}
         </Button>
@@ -71,18 +95,29 @@ function FieldCard({ field }: { field: PosPlaybookField }) {
 
       {open ? (
         <div className="space-y-3 border-t px-3 py-3 text-xs leading-relaxed">
-          {field.where ? (
-            <p>
-              <span className="font-semibold text-foreground">Where: </span>
-              <span className="text-muted-foreground">{field.where}</span>
+          <div className="space-y-2">
+            {fives.map((item) => (
+              <div
+                key={item.label}
+                className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2"
+              >
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-200">
+                  {item.label} — {item.q}
+                </p>
+                <p className="mt-1 whitespace-pre-wrap text-muted-foreground">
+                  {item.a}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          <div className="rounded-lg border border-amber-500/25 bg-amber-500/5 px-3 py-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-200">
+              Real-life workflow
             </p>
-          ) : null}
-          <p>
-            <span className="font-semibold text-foreground">How to fill: </span>
-            <span className="whitespace-pre-wrap text-muted-foreground">
-              {field.howToFill}
-            </span>
-          </p>
+            <p className="mt-1 text-muted-foreground">{field.workflow}</p>
+          </div>
+
           <div className="rounded-lg bg-muted/60 px-3 py-2 font-mono text-[11px] leading-relaxed">
             <p className="mb-1 font-sans text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
               Example value
@@ -97,12 +132,7 @@ function FieldCard({ field }: { field: PosPlaybookField }) {
               </>
             ) : null}
           </div>
-          <p>
-            <span className="font-semibold text-foreground">
-              When to change:{" "}
-            </span>
-            <span className="text-muted-foreground">{field.whenToChange}</span>
-          </p>
+
           {field.commonMistakes ? (
             <p className="rounded-lg border border-destructive/25 bg-destructive/5 px-3 py-2 text-destructive">
               <span className="font-semibold">Common mistake: </span>
@@ -136,6 +166,7 @@ export function PosPlaybook({
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const [page, setPage] = useState<GuidePageId>("overview");
+  const [fieldsForceOpen, setFieldsForceOpen] = useState<boolean | null>(null);
 
   const resolvedTitle = playbook?.title ?? title ?? "Playbook";
   const resolvedDescription = playbook?.description ?? description;
@@ -192,8 +223,8 @@ export function PosPlaybook({
             </p>
             <p className="font-semibold tracking-tight">{resolvedTitle}</p>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Open → use page buttons inside for Overview, Fields with examples,
-              and Scenarios.
+              Open → Fields & values → Open 5Ws on each field (What, Why, Who,
+              When, Where, How + real-life workflow).
             </p>
           </div>
         </div>
@@ -267,7 +298,9 @@ export function PosPlaybook({
                   </li>
                   <li>
                     <strong className="text-foreground">Fields & values</strong>{" "}
-                    — tap “How to fill” on each field for examples.
+                    — tap <strong className="text-foreground">Open 5Ws</strong>{" "}
+                    on each field (What / Why / Who / When / Where / How +
+                    workflow).
                   </li>
                   <li>
                     <strong className="text-foreground">Examples</strong> —
@@ -309,18 +342,44 @@ export function PosPlaybook({
 
             {currentPage === "fields" ? (
               <div className="space-y-3">
-                <h3 className="text-base font-semibold tracking-tight">
-                  Fields & values
-                </h3>
-                <p className="text-muted-foreground">
-                  Each card is one form field or config key. Click{" "}
-                  <strong className="text-foreground">How to fill</strong> for
-                  where it lives, example values, when to change it, and common
-                  mistakes.
-                </p>
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <h3 className="text-base font-semibold tracking-tight">
+                      Fields & values (5Ws)
+                    </h3>
+                    <p className="mt-1 text-muted-foreground">
+                      Each card is one form field or config key. Click{" "}
+                      <strong className="text-foreground">Open 5Ws</strong> for:
+                      What, Why, Who, When, Where, How (fill / analyse /
+                      update), a real-life workflow story, and example values.
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setFieldsForceOpen(true)}
+                    >
+                      Expand all 5Ws
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setFieldsForceOpen(false)}
+                    >
+                      Collapse all
+                    </Button>
+                  </div>
+                </div>
                 <div className="space-y-2">
                   {resolvedFields.map((field) => (
-                    <FieldCard key={field.name} field={field} />
+                    <FieldCard
+                      key={field.name}
+                      field={field}
+                      forceOpen={fieldsForceOpen}
+                    />
                   ))}
                 </div>
               </div>
