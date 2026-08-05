@@ -136,6 +136,13 @@ export function ShopPosTab({ shopId }: { shopId: string }) {
     order_pull_enabled: false,
     base_url: "",
     auth_type: "bearer",
+    menu_path: "",
+    orders_path: "",
+    account: "",
+    location: "",
+    brand_id: "",
+    timezone: "Asia/Dubai",
+    channel: "Yaadro",
     credentials_plaintext: "",
     webhook_secret: "",
   });
@@ -158,6 +165,8 @@ export function ShopPosTab({ shopId }: { shopId: string }) {
     >;
     const api = (overrides.api ?? {}) as Record<string, unknown>;
     const auth = (api.auth ?? {}) as Record<string, unknown>;
+    const menuTenant = (api.menuTenant ?? {}) as Record<string, unknown>;
+    const orderTenant = (api.orderTenant ?? {}) as Record<string, unknown>;
     setForm({
       mapping_profile_id: String(existing.mapping_profile_id ?? ""),
       provider: String(existing.provider ?? "cratis"),
@@ -168,6 +177,28 @@ export function ShopPosTab({ shopId }: { shopId: string }) {
       order_pull_enabled: Boolean(existing.order_pull_enabled ?? false),
       base_url: typeof api.baseUrl === "string" ? api.baseUrl : "",
       auth_type: typeof auth.type === "string" ? auth.type : "bearer",
+      menu_path: typeof api.menuPath === "string" ? api.menuPath : "",
+      orders_path: typeof api.ordersPath === "string" ? api.ordersPath : "",
+      account:
+        typeof menuTenant.account === "string"
+          ? menuTenant.account
+          : typeof orderTenant.account === "string"
+            ? orderTenant.account
+            : typeof api.account === "string"
+              ? api.account
+              : "",
+      location:
+        typeof menuTenant.location === "string"
+          ? menuTenant.location
+          : typeof orderTenant.location === "string"
+            ? orderTenant.location
+            : typeof api.location === "string"
+              ? api.location
+              : "",
+      brand_id: typeof api.brandId === "string" ? api.brandId : "",
+      timezone:
+        typeof api.timezone === "string" ? api.timezone : "Asia/Dubai",
+      channel: typeof api.channel === "string" ? api.channel : "Yaadro",
       credentials_plaintext: "",
       webhook_secret: "",
     });
@@ -192,6 +223,16 @@ export function ShopPosTab({ shopId }: { shopId: string }) {
       catalog_sync_enabled: lanePreset.catalog_sync_enabled,
       order_push_enabled: lanePreset.order_push_enabled,
       order_pull_enabled: lanePreset.order_pull_enabled,
+      ...(provider === "cratis"
+        ? {
+            base_url: "https://online.cratis.live",
+            auth_type: "none",
+            menu_path: "/pos/",
+            orders_path: "/pos/orders/",
+            timezone: "Asia/Dubai",
+            channel: "Yaadro",
+          }
+        : {}),
     }));
   }
 
@@ -246,14 +287,63 @@ export function ShopPosTab({ shopId }: { shopId: string }) {
       return;
     }
 
+    if (
+      selectedProvider === "cratis" &&
+      (!form.menu_path.trim() ||
+        !form.orders_path.trim() ||
+        !form.account.trim() ||
+        !form.location.trim())
+    ) {
+      const msg =
+        "Cratis requires menu path, orders path, account, and location.";
+      setError(msg);
+      appToast.error(msg);
+      return;
+    }
+
+    const account = form.account.trim();
+    const location = form.location.trim();
+    const menuPath = form.menu_path.trim();
+    const ordersPath = form.orders_path.trim();
     const config_overrides =
-      form.base_url.trim() || form.auth_type
+      form.base_url.trim() ||
+      form.auth_type ||
+      menuPath ||
+      ordersPath ||
+      account ||
+      location
         ? {
             api: {
               ...(form.base_url.trim()
                 ? { baseUrl: form.base_url.trim() }
                 : {}),
               auth: { type: form.auth_type },
+              ...(menuPath ? { menuPath } : {}),
+              ...(ordersPath ? { ordersPath } : {}),
+              ...(account ? { account } : {}),
+              ...(location ? { location } : {}),
+              ...(account || location
+                ? {
+                    menuTenant: { account, location },
+                    orderTenant: { account, location },
+                  }
+                : {}),
+              ...(form.brand_id.trim()
+                ? { brandId: form.brand_id.trim() }
+                : {}),
+              ...(form.timezone.trim()
+                ? { timezone: form.timezone.trim() }
+                : {}),
+              ...(form.channel.trim() ? { channel: form.channel.trim() } : {}),
+              ...(selectedProvider === "cratis"
+                ? {
+                    endpoints: {
+                      menu: { method: "GET", path: menuPath },
+                      orderCreate: { method: "POST", path: ordersPath },
+                      orderStatus: { method: "POST", path: ordersPath },
+                    },
+                  }
+                : {}),
             },
           }
         : undefined;
@@ -399,6 +489,89 @@ export function ShopPosTab({ shopId }: { shopId: string }) {
               </Field>
             </div>
           )}
+
+          {selectedProvider === "cratis" ? (
+            <div className="space-y-4 rounded-xl border p-4">
+              <div>
+                <p className="text-sm font-medium">Cratis shop connection</p>
+                <p className="text-xs text-muted-foreground">
+                  Enter the tenant values supplied by Cratis for this branch.
+                </p>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field
+                  label="Menu path"
+                  hint="Branch-prefixed when supplied by Cratis."
+                >
+                  <Input
+                    value={form.menu_path}
+                    onChange={(e) =>
+                      setForm({ ...form, menu_path: e.target.value })
+                    }
+                    placeholder="/hnc_test/pos/"
+                    required
+                  />
+                </Field>
+                <Field label="Orders path">
+                  <Input
+                    value={form.orders_path}
+                    onChange={(e) =>
+                      setForm({ ...form, orders_path: e.target.value })
+                    }
+                    placeholder="/pos/orders/"
+                    required
+                  />
+                </Field>
+                <Field label="Account">
+                  <Input
+                    value={form.account}
+                    onChange={(e) =>
+                      setForm({ ...form, account: e.target.value })
+                    }
+                    placeholder="hnc"
+                    required
+                  />
+                </Field>
+                <Field label="Location">
+                  <Input
+                    value={form.location}
+                    onChange={(e) =>
+                      setForm({ ...form, location: e.target.value })
+                    }
+                    placeholder="HNC002"
+                    required
+                  />
+                </Field>
+                <Field label="Brand ID" hint="Restaurant brand shown to Cratis.">
+                  <Input
+                    value={form.brand_id}
+                    onChange={(e) =>
+                      setForm({ ...form, brand_id: e.target.value })
+                    }
+                    placeholder="Hot N Cool"
+                  />
+                </Field>
+                <Field label="Timezone">
+                  <Input
+                    value={form.timezone}
+                    onChange={(e) =>
+                      setForm({ ...form, timezone: e.target.value })
+                    }
+                    placeholder="Asia/Dubai"
+                  />
+                </Field>
+                <Field label="Channel">
+                  <Input
+                    value={form.channel}
+                    onChange={(e) =>
+                      setForm({ ...form, channel: e.target.value })
+                    }
+                    placeholder="Yaadro"
+                  />
+                </Field>
+              </div>
+            </div>
+          ) : null}
 
           {selectedProvider && selectedProvider !== "saleculator" ? (
             <Field
