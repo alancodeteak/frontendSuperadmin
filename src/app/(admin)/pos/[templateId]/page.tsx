@@ -8,7 +8,6 @@ import {
   ArrowLeftIcon,
   CopyIcon,
   FlaskConicalIcon,
-  GitBranchIcon,
   PlugZapIcon,
   PowerIcon,
 } from "lucide-react";
@@ -16,6 +15,7 @@ import {
 import { PageShell } from "@/components/layout/page-shell";
 import { TopBarSlot } from "@/components/layout/top-bar-slot";
 import { PosPlaybook } from "@/components/pos/pos-playbook";
+import { PosConfigStructuredEditor } from "@/components/pos/pos-config-structured-editor";
 import { CopyButton } from "@/components/shared/copy-button";
 import {
   ErrorState,
@@ -48,6 +48,7 @@ import {
   testConnectionPosTemplate,
   testMapPosTemplate,
   type PosEndpointKey,
+  type PosProvider,
 } from "@/lib/api/pos";
 import { posKeys, posTemplateQuery } from "@/lib/queries/pos";
 
@@ -100,7 +101,8 @@ export default function PosTemplateDetailPage() {
   const id = params.templateId;
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [configText, setConfigText] = useState("{}");
+  const [config, setConfig] = useState<Record<string, unknown>>({});
+  const [testMapBusy, setTestMapBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [endpointKey, setEndpointKey] = useState<PosEndpointKey>("menu");
   const [form, setForm] = useState({
@@ -126,24 +128,21 @@ export default function PosTemplateDetailPage() {
       description: String(template.description ?? ""),
       is_active: Boolean(template.is_active ?? true),
     });
-    setConfigText(JSON.stringify(template.config ?? {}, null, 2));
+    setConfig(
+      template.config && typeof template.config === "object"
+        ? (template.config as Record<string, unknown>)
+        : {},
+    );
   }, [template]);
 
   const saveMutation = useMutation({
-    mutationFn: async () => {
-      let config: Record<string, unknown>;
-      try {
-        config = JSON.parse(configText) as Record<string, unknown>;
-      } catch {
-        throw new ApiError(400, "Config must be valid JSON");
-      }
-      return patchPosTemplate(id, {
+    mutationFn: async () =>
+      patchPosTemplate(id, {
         description: form.description.trim() || undefined,
         is_active: form.is_active,
         version: form.version.trim() || undefined,
         config,
-      });
-    },
+      }),
     onSuccess: async () => {
       appToast.success("Template saved.");
       await queryClient.invalidateQueries({ queryKey: posKeys.template(id) });
@@ -176,20 +175,19 @@ export default function PosTemplateDetailPage() {
     }
   }
 
-  async function onTestMap() {
+  async function onTestMap(input: {
+    mapping_section: string;
+    sample_payload: Record<string, unknown>;
+  }) {
     setMessage(null);
+    setTestMapBusy(true);
     try {
-      const res = await testMapPosTemplate(id, {
-        mapping_section: POS_TEST_MAP_DEFAULT_SECTION,
-        sample_payload: {
-          id: "POS-1001",
-          status: "NEW",
-          items: [{ sku: "A1", qty: 2 }],
-        },
-      });
+      const res = await testMapPosTemplate(id, input);
       setMessage(`Test map: ${JSON.stringify(res, null, 2)}`);
     } catch (err) {
       setMessage(err instanceof ApiError ? err.message : "Test map failed");
+    } finally {
+      setTestMapBusy(false);
     }
   }
 
@@ -286,7 +284,22 @@ export default function PosTemplateDetailPage() {
             <CopyIcon className="size-3.5" />
             Clone
           </Button>
-          <Button variant="outline" size="sm" onClick={() => void onTestMap()}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              void onTestMap({
+                mapping_section: POS_TEST_MAP_DEFAULT_SECTION,
+                sample_payload: {
+                  id: "POS-1001",
+                  vno: "B-1001",
+                  customer: { name: "Ali", phone: "+971501234567" },
+                  items: [{ itn: "Shawarma", qty: 2 }],
+                },
+              })
+            }
+            disabled={testMapBusy}
+          >
             <FlaskConicalIcon className="size-3.5" />
             Test map
           </Button>
@@ -408,30 +421,16 @@ export default function PosTemplateDetailPage() {
         </Section>
 
         <Section
-          title="Config"
-          description="Raw connector JSON. Keep it valid — save will reject broken syntax."
+          title="Connector configuration"
+          description="Use the section tabs below — no need to edit raw JSON unless you open Advanced."
         >
-          <div className="overflow-hidden rounded-2xl border bg-slate-950 text-slate-100 shadow-sm">
-            <div className="flex items-center justify-between border-b border-white/10 px-4 py-2.5">
-              <div className="flex items-center gap-2 text-xs text-slate-400">
-                <GitBranchIcon className="size-3.5" />
-                <span>config.json</span>
-              </div>
-              <CopyButton
-                value={configText}
-                iconOnly
-                size={13}
-                label="Copy config JSON"
-                className="size-7 border-white/15 bg-transparent text-slate-300 hover:bg-white/10 hover:text-white"
-              />
-            </div>
-            <Textarea
-              className="min-h-80 resize-y rounded-none border-0 bg-transparent px-4 py-4 font-mono text-xs leading-relaxed text-slate-100 shadow-none focus-visible:ring-0"
-              value={configText}
-              onChange={(e) => setConfigText(e.target.value)}
-              spellCheck={false}
-            />
-          </div>
+          <PosConfigStructuredEditor
+            provider={(template.provider ?? "generic") as PosProvider}
+            config={config}
+            onChange={setConfig}
+            onTestMap={onTestMap}
+            testMapBusy={testMapBusy}
+          />
         </Section>
 
         <div className="flex flex-wrap items-center gap-3 border-t pt-6">

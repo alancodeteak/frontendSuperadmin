@@ -280,108 +280,135 @@ export const POS_TEMPLATE_FIELD_GLOSSARY: PosPlaybookField[] = [
     who: "Ops selects on create. Eng owns new providers. Locked afterward.",
     when: "At create only. Wrong choice → new template, not an edit.",
     where: "Create dialog; read-only on template header.",
-    how: "1) Match vendor brand. 2) Accept suggested connector. 3) Confirm lane in the Beginner guide. 4) Analyse odd behaviour: verify provider/lane before editing JSON for hours.",
+    how: "1) Match vendor brand. 2) Accept suggested connector. 3) Confirm lane in the Beginner guide. 4) Analyse odd behaviour: verify provider/lane before editing config for hours.",
     workflow:
       "Email: “We use Cratis”. You create/use cratis + Lane A — never a generic clone. Email: “JSON like Gravity” → Lane C gravity/generic.",
     example: "provider=gravity, connector=generic_json, lane=C",
   },
   {
-    name: "Config JSON → api.baseUrl",
+    name: "1. API & auth → Base URL",
     meaning: "Default POS host stored on the template.",
     what: "Optional default https host. Real shops usually override with their own Vendor base URL.",
     why: "Handy for demos/tests. Dangerous if you put one live shop’s URL here and attach many shops without overrides.",
     who: "Template editor sets default. Shop attach should override per branch.",
     when: "When creating a template for docs/sandbox. Prefer shop-level URL for production branches.",
-    where: "Template page → Config JSON → api.baseUrl.",
+    where: "Template page → section 1. API & auth → Base URL.",
     how: "1) Set a placeholder host for documentation. 2) On each shop, set Vendor base URL. 3) Analyse: all shops hitting one host → check they overrode base URL. 4) Update shop URLs for moves; only change template default if all shops share one host on purpose.",
     workflow:
       "Template keeps https://pos-vendor.example.com as a sample. Marina shop overrides to https://marina…. Downtown overrides to https://dt….",
-    example: '"baseUrl": "https://pos-vendor.example.com"',
+    example: "https://pos-vendor.example.com",
   },
   {
-    name: "Config JSON → api.auth",
+    name: "1. API & auth → Login style",
     meaning: "Default login style for shops using this template.",
-    what: "Object with type, optional headerName, optional tokenUrl for OAuth.",
+    what: "Auth type dropdown plus optional header name and token URL for OAuth.",
     why: "Shops inherit a sensible default so ops only pastes secrets per shop.",
     who: "Template owner sets type/header/tokenUrl. Shop owner pastes credentials.",
     when: "When the brand’s auth method is known; update if vendor changes auth for all shops on this recipe.",
-    where: "Template → Config JSON → api.auth.",
-    how: "1) Set type from vendor docs. 2) Add headerName. 3) For OAuth add tokenUrl. 4) Do not put live client_secret in the shared template if shops differ — put secrets on the shop. 5) Analyse 401s across all shops → template auth type/header wrong. One shop only → that shop’s credentials.",
+    where: "Template page → section 1. API & auth → Auth type, header name, token URL.",
+    how: "1) Pick type from the dropdown from vendor docs. 2) Fill header name when needed. 3) For OAuth add token URL. 4) Do not put live client_secret in the shared template if shops differ — put secrets on the shop. 5) Analyse 401s across all shops → template auth type/header wrong. One shop only → that shop’s credentials.",
     workflow:
-      "All Gravity shops use bearer. You set auth.type=bearer once on the template. Each shop pastes its own token in Credentials.",
-    example: '{"type":"bearer","headerName":"Authorization"}',
+      "All Gravity shops use bearer. You set Auth type = bearer once on the template. Each shop pastes its own token in Credentials.",
+    example: "Auth type: bearer, Header: Authorization",
     exampleAlt:
-      '{"type":"oauth2_client_credentials","headerName":"Authorization","tokenUrl":"https://pos.example.com/oauth/token"}',
+      "Auth type: oauth2_client_credentials, Token URL: https://pos.example.com/oauth/token",
   },
   {
-    name: "Config JSON → menuTenant / orderTenant",
+    name: "1. API & auth → Default branch codes",
     meaning: "Default account/location codes on the recipe.",
     what: "Demo or shared defaults for account + location. Live shops should override.",
     why: "Template needs a valid shape; shops need real branch codes so tickets and menus hit the right store.",
     who: "Template editor sets placeholders. Shop ops sets real codes.",
     when: "Placeholders at template create. Real values at every shop attach.",
-    where: "Template config api.menuTenant / api.orderTenant; shop overrides.",
+    where: "Template page → section 1. API & auth → Menu tenant / Order tenant.",
     how: "1) Leave ACC001/LOC001 style demos on template. 2) On shop, replace with vendor codes. 3) Analyse wrong-store issues → shop tenants first. 4) Update per shop when branches change.",
     workflow:
       "Template shows sample tenants for training. Production Marina shop overrides to ACC001/DXB-MARINA before go-live.",
-    example: '{"account":"ACC001","location":"LOC001"}',
+    example: "Account ACC001, Location LOC001",
   },
   {
-    name: "Config JSON → endpoints",
+    name: "2. Endpoints",
     meaning: "Which URL paths to call for menu, create order, status, etc.",
-    what: "Map of actions → HTTP method + path (e.g. POST /api/orders).",
+    what: "Each action has an enable toggle plus HTTP method and path (e.g. POST /api/orders).",
     why: "Yaadro must hit the vendor’s real paths. Wrong path = 404 and no orders.",
     who: "Ops/eng copy from vendor API docs onto the template. Shops usually do not change paths.",
     when: "When building the template, and when vendor version upgrades paths.",
-    where: "Template → Config JSON → endpoints.",
-    how: "1) From vendor docs, fill only actions you enabled in capabilities. 2) Test connection per key. 3) Analyse 404 → path typo. 4) Update template paths once; all shops inherit.",
+    where: "Template page → section 2. Endpoints.",
+    how: "1) From vendor docs, enable only actions you turned on in capabilities. 2) Set method + path per row. 3) Test connection per key. 4) Analyse 404 → path typo. 5) Update template paths once; all shops inherit.",
     workflow:
-      "Docs say create order is POST /v1/orders. You set endpoints.orderCreate accordingly, Test connection, then attach shops.",
-    example: '{"orderCreate":{"method":"POST","path":"/api/orders"}}',
+      "Docs say create order is POST /v1/orders. You enable orderCreate, set POST + /v1/orders, Test connection, then attach shops.",
+    example: "orderCreate: POST /api/orders",
     exampleAlt:
-      '{"menu":{"method":"GET","path":"/api/menu"},"menuCategories":{"method":"GET","path":"/api/menu/categories"}}',
+      "menu: GET /api/menu, menuCategories: GET /api/menu/categories",
   },
   {
-    name: "Config JSON → capabilities",
+    name: "3. Capabilities",
     meaning: "What this POS is allowed to do in Yaadro’s eyes.",
-    what: "Flags/modes for catalog, orders out/in, status, riders — e.g. push vs none, webhook vs none.",
+    what: "Dropdowns/flags for catalog, orders out/in, status, riders — e.g. push vs none, webhook vs none.",
     why: "Turns features on only when the vendor supports them. Avoids calling endpoints that do not exist.",
     who: "Template owner. Lane presets may constrain Cratis/Saleculator.",
     when: "At template setup; again when vendor enables a new feature (e.g. webhooks).",
-    where: "Template → Config JSON → capabilities.",
-    how: "1) Ask vendor what they support. 2) Set matching modes. 3) Add matching endpoints/mappings. 4) Analyse: capability on but endpoint missing → failures. 5) Update carefully and re-test.",
+    where: "Template page → section 3. Capabilities.",
+    how: "1) Ask vendor what they support. 2) Set matching modes in the form. 3) Add matching endpoints/mappings. 4) Analyse: capability on but endpoint missing → failures. 5) Update carefully and re-test.",
     workflow:
       "Gravity can push orders and send webhooks, no catalog. You set orders_out=push, orders_in=webhook, catalog=none.",
     example:
-      '{"catalog":"pull","orders_out":"push","orders_in":"webhook"}',
+      "Catalog: none, Orders out: push, Orders in: webhook",
   },
   {
-    name: "Config JSON → events",
+    name: "4. Events",
     meaning: "Which Yaadro moments trigger a push to the POS.",
-    what: "Lists like order_create_on: [customer_order_created]. Only for push capabilities.",
+    what: "Checkbox lists for order_create_on and status_out_on. Only applies when push capabilities are enabled.",
     why: "Controls timing: send when customer orders, or later when kitchen accepts — business choice.",
     who: "Ops with product. Eng if new event names are required (may need code).",
     when: "After capabilities enable push; tweak when ops wants different timing.",
-    where: "Template → Config JSON → events.",
-    how: "1) Start with customer_order_created. 2) Save and place a test order. 3) Analyse: push too early/late → adjust list within known events. 4) Unknown event names → ask eng.",
+    where: "Template page → section 4. Events (tick the events you want).",
+    how: "1) Start with customer_order_created checked. 2) Save and place a test order. 3) Analyse: push too early/late → adjust checkboxes within known events. 4) Unknown event names → ask eng.",
     workflow:
-      "Kitchen wants tickets only after payment confirm. You change events from created to the agreed status event, retest one order.",
-    example: '{"order_create_on":["customer_order_created"]}',
+      "Kitchen wants tickets only after payment confirm. You uncheck created and tick the agreed status event, retest one order.",
+    example: "Order create on: customer_order_created",
   },
   {
-    name: "Config JSON → mappings.order_inbound",
+    name: "5. Mappings → Order inbound",
     meaning: "Translator from POS webhook JSON → Yaadro order fields.",
-    what: "Rules that say “vendor’s order.id becomes our external order id”, etc.",
+    what: "Labeled fields for external order id, status, lines, etc. — each maps a vendor JSON path.",
     why: "Every POS names fields differently. Mapping is how Lane C understands their webhook without new code.",
     who: "Ops/eng on the template. Test map is your lab. Shops do not each keep a mapping.",
     when: "When orders_in=webhook; update when vendor renames fields.",
-    where: "Template → Config JSON → mappings.order_inbound + Test map button.",
-    how: "1) Get one real sample webhook JSON. 2) Open Test map. 3) Adjust paths until id, status, lines appear. 4) Save. 5) Analyse failed inbound → compare latest payload to mapping. 6) Update mapping once for all shops on this template.",
+    where: "Template page → section 5. Mappings → Order inbound + section 7. Test map.",
+    how: "1) Get one real sample webhook JSON. 2) Open Test map (tab 7). 3) Fill/adjust paths until id, status, lines appear. 4) Save. 5) Analyse failed inbound → compare latest payload to mapping. 6) Update mapping once for all shops on this template.",
     workflow:
-      "POS upgrade renames order.id to orderCode. Inbound breaks. You paste new sample into Test map, point externalOrderId to the new path, save — all Gravity shops work again.",
+      "POS upgrade renames order.id to orderCode. Inbound breaks. You paste new sample into Test map, point External order id to the new path, save — all Gravity shops work again.",
     example:
-      '{"externalOrderId":"$.order.id","status":"$.order.state","lines":"$.order.items"}',
+      "External order id: $.order.id, Status: $.order.state, Lines: $.order.items",
     commonMistakes: "Never running Test map before go-live.",
+  },
+  {
+    name: "6. Status codes",
+    meaning: "Map status names between Yaadro and the POS.",
+    what: "Key → value rows: Yaadro status on the left, vendor status string on the right.",
+    why: "Vendors use different words (e.g. PREPARING vs in_kitchen). Mapping keeps sync consistent.",
+    who: "Ops/eng on the template when status push or webhook is enabled.",
+    when: "During template setup and when vendor renames status values.",
+    where: "Template page → section 6. Status codes.",
+    how: "1) List vendor status strings from their docs or a sample webhook. 2) Add a row per Yaadro status. 3) Save and test a status change. 4) Analyse mismatches → add or fix rows here.",
+    workflow:
+      "Vendor sends READY but Yaadro expects ready_for_pickup. You add a row mapping ready_for_pickup → READY, save, retest.",
+    example: "ready_for_pickup → READY, cancelled → CANCELLED",
+  },
+  {
+    name: "Advanced → Raw JSON",
+    meaning: "Power-user view of the full config object.",
+    what: "Collapsed editor at the bottom of the config card. Same data as tabs 1–6, in JSON form.",
+    why: "Rare edge keys or copy/paste from eng — normal onboarding should not need this.",
+    who: "Eng or advanced ops only after trying the section tabs.",
+    when: "Debugging, bulk paste from vendor, or keys not yet in the form.",
+    where: "Template page → Config card → Advanced → Edit raw JSON.",
+    how: "1) Prefer sections 1–7 first. 2) Open Advanced only if eng asks or a field is missing. 3) Invalid JSON blocks save — fix syntax before saving.",
+    workflow:
+      "Eng sends a starter config file. You paste in Advanced once, verify tabs look right, then use forms for day-to-day edits.",
+    example: "(open Advanced → Edit raw JSON at the bottom of the config card)",
+    commonMistakes: "Editing JSON while also changing tabs — save often; tabs and JSON stay in sync on save.",
   },
   {
     name: "Test map",
@@ -390,7 +417,7 @@ export const POS_TEMPLATE_FIELD_GLOSSARY: PosPlaybookField[] = [
     why: "Lets a fresh user learn mappings without breaking production.",
     who: "Anyone configuring the template. Do this before attaching shops.",
     when: "After every mapping edit, and before go-live.",
-    where: "Template page → Test map.",
+    where: "Template page → section 7. Test map (or Test map panel on the config card).",
     how: "1) Paste vendor sample. 2) Run. 3) Read output — missing fields mean fix mapping. 4) Repeat until complete. 5) Then save template.",
     workflow:
       "Before Friday launch you spend 20 minutes with Test map and one sample file from the vendor until the preview looks like a normal Yaadro order.",
@@ -567,15 +594,19 @@ export const POS_LANE_CHOOSER_PLAYBOOK: PosPlaybookDef = {
 export const POS_TEMPLATE_DETAIL_PLAYBOOK: PosPlaybookDef = {
   title: "Template guide — every config field with 5Ws",
   description:
-    "This screen edits the shared recipe. Read 5Ws on each field before changing JSON. Shop passwords and live branch codes belong on Shop → POS.",
+    "This screen edits the shared recipe. Work through section tabs 1–7 on the config card; read 5Ws on each field before saving. Shop passwords and live branch codes belong on Shop → POS. Raw JSON is only under Advanced.",
   steps: [
     { title: "Confirm provider / connector / lane (locked)" },
     {
-      title: "Open Fields & values — 5Ws for auth, tenants, endpoints, mappings",
+      title: "Open Fields & values — 5Ws for each section tab (API, endpoints, mappings, …)",
     },
-    { title: "Set capabilities + events to match the vendor" },
-    { title: "Test map (inbound) then Test connection (live)" },
-    { title: "Save — attach shops only after tests look good" },
+    {
+      title: "Fill tabs 1–4: API & auth, Endpoints, Capabilities, Events (use checkboxes for events)",
+    },
+    {
+      title: "Fill tabs 5–6: Mappings and Status codes; run tab 7 Test map",
+    },
+    { title: "Test connection (live) then Save — attach shops only after tests look good" },
   ],
   fields: POS_TEMPLATE_FIELD_GLOSSARY,
   examples: [
@@ -583,23 +614,23 @@ export const POS_TEMPLATE_DETAIL_PLAYBOOK: PosPlaybookDef = {
       title: "First-time Gravity template",
       situation: "New Lane C vendor, JSON HTTP, webhooks + order push.",
       whatToDo:
-        "Create gravity template. Fill auth, endpoints, capabilities, starter order_inbound. Test map. Save.",
+        "Create gravity template. Use tabs 1–5: auth, endpoints, capabilities, events, order_inbound. Test map (tab 7). Save.",
       values: [
         {
-          field: "api.auth",
-          value: '{"type":"bearer","headerName":"Authorization"}',
+          field: "1. API & auth → Login style",
+          value: "Auth type: bearer, Header: Authorization",
         },
         {
-          field: "endpoints.orderCreate",
-          value: '{"method":"POST","path":"/v1/orders"}',
+          field: "2. Endpoints → orderCreate",
+          value: "POST /v1/orders",
         },
         {
-          field: "capabilities",
-          value: '{"orders_out":"push","orders_in":"webhook","catalog":"none"}',
+          field: "3. Capabilities",
+          value: "Orders out: push, Orders in: webhook, Catalog: none",
         },
         {
-          field: "events.order_create_on",
-          value: '["customer_order_created"]',
+          field: "4. Events → Order create on",
+          value: "customer_order_created (checked)",
         },
       ],
     },
@@ -607,11 +638,11 @@ export const POS_TEMPLATE_DETAIL_PLAYBOOK: PosPlaybookDef = {
       title: "OAuth2 vendor on Lane C",
       situation: "Client id/secret + token URL; refresh on 401.",
       whatToDo:
-        "Set oauth2_client_credentials + tokenUrl. Seal client JSON on shop credentials.",
+        "Tab 1: set oauth2_client_credentials + token URL. Seal client JSON on shop credentials.",
       values: [
-        { field: "api.auth.type", value: "oauth2_client_credentials" },
+        { field: "1. API & auth → Auth type", value: "oauth2_client_credentials" },
         {
-          field: "api.auth.tokenUrl",
+          field: "1. API & auth → Token URL",
           value: "https://pos.example.com/oauth/token",
         },
         {
@@ -625,8 +656,12 @@ export const POS_TEMPLATE_DETAIL_PLAYBOOK: PosPlaybookDef = {
   ],
   faqs: [
     {
-      q: "Do I put the shop password in config JSON?",
-      a: "No for multi-shop templates. Secrets on Shop → POS. Template holds auth type + header defaults.",
+      q: "Do I put the shop password in the template config?",
+      a: "No for multi-shop templates. Secrets on Shop → POS → Credentials. Template tab 1 holds auth type + header defaults only.",
+    },
+    {
+      q: "When should I use Advanced → raw JSON?",
+      a: "Only when eng gives you a full config to paste, or a key is not in the section tabs yet. Day-to-day edits use tabs 1–7.",
     },
     {
       q: "How do I know mapping is good enough?",
@@ -642,11 +677,11 @@ export const POS_TEMPLATE_LANE_CALLOUTS: Record<string, string> = {
   saleculator:
     "Lane B — Integration token on Features only. Attach after token exists.",
   generic:
-    "Lane C — endpoints + mappings are the main work. Use Fields → Open 5Ws + Test map.",
+    "Lane C — endpoints + mappings are the main work. Use section tabs 1–7 + Fields → Open 5Ws + Test map.",
   gravity:
-    "Lane C — shop overrides URL/tenants; template holds paths/mappings. Read 5Ws before editing JSON.",
+    "Lane C — shop overrides URL/tenants; template holds paths/mappings. Use tabs 2–5; read 5Ws before saving.",
   topas:
-    "Lane C — shop overrides URL/tenants; template holds paths/mappings. Read 5Ws before editing JSON.",
+    "Lane C — shop overrides URL/tenants; template holds paths/mappings. Use tabs 2–5; read 5Ws before saving.",
 };
 
 export const POS_SCENARIO_MATRIX: PosScenarioRow[] = [

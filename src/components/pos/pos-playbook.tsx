@@ -391,8 +391,8 @@ export function PosPlaybook({
                   Examples by scenario
                 </h3>
                 <p className="text-muted-foreground">
-                  Find your situation, then copy the field values into the form
-                  or config JSON.
+                  Find your situation, then copy the field values into the
+                  matching section tabs on the config card.
                 </p>
                 {examples.map((ex) => (
                   <div

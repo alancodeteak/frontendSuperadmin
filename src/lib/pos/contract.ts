@@ -93,6 +93,38 @@ export type PosEvents = {
   status_out_on: string[];
 };
 
+/** Known domain events (matches backend POS_DOMAIN_EVENTS). */
+export const POS_DOMAIN_EVENTS = [
+  "blank_created",
+  "customer_order_created",
+  "Pending",
+  "Accepted",
+  "Rejected",
+  "Assigned",
+  "Picked Up",
+  "Out for Delivery",
+  "Delivered",
+  "customer_not_available",
+  "cancelled",
+] as const;
+
+export const POS_ORDER_CREATE_EVENT_OPTIONS = [
+  "blank_created",
+  "customer_order_created",
+] as const;
+
+export const POS_STATUS_OUT_EVENT_OPTIONS = [
+  "Pending",
+  "Accepted",
+  "Rejected",
+  "Assigned",
+  "Picked Up",
+  "Out for Delivery",
+  "Delivered",
+  "customer_not_available",
+  "cancelled",
+] as const;
+
 export type PosStatusMaps = {
   outbound?: Record<string, unknown>;
   inbound?: Record<string, unknown>;
