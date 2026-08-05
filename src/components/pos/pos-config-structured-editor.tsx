@@ -7,8 +7,8 @@ import { PosAuthFields, type PosAuthFieldsValue } from "@/components/pos/pos-aut
 import { PosCapabilitiesForm } from "@/components/pos/pos-capabilities-form";
 import { PosEndpointsForm } from "@/components/pos/pos-endpoints-form";
 import { PosEventsForm } from "@/components/pos/pos-events-form";
+import { PosGuidedMappingsEditor } from "@/components/pos/pos-guided-mappings-editor";
 import { PosMappingSectionEditor } from "@/components/pos/pos-mapping-section-editor";
-import { PosOrderInboundFieldsEditor } from "@/components/pos/pos-order-inbound-fields-editor";
 import { PosStatusMapsEditor } from "@/components/pos/pos-status-maps-editor";
 import { PosTenantFields } from "@/components/pos/pos-tenant-fields";
 import { PosTestMapPanel } from "@/components/pos/pos-test-map-panel";
@@ -294,24 +294,18 @@ export function PosConfigStructuredEditor({
         {section === "mappings" ? (
           <div className="space-y-4">
             <ConfigPanel
-              title="Order inbound — common fields"
-              description="Friendly editor for webhook → Yaadro order mapping."
+              title="Guided body & field mappings"
+              description="Choose a data flow, paste a vendor sample, and add fields without writing JSON."
             >
-              <PosOrderInboundFieldsEditor
-                mapping={
-                  (model.mappings.order_inbound as Record<string, unknown>) ??
-                  {}
-                }
-                onChange={(order_inbound) =>
-                  patchModel({
-                    mappings: { ...model.mappings, order_inbound },
-                  })
-                }
+              <PosGuidedMappingsEditor
+                capabilities={model.capabilities}
+                mappings={model.mappings}
+                onChange={(mappings) => patchModel({ mappings })}
               />
             </ConfigPanel>
             <ConfigPanel
-              title="All mapping sections"
-              description="Other sections (order_outbound, status, catalog) — JSON per section."
+              title="Developer mapping JSON"
+              description="Advanced fallback for unsupported vendor shapes. Normal onboarding should use the guided editor above."
               defaultOpen={false}
             >
               <PosMappingSectionEditor
@@ -328,6 +322,12 @@ export function PosConfigStructuredEditor({
             description="Map status names and choose how status updates work."
           >
             <div className="space-y-6">
+              <div className="rounded-lg bg-muted/40 p-3 text-xs text-muted-foreground">
+                Use <strong>Outbound</strong> for Yaadro status → vendor code and{" "}
+                <strong>Inbound</strong> for vendor code → Yaadro status. If the
+                vendor requires a custom status request body, configure{" "}
+                <strong>5. Mappings → Status sent to POS</strong>.
+              </div>
               <div className="space-y-1.5 max-w-xs">
                 <Label className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
                   Status update mode

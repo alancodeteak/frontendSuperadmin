@@ -369,6 +369,20 @@ export const POS_TEMPLATE_FIELD_GLOSSARY: PosPlaybookField[] = [
     example: "Order create on: customer_order_created",
   },
   {
+    name: "5. Mappings → Order sent to POS",
+    meaning: "Build the vendor-specific request body from Yaadro order fields.",
+    what: "Rows where the left field is the vendor body name and the selected source is a Yaadro field. Line items have their own array and item-field rows.",
+    why: "The vendor may expect OrderNo, CustomerName and Lines while Yaadro stores client_order_ref, customer_name and items.",
+    who: "Ops can configure it from the vendor’s create-order API example; eng is needed only for unsupported nested or non-JSON bodies.",
+    when: "When Orders out = push. Update when the vendor changes its create-order request contract.",
+    where: "Template → 5. Mappings → Order sent to POS.",
+    how: "1) Paste the vendor’s expected request-body example. 2) Click Add body fields from sample. 3) For each vendor field choose its Yaadro source. 4) Set the Yaadro array source to items and map each vendor line field. 5) Use defaults/optional only when the vendor contract says so. 6) Test map, then test one order.",
+    workflow:
+      "Vendor expects OrderNo and Lines[].PLU. Paste its example, map OrderNo ← client_order_ref and PLU ← pos_product_id, then test the generated body.",
+    example: "OrderNo ← client_order_ref; Lines[].PLU ← items[].pos_product_id",
+    commonMistakes: "Putting Yaadro names on the left. For outbound, the left side must use the vendor’s exact body field names and case.",
+  },
+  {
     name: "5. Mappings → Order inbound",
     meaning: "Translator from POS webhook JSON → Yaadro order fields.",
     what: "Labeled fields for external order id, status, lines, etc. — each maps a vendor JSON path.",
@@ -376,12 +390,40 @@ export const POS_TEMPLATE_FIELD_GLOSSARY: PosPlaybookField[] = [
     who: "Ops/eng on the template. Test map is your lab. Shops do not each keep a mapping.",
     when: "When orders_in=webhook; update when vendor renames fields.",
     where: "Template page → section 5. Mappings → Order inbound + section 7. Test map.",
-    how: "1) Get one real sample webhook JSON. 2) Open Test map (tab 7). 3) Fill/adjust paths until id, status, lines appear. 4) Save. 5) Analyse failed inbound → compare latest payload to mapping. 6) Update mapping once for all shops on this template.",
+    how: "1) Paste one real webhook in the mapping card. 2) Add a Yaadro field. 3) Select the matching vendor path suggestion. 4) Set the vendor items array path and map its fields. 5) Open Test map (tab 7) and verify id, status and lines. 6) Save. 7) If inbound later fails, compare the latest payload and update this template once for all attached shops.",
     workflow:
       "POS upgrade renames order.id to orderCode. Inbound breaks. You paste new sample into Test map, point External order id to the new path, save — all Gravity shops work again.",
     example:
-      "External order id: $.order.id, Status: $.order.state, Lines: $.order.items",
+      "Bill / external order ID ← order.id; Status ← order.state; Items array ← order.items",
     commonMistakes: "Never running Test map before go-live.",
+  },
+  {
+    name: "5. Mappings → Categories and products",
+    meaning: "Translate POS menu responses into Yaadro catalog fields.",
+    what: "Combined mode maps categories and products from one response. Split mode provides separate Category response and Product response cards.",
+    why: "POS systems use different array and field names for IDs, names, prices, PLUs and category links.",
+    who: "Ops/eng with one real menu response from the vendor.",
+    when: "When Catalog is pull_combined or pull_split. It is not needed when Catalog = none.",
+    where: "Template → 5. Mappings → Combined category + product response, Category response, or Product response.",
+    how: "1) Match the card to the Catalog capability. 2) Paste a real response. 3) Set each vendor array path. 4) Add required fields marked *. 5) Select vendor paths for category name/ID and product name/PLU/price/category ID. 6) Test map before the first catalog sync.",
+    workflow:
+      "The vendor returns data.groups and data.menuItems. Map Categories array ← data.groups and Products array ← data.menuItems, then map fields inside one row.",
+    example: "Product name ← title; PLU ← sku; Price ← unitPrice; POS category ID ← groupId",
+    commonMistakes: "Using pull_split while configuring only the combined card, or omitting the product-to-category ID.",
+  },
+  {
+    name: "5. Mappings → Riders received from POS",
+    meaning: "Translate a POS rider list into Yaadro riders.",
+    what: "One rider array path with code, name and optional phone mappings.",
+    why: "Yaadro requires a stable rider code and name; vendor field names vary.",
+    who: "Ops/eng with a real rider-list response.",
+    when: "Only when Riders = inbound.",
+    where: "Template → 5. Mappings → Riders received from POS.",
+    how: "1) Paste a rider response. 2) Set the riders array path. 3) Map Code and Name (required *). 4) Map Phone if supplied. 5) Test map and check every row has code + name.",
+    workflow:
+      "Vendor returns data.drivers[]. Map Riders array ← data.drivers, Code ← driverId, Name ← fullName and Phone ← mobile.",
+    example: "Riders ← data.drivers; Code ← driverId; Name ← fullName",
+    commonMistakes: "Mapping a display name as code; codes must remain stable across syncs.",
   },
   {
     name: "6. Status codes",
