@@ -426,6 +426,19 @@ export const POS_TEMPLATE_FIELD_GLOSSARY: PosPlaybookField[] = [
     commonMistakes: "Mapping a display name as code; codes must remain stable across syncs.",
   },
   {
+    name: "5. Mappings → Value translation maps",
+    meaning: "Translate coded vendor values into Yaadro-friendly strings.",
+    what: "Named tables such as diet_type: vendor 1 → veg, vendor 0 → non-veg. Referenced from a mapping row via Value map name.",
+    why: "Vendors often send flags or codes instead of readable diet/payment/status strings.",
+    who: "Ops/eng when catalog or order fields use coded values.",
+    when: "Optional, usually for catalog products or order lines with diet_type.",
+    where: "Template → 5. Mappings → Value translation maps.",
+    how: "1) Add map name diet_type. 2) Add vendor value → Yaadro value rows. 3) On the product/line mapping field set Value map name = diet_type. 4) Test map with a real coded sample.",
+    workflow:
+      "Vendor sends vegFlag: \"1\". You create diet_type map 1 → veg, then point diet_type mapping field to vegFlag with Value map name diet_type.",
+    example: "diet_type: 1 → veg, 0 → non-veg",
+  },
+  {
     name: "6. Status codes",
     meaning: "Map status names between Yaadro and the POS.",
     what: "Key → value rows: Yaadro status on the left, vendor status string on the right.",
@@ -568,8 +581,8 @@ const LANE_EXAMPLES: PosPlaybookExample[] = [
       "Template → mappings.order_inbound → Test map with new sample → Save. Shops keep same URL if unchanged.",
     values: [
       {
-        field: "mappings.order_inbound.externalOrderId",
-        value: "was $.order.id → now $.payload.orderCode",
+        field: "mappings.order_inbound.bill_no",
+        value: "was order.id → now payload.orderCode",
       },
       { field: "Test map", value: "Paste new sample until output is complete" },
     ],

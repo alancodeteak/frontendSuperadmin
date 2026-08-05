@@ -38,6 +38,7 @@ export type PosTemplateConfigModel = {
   };
   status_update: { mode: PosStatusUpdateMode };
   mappings: Record<string, unknown>;
+  value_maps: Record<string, Record<string, string>>;
   /** Keys not handled by structured UI — preserved on save */
   extra: Record<string, unknown>;
 };
@@ -57,6 +58,16 @@ function mapRecord(v: unknown): Record<string, string> {
     if (typeof val === "string" || typeof val === "number") {
       out[k] = String(val);
     }
+  }
+  return out;
+}
+
+function parseValueMaps(raw: unknown): Record<string, Record<string, string>> {
+  if (!isRecord(raw)) return {};
+  const out: Record<string, Record<string, string>> = {};
+  for (const [name, map] of Object.entries(raw)) {
+    const parsed = mapRecord(map);
+    if (Object.keys(parsed).length > 0) out[name] = parsed;
   }
   return out;
 }
@@ -128,6 +139,7 @@ export function parseTemplateConfig(
     "status_maps",
     "status_update",
     "mappings",
+    "value_maps",
     "endpoints",
   ]);
   const extra: Record<string, unknown> = {};
@@ -166,6 +178,7 @@ export function parseTemplateConfig(
       mode: (str(statusUpdateRaw.mode, "api") as PosStatusUpdateMode) || "api",
     },
     mappings: isRecord(raw?.mappings) ? { ...raw.mappings } : {},
+    value_maps: parseValueMaps(raw?.value_maps),
     extra,
   };
 }
@@ -225,6 +238,11 @@ export function serializeTemplateConfig(model: PosTemplateConfigModel): Record<s
     status_maps.export = model.status_maps.export;
   }
 
+  const value_maps: Record<string, unknown> = {};
+  for (const [name, map] of Object.entries(model.value_maps)) {
+    if (Object.keys(map).length > 0) value_maps[name] = map;
+  }
+
   return {
     ...model.extra,
     api,
@@ -233,5 +251,6 @@ export function serializeTemplateConfig(model: PosTemplateConfigModel): Record<s
     status_maps,
     status_update: model.status_update,
     mappings: model.mappings,
+    ...(Object.keys(value_maps).length ? { value_maps } : {}),
   };
 }

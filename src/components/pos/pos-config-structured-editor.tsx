@@ -12,6 +12,7 @@ import { PosMappingSectionEditor } from "@/components/pos/pos-mapping-section-ed
 import { PosStatusMapsEditor } from "@/components/pos/pos-status-maps-editor";
 import { PosTenantFields } from "@/components/pos/pos-tenant-fields";
 import { PosTestMapPanel } from "@/components/pos/pos-test-map-panel";
+import { PosValueMapsEditor } from "@/components/pos/pos-value-maps-editor";
 import { CopyButton } from "@/components/shared/copy-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -300,7 +301,18 @@ export function PosConfigStructuredEditor({
               <PosGuidedMappingsEditor
                 capabilities={model.capabilities}
                 mappings={model.mappings}
+                valueMapNames={Object.keys(model.value_maps)}
                 onChange={(mappings) => patchModel({ mappings })}
+              />
+            </ConfigPanel>
+            <ConfigPanel
+              title="Value translation maps"
+              description="Translate coded vendor values (for example diet flags) before they land in Yaadro fields."
+              defaultOpen={false}
+            >
+              <PosValueMapsEditor
+                value={model.value_maps}
+                onChange={(value_maps) => patchModel({ value_maps })}
               />
             </ConfigPanel>
             <ConfigPanel

@@ -7,9 +7,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { PosCapabilities } from "@/lib/pos/contract";
+import {
+  parseRuleDefault,
+  patchRuleSource,
+  readRuleConcat,
+  readRulePaths,
+  readRuleSeparator,
+  readRuleValueMapRef,
+  switchRuleMode,
+  type MappingRuleRecord,
+} from "@/lib/pos/mapping-rule-io";
 
 type MappingRecord = Record<string, unknown>;
-type RuleRecord = Record<string, unknown>;
+type RuleRecord = MappingRuleRecord;
 
 type FieldDef = {
   key: string;
@@ -93,7 +103,7 @@ const ORDER_INBOUND_ITEMS: FieldDef[] = [
   { key: "pos_category_id", label: "POS category ID" },
   { key: "vat", label: "VAT amount" },
   { key: "vat_rate", label: "VAT rate" },
-  { key: "diet_type", label: "Diet type" },
+  { key: "diet_type", label: "Diet type (use value map if coded)" },
 ];
 
 const CATEGORY_FIELDS: FieldDef[] = [
@@ -231,25 +241,15 @@ function isNestedObjectRule(value: unknown): value is Record<string, RuleRecord>
 }
 
 function pathsFromRule(rule: unknown): string {
-  return isRecord(rule) && Array.isArray(rule.paths) ? rule.paths.map(String).join(", ") : "";
+  return readRulePaths(rule);
 }
 
 function concatFromRule(rule: unknown): string {
-  return isRecord(rule) && Array.isArray(rule.concat) ? rule.concat.map(String).join(", ") : "";
-}
-
-function parseList(raw: string): string[] {
-  return raw.split(",").map((value) => value.trim()).filter(Boolean);
+  return readRuleConcat(rule);
 }
 
 function parseDefault(raw: string): unknown {
-  const value = raw.trim();
-  if (!value) return undefined;
-  if (value === "true") return true;
-  if (value === "false") return false;
-  if (value === "null") return null;
-  const numberValue = Number(value);
-  return Number.isFinite(numberValue) && value !== "" ? numberValue : value;
+  return parseRuleDefault(raw);
 }
 
 function flattenPaths(value: unknown, prefix = "", out = new Set<string>()): string[] {
@@ -293,16 +293,20 @@ function RuleEditor({
   rule,
   sourceOptions,
   sourceLabel,
+  valueMapNames = [],
   onChange,
 }: {
   rule: RuleRecord;
   sourceOptions: string[];
   sourceLabel: string;
+  valueMapNames?: string[];
   onChange: (next: RuleRecord) => void;
 }) {
   const inputId = useId();
   const mode = Array.isArray(rule.concat) ? "join" : "path";
   const source = mode === "join" ? concatFromRule(rule) : pathsFromRule(rule);
+  const separator = readRuleSeparator(rule);
+  const valueMapRef = readRuleValueMapRef(rule);
   const listId = `mapping-paths-${inputId.replace(/:/g, "")}`;
 
   function patch(patchValue: RuleRecord) {
@@ -310,67 +314,104 @@ function RuleEditor({
   }
 
   return (
-    <div className="grid gap-3 md:grid-cols-[7rem_minmax(12rem,1fr)_8rem_7rem]">
-      <select
-        className="h-9 rounded-lg border border-input bg-background px-2 text-xs"
-        value={mode}
-        onChange={(event) => {
-          const next = { ...rule };
-          delete next.paths;
-          delete next.concat;
-          if (event.target.value === "join") next.concat = source ? parseList(source) : [];
-          else next.paths = source ? parseList(source) : [];
-          onChange(next);
-        }}
-        aria-label="Mapping method"
-      >
-        <option value="path">Find field</option>
-        <option value="join">Join fields</option>
-      </select>
-      <div>
-        <Input
-          list={listId}
-          value={source}
+    <div className="space-y-2">
+      <div className="grid gap-3 md:grid-cols-[7rem_minmax(12rem,1fr)_8rem_7rem]">
+        <select
+          className="h-9 rounded-lg border border-input bg-background px-2 text-xs"
+          value={mode}
           onChange={(event) =>
-            patch(
-              mode === "join"
-                ? { concat: parseList(event.target.value) }
-                : { paths: parseList(event.target.value) },
+            onChange(
+              switchRuleMode(rule, event.target.value === "join" ? "join" : "path", source),
             )
           }
-          placeholder={sourceLabel}
-          className="font-mono text-xs"
+          aria-label="Mapping method"
+        >
+          <option value="path">Find field</option>
+          <option value="join">Join fields</option>
+        </select>
+        <div>
+          <Input
+            list={listId}
+            value={source}
+            onChange={(event) =>
+              onChange(
+                patchRuleSource(rule, mode, event.target.value),
+              )
+            }
+            placeholder={sourceLabel}
+            className="font-mono text-xs"
+          />
+          <datalist id={listId}>
+            {sourceOptions.map((option) => <option key={option} value={option} />)}
+          </datalist>
+          <p className="mt-1 text-[10px] text-muted-foreground">
+            {mode === "join"
+              ? "Enter multiple paths separated by commas."
+              : "Add fallback paths with commas; the first value found is used."}
+          </p>
+        </div>
+        <Input
+          value={rule.default === undefined ? "" : String(rule.default)}
+          onChange={(event) => {
+            const next = { ...rule };
+            const parsed = parseDefault(event.target.value);
+            if (parsed === undefined) delete next.default;
+            else next.default = parsed;
+            onChange(next);
+          }}
+          placeholder="Default"
+          className="text-xs"
+          aria-label="Default value"
         />
-        <datalist id={listId}>
-          {sourceOptions.map((option) => <option key={option} value={option} />)}
-        </datalist>
-        <p className="mt-1 text-[10px] text-muted-foreground">
-          {mode === "join"
-            ? "Enter multiple paths separated by commas."
-            : "Add fallback paths with commas; the first value found is used."}
-        </p>
+        <label className="flex h-9 items-center gap-2 text-xs">
+          <input
+            type="checkbox"
+            checked={rule.optional === true}
+            onChange={(event) => patch({ optional: event.target.checked })}
+          />
+          Optional
+        </label>
       </div>
-      <Input
-        value={rule.default === undefined ? "" : String(rule.default)}
-        onChange={(event) => {
-          const next = { ...rule };
-          const parsed = parseDefault(event.target.value);
-          if (parsed === undefined) delete next.default;
-          else next.default = parsed;
-          onChange(next);
-        }}
-        placeholder="Default"
-        className="text-xs"
-        aria-label="Default value"
-      />
-      <label className="flex h-9 items-center gap-2 text-xs">
-        <input
-          type="checkbox"
-          checked={rule.optional === true}
-          onChange={(event) => patch({ optional: event.target.checked })}
-        />
-        Optional
-      </label>
+      <div className="grid gap-3 md:grid-cols-2">
+        {mode === "join" ? (
+          <div className="space-y-1">
+            <Label className="text-[10px] text-muted-foreground">Join separator</Label>
+            <Input
+              value={separator}
+              onChange={(event) => {
+                const next = { ...rule };
+                const nextSeparator = event.target.value;
+                if (!nextSeparator) delete next.separator;
+                else next.separator = nextSeparator;
+                onChange(next);
+              }}
+              className="text-xs"
+              placeholder=", "
+            />
+          </div>
+        ) : null}
+        <div className="space-y-1">
+          <Label className="text-[10px] text-muted-foreground">Value map name (optional)</Label>
+          <Input
+            list={valueMapNames.length ? `${listId}-value-maps` : undefined}
+            value={valueMapRef}
+            onChange={(event) => {
+              const next = { ...rule };
+              const ref = event.target.value.trim();
+              if (!ref) delete next.value_map_ref;
+              else next.value_map_ref = ref;
+              onChange(next);
+            }}
+            className="font-mono text-xs"
+            placeholder="diet_type"
+          />
+          {valueMapNames.length ? (
+            <datalist id={`${listId}-value-maps`}>
+              {valueMapNames.map((name) => <option key={name} value={name} />)}
+            </datalist>
+          ) : null}
+        </div>
+      </div>
     </div>
   );
 }
@@ -381,12 +422,14 @@ function GuidedSection({
   sample,
   onSampleChange,
   onChange,
+  valueMapNames = [],
 }: {
   definition: SectionDef;
   mapping: MappingRecord;
   sample: string;
   onSampleChange: (value: string) => void;
   onChange: (next: MappingRecord) => void;
+  valueMapNames?: string[];
 }) {
   const [sampleError, setSampleError] = useState<string | null>(null);
   const parsedSample = useMemo(() => {
@@ -634,6 +677,7 @@ function GuidedSection({
                       ? "Vendor path, e.g. data.order_no"
                       : "Yaadro field, e.g. client_order_ref"
                   }
+                  valueMapNames={valueMapNames}
                   onChange={(next) => setRule(key, next)}
                 />
               </div>
@@ -721,6 +765,7 @@ function GuidedSection({
                     rule={isRecord(childRule) ? childRule : {}}
                     sourceOptions={definition.fields.map((field) => field.key)}
                     sourceLabel="Yaadro source field"
+                    valueMapNames={valueMapNames}
                     onChange={(next) => patchObject({ ...children, [childKey]: next })}
                   />
                 </div>
@@ -873,6 +918,7 @@ function GuidedSection({
                           ? "Field inside vendor array item"
                           : "Field inside Yaadro items"
                       }
+                      valueMapNames={valueMapNames}
                       onChange={(next) => patchItem(key, next)}
                     />
                   </div>
@@ -903,10 +949,12 @@ function GuidedSection({
 export function PosGuidedMappingsEditor({
   capabilities,
   mappings,
+  valueMapNames = [],
   onChange,
 }: {
   capabilities: PosCapabilities;
   mappings: MappingRecord;
+  valueMapNames?: string[];
   onChange: (next: MappingRecord) => void;
 }) {
   const firstEnabled = SECTIONS.find((section) => section.enabled(capabilities))?.id ?? "order_inbound";
@@ -952,6 +1000,7 @@ export function PosGuidedMappingsEditor({
         sample={samples[definition.id] ?? ""}
         onSampleChange={(sample) => setSamples((current) => ({ ...current, [definition.id]: sample }))}
         onChange={(sectionMapping) => onChange({ ...mappings, [definition.id]: sectionMapping })}
+        valueMapNames={valueMapNames}
       />
     </div>
   );

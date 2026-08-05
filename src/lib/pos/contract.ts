@@ -186,6 +186,39 @@ export type PosEndpointKey = (typeof POS_ENDPOINT_KEYS)[number];
 
 export const POS_TEST_MAP_DEFAULT_SECTION = "order_inbound" as const;
 
+/** Mapping sections consumed by dms-api MappingEngine / BillMapper. */
+export const POS_MAPPING_SECTIONS = [
+  "order_inbound",
+  "order_outbound",
+  "status_outbound",
+  "catalog_sync",
+  "catalog_categories",
+  "catalog_products",
+  "rider_inbound",
+] as const;
+
+/** Stored in Advanced JSON only — no dms-api consumer today. */
+export const POS_MAPPING_SECTIONS_ADVANCED_ONLY = ["status_inbound"] as const;
+
+/** Starter order_inbound for Lane C webhook profiles (matches backend migration). */
+export const POS_STARTER_ORDER_INBOUND_MAPPING = {
+  bill_no: { paths: ["vno", "bill_no", "id"] },
+  customer_name: { paths: ["customer.name", "cust_name", "customer_name"] },
+  customer_phone: { paths: ["customer.phone", "cust_phone", "customer_phone"] },
+  address: { concat: ["addr1", "addr2"], separator: ", " },
+  total_amount: { paths: ["total", "grand_total", "total_amount"] },
+  payment_mode: { paths: ["pay_mode", "payment_mode"] },
+  items: {
+    array_path: "items",
+    item: {
+      item_name: { paths: ["itn", "name", "item_name"] },
+      quantity: { paths: ["qty", "quantity"], default: 1 },
+      price: { paths: ["rate", "price"], default: 0 },
+      totalamount: { paths: ["amt", "total", "totalamount"], default: 0 },
+    },
+  },
+} as const;
+
 export const POS_TEMPLATE_NAME_PATTERN = /^[a-z0-9][a-z0-9_-]*$/i;
 
 /** Server-forced feature flags on attach (Saleculator / Cratis). */
@@ -411,9 +444,12 @@ export function defaultPosTemplateConfig(
     status_maps: { outbound: {}, inbound: {} },
     status_update: { mode: "api" as PosStatusUpdateMode },
     mappings: {
-      order_inbound: {
-        order_id: { paths: ["id"] },
-      },
+      order_inbound:
+        provider === "generic" || provider === "gravity" || provider === "topas"
+          ? { ...POS_STARTER_ORDER_INBOUND_MAPPING }
+          : {
+              bill_no: { paths: ["id", "bill_no", "vno"] },
+            },
     },
   };
 }

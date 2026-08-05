@@ -5,15 +5,20 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  POS_MAPPING_SECTIONS,
+  POS_MAPPING_SECTIONS_ADVANCED_ONLY,
+} from "@/lib/pos/contract";
 
 const DEFAULT_SECTIONS = [
-  "order_inbound",
-  "order_outbound",
-  "status_outbound",
-  "status_inbound",
-  "rider_inbound",
-  "catalog_sync",
+  ...POS_MAPPING_SECTIONS,
+  ...POS_MAPPING_SECTIONS_ADVANCED_ONLY,
 ] as const;
+
+const SECTION_NOTES: Record<string, string> = {
+  status_inbound:
+    "Not wired in dms-api today. Use tab 6 Status codes → Inbound for Saleculator-style status translation, or Status sent to POS for custom push bodies.",
+};
 
 export function PosMappingSectionEditor({
   mappings,
@@ -78,6 +83,11 @@ export function PosMappingSectionEditor({
           </Button>
         ))}
       </div>
+      {SECTION_NOTES[active] ? (
+        <p className="rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+          {SECTION_NOTES[active]}
+        </p>
+      ) : null}
       <div className="space-y-1.5">
         <Label className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
           {active} mapping JSON
@@ -97,7 +107,7 @@ export function PosMappingSectionEditor({
         </p>
       ) : null}
       <p className="text-xs text-muted-foreground">
-        Changes apply automatically on blur and when switching sections.
+        Developer fallback only. Prefer the guided mapping cards above for normal onboarding.
       </p>
       <Button type="button" size="sm" variant="outline" onClick={() => void flushDraft()}>
         Apply section now

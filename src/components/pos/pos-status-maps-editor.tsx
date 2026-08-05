@@ -116,13 +116,13 @@ export function PosStatusMapsEditor({
     <div className="space-y-6">
       <MapTable
         title="Outbound (Yaadro → POS)"
-        hint="When we push status to the POS, map our status name to their code."
+        hint="Reserved for future use. For Lane C status push today, use 5. Mappings → Status sent to POS or a value map on order_status."
         value={value.outbound}
         onChange={(outbound) => onChange({ ...value, outbound })}
       />
       <MapTable
         title="Inbound (POS → Yaadro)"
-        hint="When POS sends status webhooks, map their code to our status."
+        hint="Used by Saleculator-style status POST. Map the vendor status code to our status name."
         value={value.inbound}
         onChange={(inbound) => onChange({ ...value, inbound })}
       />
