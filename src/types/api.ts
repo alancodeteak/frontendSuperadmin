@@ -675,3 +675,71 @@ export type TriggerShopLogoutResponse = {
   occurred_at: string;
 };
 
+/** Group admin account status (same enum as shop status minus deleted). */
+export type GroupStatus = "active" | "inactive" | "suspended" | "blocked";
+
+export type GroupShopItem = {
+  shop_id: string;
+  shop_name: string;
+  status?: string | null;
+  phone?: string | null;
+};
+
+export type UnassignedShopItem = {
+  shop_id: string;
+  shop_name: string;
+  status?: string | null;
+};
+
+export type GroupSummary = {
+  group_id: number;
+  user_id: number;
+  name: string;
+  slug?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  status: GroupStatus | string;
+  is_blocked: boolean;
+  shops_count: number;
+  last_login_at?: string | null;
+  created_at: string;
+  updated_at?: string | null;
+  block_reason?: string | null;
+};
+
+export type GroupDetail = GroupSummary & {
+  shops: GroupShopItem[];
+};
+
+export type CreateGroupInput = {
+  name: string;
+  password: string;
+  email?: string;
+  phone?: string;
+  slug?: string;
+};
+
+export type UpdateGroupProfileInput = {
+  name?: string;
+  email?: string | null;
+  phone?: string | null;
+  slug?: string;
+  status?: "active" | "inactive" | "suspended";
+};
+
+export type ReplaceGroupShopsResult = {
+  group_id: number;
+  shops_count: number;
+  shop_ids: string[];
+};
+
+export type GroupsListResult = {
+  items: GroupSummary[];
+  page: number;
+  page_size: number;
+  total: number;
+  total_pages: number;
+  has_next_page: boolean;
+  unassigned_shops?: UnassignedShopItem[];
+};
+

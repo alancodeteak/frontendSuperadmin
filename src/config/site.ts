@@ -21,6 +21,7 @@ export const siteConfig = {
 export const navItems = [
   { title: "Dashboard", href: "/dashboard" },
   { title: "Shops", href: "/shops" },
+  { title: "Groups", href: "/groups" },
   { title: "POS", href: "/pos" },
   { title: "Reports", href: "/reports" },
   { title: "Analytics", href: "/analytics" },

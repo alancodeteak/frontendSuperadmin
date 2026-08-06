@@ -26,6 +26,22 @@ export const STATIC_PAGE_HITS: SearchHit[] = [
     keywords: "add new restaurant",
   },
   {
+    id: "page:groups",
+    type: "page",
+    title: "Groups",
+    subtitle: "Group admins · shop assignment",
+    href: "/groups",
+    keywords: "group admin franchise assign shops",
+  },
+  {
+    id: "page:groups-new",
+    type: "page",
+    title: "Create group",
+    subtitle: "Add a group admin account",
+    href: "/groups/new",
+    keywords: "add new group admin",
+  },
+  {
     id: "page:pos",
     type: "page",
     title: "POS",
