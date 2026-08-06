@@ -392,7 +392,18 @@ export type PosShopLink = {
   has_credentials?: boolean;
   webhook_secret_configured?: boolean;
   integration_token_present?: boolean;
+  integration_token_fingerprint_present?: boolean;
   integration_enabled?: boolean;
+  /** Saleculator: Features token can be used as Inmenu link_token. */
+  link_token_ready?: boolean;
+  setup_guide?: {
+    title?: string;
+    link_token_hint?: string;
+    device_auth?: string;
+    template?: string;
+    steps?: string[];
+  } | null;
+  warnings?: string[];
   capabilities?: Record<string, unknown> | null;
   events?: {
     order_create_on?: string[];
@@ -418,6 +429,9 @@ export type PosSyncStatus = {
   is_active?: boolean;
   integration_enabled?: boolean;
   integration_token_present?: boolean;
+  integration_token_fingerprint_present?: boolean;
+  link_token_ready?: boolean;
+  setup_guide?: PosShopLink["setup_guide"];
   catalog_sync_enabled?: boolean;
   order_push_enabled?: boolean;
   order_pull_enabled?: boolean;

@@ -70,7 +70,7 @@ export const POS_SHOP_FIELD_GLOSSARY: PosPlaybookField[] = [
     who: "Super Admin / ops creates or picks the template. Shop managers usually only select it when attaching a shop. Developers create a new template only when the POS shape is new.",
     when: "Pick it when you first connect a shop. Change it only if you switch POS brand, or ops published a new recipe (e.g. gravity-v2) for a different API.",
     where: "Shop → POS tab → Template dropdown. List of templates also lives under main menu → POS.",
-    how: "1) Ask “which POS brand is this shop?” 2) Open the dropdown. 3) Choose the matching name (cratis-v1, saleculator-v1, gravity-v1…). 4) If unsure, open that template’s Beginner guide first. 5) After save, confirm Current link shows the same template name.",
+    how: "1) Ask “which POS brand is this shop?” 2) Open the dropdown. 3) Choose the matching name (cratis-v1, saleculator-pull-v1, gravity-v1…). 4) If unsure, open that template’s Beginner guide first. 5) After save, confirm Current link shows the same template name.",
     workflow:
       "Monday: vendor says “we are on Gravity”. You open POS list, confirm gravity-v1 exists and was tested. Tuesday: on the shop POS tab you select gravity-v1 — you do not rebuild mappings for every shop.",
     example: "cratis-v1",
@@ -108,7 +108,7 @@ export const POS_SHOP_FIELD_GLOSSARY: PosPlaybookField[] = [
     example: "bearer",
     exampleAlt: "oauth2_client_credentials",
     commonMistakes:
-      "Using shop Credentials for Saleculator’s Integration token. That token is created under Features and given to the POS so they can call Yaadro.",
+      "Using shop Credentials for Saleculator’s link_token. That secret is created under Features and pasted into Saleculator as link_token for POST /api/v1/pos/links.",
   },
   {
     name: "Header name",
@@ -139,7 +139,7 @@ export const POS_SHOP_FIELD_GLOSSARY: PosPlaybookField[] = [
     example: '{"token":"sk_live_abc123"}',
     exampleAlt: '{"client_id":"yaadro-app","client_secret":"s3cret"}',
     commonMistakes:
-      "Pasting Saleculator Integration token here. That belongs on Features, then shared with the POS vendor.",
+      "Pasting Saleculator link_token into Credentials. That belongs on Features, then into Saleculator’s link_token field.",
   },
   {
     name: "Webhook secret",
@@ -220,9 +220,9 @@ export const POS_SHOP_FIELD_GLOSSARY: PosPlaybookField[] = [
     who: "Lane preset usually locks it. Ops enables Integration on Features for Saleculator.",
     when: "When attaching Saleculator. Rarely changed afterward.",
     where: "Shop → POS → Order pull checkbox.",
-    how: "1) Saleculator: Features token first, then attach with pull On. 2) Analyse: vendor cannot list orders → check Integration enabled + token + pull On. 3) Do not use pull to “fake” a new pull POS — that needs engineering.",
+    how: "1) Saleculator: Features token first (link_token), then attach saleculator-pull-v1 with pull On. 2) Analyse: vendor cannot list orders → check Integration enabled + token + fingerprint (rotate once) + pull On. 3) Do not use pull to “fake” a new pull POS — that needs engineering.",
     workflow:
-      "Saleculator store opens till → their POS pulls open orders from Yaadro using the Integration token you created on Features.",
+      "Saleculator till links with POST /api/v1/pos/links using the Features token as link_token, then pulls open orders with the Bearer JWT.",
     example: "On for Saleculator",
     commonMistakes: "Expecting Yaadro to push when only pull is on.",
   },
@@ -241,17 +241,17 @@ export const POS_SHOP_FIELD_GLOSSARY: PosPlaybookField[] = [
   },
   {
     name: "Integration token (Features tab)",
-    meaning: "One-time token Saleculator uses to call Yaadro.",
-    what: "A secret created under Shop → Features → Integration. Shown once. The POS vendor stores it to pull orders / post status.",
-    why: "Lane B security door. Without it, Saleculator cannot talk to Yaadro. It is not the same as Cratis bearer credentials.",
-    who: "Ops creates/rotates on Features. POS vendor configures it on their side. Never store it in the POS template JSON.",
-    when: "Before first Saleculator attach, and whenever you rotate for security or the vendor lost the token.",
+    meaning: "One-time secret = Saleculator link_token.",
+    what: "A secret created under Shop → Features → Integration. Shown once. For Saleculator this plaintext is the Inmenu-compatible link_token used on POST /api/v1/pos/links.",
+    why: "Lane B security door. Without it, Saleculator cannot link or poll Yaadro. It is not the same as Cratis bearer credentials.",
+    who: "Ops creates/rotates on Features. Saleculator configures it as link_token. Never store it in the POS template JSON.",
+    when: "Before first Saleculator attach, and whenever you rotate for security or the vendor lost the token (till must re-link after rotate).",
     where: "Shop → Features → Integration (not on the POS template page).",
-    how: "1) Enable Integration. 2) Create/rotate token. 3) Copy immediately. 4) Send securely to vendor. 5) Attach Saleculator on POS tab. 6) Analyse poll failures → rotate token, update vendor, retry. 7) Update = rotate (old token dies).",
+    how: "1) Enable Integration. 2) Create/rotate token. 3) Copy immediately (link_token). 4) Send securely to Saleculator. 5) Attach saleculator-pull-v1 on POS tab. 6) Analyse poll failures → rotate token, update till link_token, re-link. 7) Update = rotate (old token dies).",
     workflow:
-      "Day 1 Features: create token, WhatsApp securely to Saleculator partner. Day 1 POS tab: attach template. Day 2: their till shows Yaadro orders.",
-    example: "(token shown once — copy immediately)",
-    commonMistakes: "Searching for this token inside template config JSON.",
+      "Day 1 Features: create token, give to Saleculator as link_token. Day 1 POS tab: attach saleculator-pull-v1. Day 2: till links via /pos/links and shows Yaadro orders.",
+    example: "(token shown once — copy immediately as link_token)",
+    commonMistakes: "Searching for this token inside template config JSON, or expecting Yaadro exchange instead of /pos/links.",
   },
 ];
 
@@ -509,15 +509,15 @@ const LANE_FIELD_EXTRAS: PosPlaybookField[] = [
   },
   {
     name: "Lane B — Saleculator",
-    meaning: "POS pulls orders from Yaadro using an Integration token.",
-    what: "Pull lane: we do not push orders out; their till fetches from us and can Accept/Reject via Saleculator’s status API.",
+    meaning: "POS links with link_token, then pulls orders from Yaadro.",
+    what: "Pull lane (Inmenu-compatible): till calls POST /api/v1/pos/links, then fetches orders / posts status. We do not push orders out.",
     why: "Matches how Saleculator works in real stores — including ecom confirmation (Pending blanks stay visible on poll so the till can accept).",
-    who: "Ops creates Features token; vendor configures till; ops attaches saleculator template.",
+    who: "Ops creates Features token (link_token); vendor configures till; ops attaches saleculator-pull-v1.",
     when: "Saleculator (or approved same-lane) vendors only.",
     where: "Shop → Features then Shop → POS.",
-    how: "Token on Features first, then attach. No base URL needed for classic pull. Do not expect Yaadro to POST create — PosPolicy always skips this lane.",
+    how: "Token on Features first (= link_token), then attach saleculator-pull-v1. No base URL needed for classic pull. Do not expect Yaadro to POST create — PosPolicy always skips this lane.",
     workflow:
-      "Enable Integration → copy token to vendor → attach saleculator → till pulls Pending blanks → POS accept API marks Accepted in Yaadro.",
+      "Enable Integration → copy token as link_token → attach saleculator-pull-v1 → till POST /pos/links → polls Pending blanks → POS accept API marks Accepted in Yaadro.",
     example: "Features token + template saleculator-pull-v1",
   },
   {
@@ -552,15 +552,16 @@ const LANE_EXAMPLES: PosPlaybookExample[] = [
   },
   {
     title: "New Saleculator shop (UI only)",
-    situation: "POS pulls orders from Yaadro.",
+    situation: "POS links with link_token then pulls orders from Yaadro.",
     whatToDo:
-      "Features → Integration → create token → give to vendor → POS tab → attach saleculator template.",
+      "Features → Integration → create/rotate token (copy as link_token) → POS tab → attach saleculator-pull-v1 → give link_token to Saleculator for POST /api/v1/pos/links.",
     values: [
       { field: "Features → Integration", value: "Enabled" },
-      { field: "Integration token", value: "(copy once, give to vendor)" },
-      { field: "Template", value: "saleculator-v1" },
+      { field: "Integration token", value: "(copy once = Saleculator link_token)" },
+      { field: "Template", value: "saleculator-pull-v1" },
       { field: "Order pull", value: "On" },
       { field: "Order push / Catalog", value: "Off" },
+      { field: "Device auth", value: "POST /api/v1/pos/links → Bearer JWT" },
     ],
   },
   {
@@ -730,7 +731,7 @@ export const POS_TEMPLATE_LANE_CALLOUTS: Record<string, string> = {
   cratis:
     "Lane A — seeded Cratis. Shop: URL + bearer + tenants. Do not use generic for Cratis.",
   saleculator:
-    "Lane B — Integration token on Features only. Attach after token exists.",
+    "Lane B — Features integration token = Saleculator link_token. Attach saleculator-pull-v1 after token exists. Device uses POST /api/v1/pos/links.",
   generic:
     "Lane C — endpoints + mappings are the main work. Use section tabs 1–7 + Fields → Open 5Ws + Test map.",
   gravity:
@@ -858,12 +859,12 @@ export const POS_SHOP_PLAYBOOK: Record<string, PosPlaybookDef> = {
   ),
   saleculator: shopPlaybook(
     "Shop POS — Saleculator (Lane B) with full 5Ws",
-    "Read 5Ws on Integration token first (Features). Then attach on this tab. Examples page shows the exact order.",
+    "Read 5Ws on Integration token first (Features — that plaintext is link_token). Then attach saleculator-pull-v1. Device links via POST /api/v1/pos/links.",
     [
-      { title: "Features → Integration → create token → copy once" },
-      { title: "Give token to POS vendor" },
-      { title: "POS tab → Saleculator template → Save" },
-      { title: "Confirm till can pull orders" },
+      { title: "Features → Integration → create/rotate token → copy as link_token" },
+      { title: "Give link_token to Saleculator; point base URL at DMS /api/v1/pos" },
+      { title: "POS tab → saleculator-pull-v1 → Save" },
+      { title: "Confirm till links (POST /pos/links) and can pull orders" },
     ],
     [LANE_EXAMPLES[1]!],
   ),

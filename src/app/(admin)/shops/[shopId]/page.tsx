@@ -79,6 +79,7 @@ import {
 } from "@/lib/api/riders";
 import {
   shopDetailQuery,
+  shopPosLinkQuery,
   shopPromotionQuery,
   shopProductsQuery,
   shopRidersQuery,
@@ -1252,6 +1253,10 @@ function FeaturesTab({
   const [rotatePhase, setRotatePhase] =
     useState<ShopConfirmPhase>("confirm");
   const [rotateError, setRotateError] = useState<string | null>(null);
+  const posLinkQuery = useQuery(shopPosLinkQuery(shop.shop_id));
+  const isSaleculatorPos =
+    posLinkQuery.data?.provider === "saleculator" ||
+    posLinkQuery.data?.connector_type === "saleculator_pull";
 
   useEffect(() => {
     setForm(readShopFeatures(shop));
@@ -1501,7 +1506,11 @@ function FeaturesTab({
           <FeatureToggleRow
             id="feat_integration_enabled"
             label="Integration enabled"
-            description="Allow third-party / POS API integration for this shop."
+            description={
+              isSaleculatorPos
+                ? "Required for Saleculator. The integration token plaintext is the device link_token (POST /api/v1/pos/links)."
+                : "Allow third-party / POS API integration for this shop."
+            }
             checked={form.integration_enabled}
             invalid={isHighlighted("integration_enabled")}
             error={fieldErrors.integration_enabled}
@@ -1570,8 +1579,9 @@ function FeaturesTab({
                 <div className="min-w-0">
                   <p className="text-sm font-medium">Rotate integration token</p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Issues a new secret and invalidates the previous token. The
-                    new token is shown only once.
+                    {isSaleculatorPos
+                      ? "Issues a new link_token for Saleculator and invalidates the previous one. The till must re-link after rotate. Shown only once."
+                      : "Issues a new secret and invalidates the previous token. The new token is shown only once."}
                   </p>
                 </div>
                 <Button
@@ -1610,6 +1620,7 @@ function FeaturesTab({
       shopName={shopDisplayName}
       token={integrationToken ?? ""}
       mode={tokenDialogMode}
+      saleculatorLinkToken={isSaleculatorPos}
       onOpenChange={(open) => {
         if (!open) setIntegrationToken(null);
       }}
@@ -1619,7 +1630,11 @@ function FeaturesTab({
       open={rotateOpen}
       phase={rotatePhase}
       title="Rotate integration token?"
-      description="This creates a new integration token and immediately invalidates the previous one. Any POS or third-party clients using the old token will stop working until you update them."
+      description={
+        isSaleculatorPos
+          ? "This creates a new Saleculator link_token and immediately invalidates the previous one. The till must re-link with POST /api/v1/pos/links using the new token."
+          : "This creates a new integration token and immediately invalidates the previous one. Any POS or third-party clients using the old token will stop working until you update them."
+      }
       confirmLabel="Rotate token"
       confirmVariant="destructive"
       icon={RefreshCwIcon}

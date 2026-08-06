@@ -22,13 +22,15 @@ type IntegrationTokenDialogProps = {
   token: string;
   /** First-time enable vs rotate re-issue */
   mode?: "created" | "rotated";
+  /** When shop uses / will use Saleculator pull lane */
+  saleculatorLinkToken?: boolean;
   onOpenChange: (open: boolean) => void;
 };
 
 function downloadTokenCsv(shopId: string, token: string) {
   const escapedShopId = `"${shopId.replaceAll('"', '""')}"`;
   const escapedToken = `"${token.replaceAll('"', '""')}"`;
-  const csv = `shop_id,integration_token\n${escapedShopId},${escapedToken}\n`;
+  const csv = `shop_id,integration_token,link_token\n${escapedShopId},${escapedToken},${escapedToken}\n`;
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
@@ -46,6 +48,7 @@ export function IntegrationTokenDialog({
   shopName,
   token,
   mode = "created",
+  saleculatorLinkToken = false,
   onOpenChange,
 }: IntegrationTokenDialogProps) {
   const [downloaded, setDownloaded] = useState(false);
@@ -88,6 +91,9 @@ export function IntegrationTokenDialog({
               {isRotated
                 ? "A new plaintext token was issued and the previous token is now invalid. Copy or download it now — it will not be shown again."
                 : "This plaintext token is shown only once. Copy or download it now — it will not be shown again and is not stored in this panel."}
+              {saleculatorLinkToken
+                ? " For Saleculator, paste this value as the device link_token (POST /api/v1/pos/links)."
+                : null}
             </DialogDescription>
           </DialogHeader>
 
@@ -99,6 +105,18 @@ export function IntegrationTokenDialog({
               {shopId}
             </p>
           </div>
+
+          {saleculatorLinkToken ? (
+            <div className="mt-4 rounded-xl border border-sky-500/30 bg-sky-500/10 p-3 text-sm">
+              <p className="font-medium">Saleculator link_token</p>
+              <p className="mt-1 text-muted-foreground">
+                Device links with{" "}
+                <code className="text-xs">POST /api/v1/pos/links</code> using
+                this secret, then polls with the returned Bearer JWT. After
+                rotate, the till must re-link.
+              </p>
+            </div>
+          ) : null}
 
           <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-950 dark:text-amber-100">
             <div className="flex gap-2">
@@ -112,7 +130,9 @@ export function IntegrationTokenDialog({
 
           <div className="mt-4 space-y-2">
             <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-              Integration token
+              {saleculatorLinkToken
+                ? "Integration token (= Saleculator link_token)"
+                : "Integration token"}
             </p>
             <div className="flex items-start gap-2 rounded-xl border bg-background p-3">
               <code className="min-w-0 flex-1 break-all font-mono text-sm">

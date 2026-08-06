@@ -409,7 +409,7 @@ export function ShopPosTab({ shopId }: { shopId: string }) {
 
       <ShopSection
         title="POS link"
-        description="Attach a mapping template. Saleculator requires Integration enabled; Cratis/Generic need vendor base URL when push is on."
+        description="Attach a mapping template. Saleculator requires Integration enabled + link_token (Features token); Cratis/Generic need vendor base URL when push is on."
       >
         {selectedProvider === "saleculator" && !integrationEnabled ? (
           <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm">
@@ -422,10 +422,35 @@ export function ShopPosTab({ shopId }: { shopId: string }) {
             >
               Features
             </Link>{" "}
-            tab and save the one-time token first.
+            tab, rotate/create the token (that plaintext is Saleculator{" "}
+            <span className="font-medium">link_token</span>), then attach{" "}
+            <span className="font-medium">saleculator-pull-v1</span>.
           </div>
         ) : null}
 
+        {selectedProvider === "saleculator" && integrationEnabled ? (
+          <div className="mb-4 rounded-xl border border-sky-500/30 bg-sky-500/5 px-4 py-3 text-sm">
+            <p className="font-medium">Saleculator device link</p>
+            <ol className="mt-2 list-decimal space-y-1 pl-5 text-muted-foreground">
+              <li>
+                Features token plaintext = device{" "}
+                <code className="text-xs">link_token</code>
+              </li>
+              <li>
+                Attach template <code className="text-xs">saleculator-pull-v1</code>
+              </li>
+              <li>
+                Point Saleculator at DMS{" "}
+                <code className="text-xs">/api/v1/pos</code>
+              </li>
+              <li>
+                Till calls{" "}
+                <code className="text-xs">POST /api/v1/pos/links</code> then
+                polls with Bearer JWT
+              </li>
+            </ol>
+          </div>
+        ) : null}
         <form onSubmit={onAttach} className="max-w-xl space-y-4">
           <Field label="Template">
             <select
@@ -715,6 +740,40 @@ export function ShopPosTab({ shopId }: { shopId: string }) {
 
       {link ? (
         <ShopSection title="Current link" className="max-w-3xl">
+          {link.warnings && link.warnings.length > 0 ? (
+            <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm">
+              <p className="mb-1 font-medium">Warnings</p>
+              <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
+                {link.warnings.map((w) => (
+                  <li key={w}>{w}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {link.setup_guide ? (
+            <div className="mb-4 rounded-xl border border-sky-500/30 bg-sky-500/5 px-4 py-3 text-sm">
+              <p className="font-medium">
+                {link.setup_guide.title ?? "Saleculator setup"}
+              </p>
+              {link.setup_guide.link_token_hint ? (
+                <p className="mt-1 text-muted-foreground">
+                  {link.setup_guide.link_token_hint}
+                </p>
+              ) : null}
+              {link.setup_guide.device_auth ? (
+                <p className="mt-1 text-muted-foreground">
+                  {link.setup_guide.device_auth}
+                </p>
+              ) : null}
+              {link.setup_guide.steps && link.setup_guide.steps.length > 0 ? (
+                <ol className="mt-2 list-decimal space-y-1 pl-5 text-muted-foreground">
+                  {link.setup_guide.steps.map((step) => (
+                    <li key={step}>{step}</li>
+                  ))}
+                </ol>
+              ) : null}
+            </div>
+          ) : null}
           <DetailList
             items={[
               { label: "Link ID", value: link.id != null ? String(link.id) : null },
@@ -750,6 +809,14 @@ export function ShopPosTab({ shopId }: { shopId: string }) {
               {
                 label: "Integration token",
                 value: yesNo(link.integration_token_present),
+              },
+              {
+                label: "Link token ready",
+                value: yesNo(link.link_token_ready),
+              },
+              {
+                label: "Token fingerprint",
+                value: yesNo(link.integration_token_fingerprint_present),
               },
               {
                 label: "Config version",
@@ -824,10 +891,17 @@ export function ShopPosTab({ shopId }: { shopId: string }) {
                   value: yesNo(sync.integration_token_present),
                 },
                 {
-                  label: "Catalog sync",
-                  value: yesNo(sync.catalog_sync_enabled),
+                  label: "Link token ready",
+                  value: yesNo(sync.link_token_ready),
                 },
                 {
+                  label: "Token fingerprint",
+                  value: yesNo(sync.integration_token_fingerprint_present),
+                },
+                {
+                  label: "Catalog sync",
+                  value: yesNo(sync.catalog_sync_enabled),
+                },                {
                   label: "Order push",
                   value: yesNo(sync.order_push_enabled),
                 },
