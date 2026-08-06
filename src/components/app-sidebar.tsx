@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FileBarChartIcon, LogOutIcon } from "lucide-react";
+import { FileBarChartIcon, LogOutIcon, UsersRoundIcon } from "lucide-react";
 
 import { AnimateIcon } from "@/components/animate-ui/icons/icon";
 import { ChartSpline } from "@/components/animate-ui/icons/chart-spline";
@@ -37,6 +37,8 @@ function NavIcon({ href }: { href: (typeof navItems)[number]["href"] }) {
       return <LayoutDashboard size={ICON_SIZE} />;
     case "/shops":
       return <Layers size={ICON_SIZE} />;
+    case "/groups":
+      return <UsersRoundIcon className="size-5" />;
     case "/pos":
       return <Unplug size={ICON_SIZE} />;
     case "/reports":
