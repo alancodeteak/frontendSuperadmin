@@ -94,7 +94,9 @@ import {
 import { cn, formatCurrency } from "@/lib/utils";
 import {
   cascadeVenueMasterFlagsSnake,
+  hasQrCapableServiceSnake,
   validateVenueMasterFlagsSnake,
+  venueEcomSyncHint,
 } from "@/lib/venue-feature-flags";
 import type {
   Rider,
@@ -1613,12 +1615,12 @@ function FeaturesTab({
           <FeatureToggleRow
             id="feat_qr_ordering_enabled"
             label="QR ordering"
-            description="Table / room QR deep links. Requires venue + table or room."
+            description="Public QR deep links. Requires venue + at least one service below. Enables guest checkout for table/room/drive-thru when saved."
             checked={form.qr_ordering_enabled}
             disabled={
               !form.ecom_enabled ||
               !form.venue_management_enabled ||
-              (!form.table_ordering_enabled && !form.room_service_enabled)
+              !hasQrCapableServiceSnake(form)
             }
             invalid={isHighlighted("qr_ordering_enabled")}
             error={fieldErrors.qr_ordering_enabled}
@@ -1644,6 +1646,11 @@ function FeaturesTab({
             error={fieldErrors.drive_thru_enabled}
             onChange={(v) => setFlag("drive_thru_enabled", v)}
           />
+          {venueEcomSyncHint(form) ? (
+            <p className="text-muted-foreground col-span-full text-sm">
+              {venueEcomSyncHint(form)}
+            </p>
+          ) : null}
           <FeatureToggleRow
             id="feat_integration_enabled"
             label="Integration enabled"

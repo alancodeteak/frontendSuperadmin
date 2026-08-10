@@ -59,7 +59,7 @@ import {
   revokeShopPhotoPreview,
   type ShopPhotoSelection,
 } from "@/lib/shop-photo";
-import { cascadeVenueMasterFlagsSnake } from "@/lib/venue-feature-flags";
+import { cascadeVenueMasterFlagsSnake, hasQrCapableServiceSnake, venueEcomSyncHint } from "@/lib/venue-feature-flags";
 import { cn } from "@/lib/utils";
 
 const STEPS = [
@@ -1390,12 +1390,12 @@ export function CreateShopWizard() {
               <FeatureToggleRow
                 id="qr_ordering_enabled"
                 label="QR ordering"
-                description="Table / room QR deep links. Requires venue + table or room."
+                description="Public QR deep links. Requires venue + at least one service below. Enables guest checkout for table/room/drive-thru when saved."
                 checked={form.qr_ordering_enabled}
                 disabled={
                   !form.ecom_enabled ||
                   !form.venue_management_enabled ||
-                  (!form.table_ordering_enabled && !form.room_service_enabled)
+                  !hasQrCapableServiceSnake(form)
                 }
                 error={showError("qr_ordering_enabled")}
                 onChange={(v) => update("qr_ordering_enabled", v)}
@@ -1418,6 +1418,11 @@ export function CreateShopWizard() {
                 error={showError("drive_thru_enabled")}
                 onChange={(v) => update("drive_thru_enabled", v)}
               />
+              {venueEcomSyncHint(form) ? (
+                <p className="text-muted-foreground col-span-full text-sm">
+                  {venueEcomSyncHint(form)}
+                </p>
+              ) : null}
               <FeatureToggleRow
                 id="is_msg_activated"
                 label="Messaging activated"

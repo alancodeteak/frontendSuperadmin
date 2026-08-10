@@ -13,6 +13,20 @@ export type VenueMasterFlagKey = (typeof VENUE_MASTER_FLAG_KEYS)[number];
 
 export type VenueMasterFlagsSnake = Record<VenueMasterFlagKey, boolean>;
 
+export function hasQrCapableServiceSnake(flags: {
+  table_ordering_enabled: boolean;
+  room_service_enabled: boolean;
+  pickup_ordering_enabled: boolean;
+  drive_thru_enabled: boolean;
+}): boolean {
+  return (
+    flags.table_ordering_enabled ||
+    flags.room_service_enabled ||
+    flags.pickup_ordering_enabled ||
+    flags.drive_thru_enabled
+  );
+}
+
 export const DEFAULT_VENUE_MASTER_FLAGS: VenueMasterFlagsSnake = {
   venue_management_enabled: false,
   qr_ordering_enabled: false,
@@ -57,7 +71,7 @@ export function cascadeVenueMasterFlagsSnake(flags: {
     };
   }
 
-  if (!next.table_ordering_enabled && !next.room_service_enabled) {
+  if (!hasQrCapableServiceSnake(next)) {
     next = { ...next, qr_ordering_enabled: false };
   }
 
@@ -98,12 +112,35 @@ export function validateVenueMasterFlagsSnake(flags: {
   if (flags.drive_thru_enabled && !flags.ecom_enabled) {
     return "drive_thru_enabled requires ecom_enabled";
   }
-  if (
+  if (flags.qr_ordering_enabled && !hasQrCapableServiceSnake(flags)) {
+    return "qr_ordering_enabled requires table_ordering_enabled, room_service_enabled, pickup_ordering_enabled, or drive_thru_enabled";
+  }
+  return null;
+}
+
+/** Plain-language note shown next to venue toggles in super-admin UI. */
+export function venueEcomSyncHint(flags: {
+  qr_ordering_enabled: boolean;
+  table_ordering_enabled: boolean;
+  room_service_enabled: boolean;
+  pickup_ordering_enabled: boolean;
+  drive_thru_enabled: boolean;
+}): string | null {
+  const guestQr =
     flags.qr_ordering_enabled &&
-    !flags.table_ordering_enabled &&
-    !flags.room_service_enabled
+    (flags.table_ordering_enabled ||
+      flags.room_service_enabled ||
+      flags.drive_thru_enabled);
+  if (guestQr) {
+    return "Also enables matching ecom service_configs and guest QR checkout (allow_anonymous_table_orders) on save.";
+  }
+  if (
+    flags.table_ordering_enabled ||
+    flags.room_service_enabled ||
+    flags.pickup_ordering_enabled ||
+    flags.drive_thru_enabled
   ) {
-    return "qr_ordering_enabled requires table_ordering_enabled or room_service_enabled";
+    return "Matching ecom service_configs entries are enabled automatically when you save.";
   }
   return null;
 }
