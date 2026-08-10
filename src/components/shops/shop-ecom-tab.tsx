@@ -18,7 +18,173 @@ import { Textarea } from "@/components/ui/textarea";
 import { parseApiFormError } from "@/lib/api-form-error";
 import { appToast } from "@/lib/app-toast";
 import { patchShop } from "@/lib/api/shops";
-import type { ShopDetail, ShopEcomSettings } from "@/types/api";
+import type {
+  ShopDetail,
+  ShopEcomSettings,
+  ShopServiceConfigEntry,
+  ShopServiceConfigs,
+} from "@/types/api";
+
+const SERVICE_CONFIG_TYPES = [
+  "delivery",
+  "pickup",
+  "drive_thru",
+  "dine_in",
+  "room_service",
+] as const;
+
+type ServiceConfigType = (typeof SERVICE_CONFIG_TYPES)[number];
+
+const SERVICE_CONFIG_LABELS: Record<ServiceConfigType, string> = {
+  delivery: "Delivery",
+  pickup: "Pickup",
+  drive_thru: "Drive-thru",
+  dine_in: "Dine-in",
+  room_service: "Room service",
+};
+
+type ServiceConfigFormEntry = {
+  enabled: boolean;
+  min_order_amount: string;
+  prep_time_minutes: string;
+  requires_phone: boolean;
+  service_charge: string;
+  delivery_charge: string;
+  delivery_radius_km: string;
+};
+
+type ServiceConfigsForm = Record<ServiceConfigType, ServiceConfigFormEntry>;
+
+function defaultServiceConfigEntry(
+  serviceType: ServiceConfigType,
+  raw?: ShopServiceConfigEntry | null,
+): ServiceConfigFormEntry {
+  return {
+    enabled: raw?.enabled === true,
+    min_order_amount:
+      raw?.min_order_amount != null ? String(raw.min_order_amount) : "0",
+    prep_time_minutes:
+      raw?.prep_time_minutes != null ? String(raw.prep_time_minutes) : "",
+    requires_phone:
+      raw?.requires_phone === true ||
+      (raw?.requires_phone == null &&
+        (serviceType === "delivery" ||
+          serviceType === "pickup" ||
+          serviceType === "room_service")),
+    service_charge:
+      serviceType === "delivery"
+        ? ""
+        : raw?.service_charge != null
+          ? String(raw.service_charge)
+          : "0",
+    delivery_charge:
+      serviceType === "delivery"
+        ? raw?.delivery_charge != null
+          ? String(raw.delivery_charge)
+          : "0"
+        : "",
+    delivery_radius_km:
+      serviceType === "delivery"
+        ? raw?.delivery_radius_km != null
+          ? String(raw.delivery_radius_km)
+          : ""
+        : "",
+  };
+}
+
+function serviceConfigsFormFromData(
+  configs: ShopServiceConfigs | null | undefined,
+): ServiceConfigsForm {
+  const source =
+    configs && typeof configs === "object" && !Array.isArray(configs)
+      ? configs
+      : {};
+  return {
+    delivery: defaultServiceConfigEntry("delivery", source.delivery),
+    pickup: defaultServiceConfigEntry("pickup", source.pickup),
+    drive_thru: defaultServiceConfigEntry("drive_thru", source.drive_thru),
+    dine_in: defaultServiceConfigEntry("dine_in", source.dine_in),
+    room_service: defaultServiceConfigEntry("room_service", source.room_service),
+  };
+}
+
+function serializeServiceConfigs(form: ServiceConfigsForm): ShopServiceConfigs {
+  const out: ShopServiceConfigs = {};
+  for (const serviceType of SERVICE_CONFIG_TYPES) {
+    const entry = form[serviceType];
+    const minOrder = Number(entry.min_order_amount.trim() || "0");
+    const prepRaw = entry.prep_time_minutes.trim();
+    const prep =
+      prepRaw === "" ? undefined : Number.parseInt(prepRaw, 10);
+    const base = {
+      enabled: entry.enabled,
+      min_order_amount: Number.isFinite(minOrder) && minOrder >= 0 ? minOrder : 0,
+      ...(prep != null && Number.isInteger(prep) && prep >= 0
+        ? { prep_time_minutes: prep }
+        : {}),
+      requires_phone: entry.requires_phone,
+    };
+    if (serviceType === "delivery") {
+      const charge = Number(entry.delivery_charge.trim() || "0");
+      const radiusRaw = entry.delivery_radius_km.trim();
+      const radius = radiusRaw === "" ? null : Number(radiusRaw);
+      out[serviceType] = {
+        ...base,
+        delivery_charge: Number.isFinite(charge) && charge >= 0 ? charge : 0,
+        delivery_radius_km:
+          radius == null
+            ? null
+            : Number.isFinite(radius) && radius > 0
+              ? radius
+              : null,
+      };
+      continue;
+    }
+    const charge = Number(entry.service_charge.trim() || "0");
+    out[serviceType] = {
+      ...base,
+      ...(serviceType === "room_service" || charge > 0
+        ? {
+            service_charge:
+              Number.isFinite(charge) && charge >= 0 ? charge : 0,
+          }
+        : {}),
+    };
+  }
+  return out;
+}
+
+function formatServiceConfigSummary(
+  configs: ShopServiceConfigs | null | undefined,
+): string {
+  if (!configs || typeof configs !== "object") return "";
+  return SERVICE_CONFIG_TYPES.filter((type) => configs[type]?.enabled)
+    .map((type) => {
+      const entry = configs[type]!;
+      const parts: string[] = [];
+      if (entry.min_order_amount != null && entry.min_order_amount > 0) {
+        parts.push(`min AED ${entry.min_order_amount}`);
+      }
+      if (
+        type === "delivery" &&
+        entry.delivery_charge != null &&
+        entry.delivery_charge > 0
+      ) {
+        parts.push(`fee AED ${entry.delivery_charge}`);
+      }
+      if (
+        type === "delivery" &&
+        entry.delivery_radius_km != null &&
+        entry.delivery_radius_km > 0
+      ) {
+        parts.push(`${entry.delivery_radius_km} km`);
+      }
+      return parts.length
+        ? `${SERVICE_CONFIG_LABELS[type]} · ${parts.join(" · ")}`
+        : SERVICE_CONFIG_LABELS[type];
+    })
+    .join(", ");
+}
 
 function ShopSection({
   title,
@@ -131,12 +297,6 @@ function ecomFormFromData(ecom: ShopEcomSettings | null | undefined) {
       : "";
   return {
     domain: String(ecom?.domain ?? ""),
-    min_order_amount:
-      ecom?.min_order_amount != null ? String(ecom.min_order_amount) : "",
-    delivery_radius_km:
-      ecom?.delivery_radius_km != null ? String(ecom.delivery_radius_km) : "",
-    delivery_charge:
-      ecom?.delivery_charge != null ? String(ecom.delivery_charge) : "",
     cooking_notes_enabled: Boolean(ecom?.cooking_notes_enabled),
     delivery_instructions_enabled: Boolean(ecom?.delivery_instructions_enabled),
     cutlery_enabled: Boolean(ecom?.cutlery_enabled),
@@ -151,6 +311,8 @@ function ecomFormFromData(ecom: ShopEcomSettings | null | undefined) {
     og_image: String(ecom?.og_image ?? ""),
     twitter_card: String(ecom?.twitter_card ?? ""),
     robots_index: Boolean(ecom?.robots_index ?? true),
+    allow_anonymous_table_orders: Boolean(ecom?.allow_anonymous_table_orders),
+    service_configs: serviceConfigsFormFromData(ecom?.service_configs),
   };
 }
 
@@ -197,6 +359,23 @@ export function ShopEcomTab({
     });
   }
 
+  function setServiceConfigField<K extends keyof ServiceConfigFormEntry>(
+    serviceType: ServiceConfigType,
+    key: K,
+    value: ServiceConfigFormEntry[K],
+  ) {
+    setForm((prev) => ({
+      ...prev,
+      service_configs: {
+        ...prev.service_configs,
+        [serviceType]: {
+          ...prev.service_configs[serviceType],
+          [key]: value,
+        },
+      },
+    }));
+  }
+
   async function onSave(e: React.FormEvent) {
     e.preventDefault();
     if (!ecomEnabled) {
@@ -225,15 +404,6 @@ export function ShopEcomTab({
 
     const ecom: ShopEcomSettings = {
       domain: form.domain.trim() ? form.domain.trim().toLowerCase() : null,
-      min_order_amount: form.min_order_amount.trim()
-        ? Number(form.min_order_amount)
-        : 0,
-      delivery_radius_km: form.delivery_radius_km.trim()
-        ? Number(form.delivery_radius_km)
-        : null,
-      delivery_charge: form.delivery_charge.trim()
-        ? Number(form.delivery_charge)
-        : 0,
       cooking_notes_enabled: form.cooking_notes_enabled,
       delivery_instructions_enabled: form.delivery_instructions_enabled,
       cutlery_enabled: form.cutlery_enabled,
@@ -248,6 +418,8 @@ export function ShopEcomTab({
       og_image: form.og_image.trim() || null,
       twitter_card: form.twitter_card.trim() || null,
       robots_index: form.robots_index,
+      allow_anonymous_table_orders: form.allow_anonymous_table_orders,
+      service_configs: serializeServiceConfigs(form.service_configs),
     };
 
     try {
@@ -303,25 +475,12 @@ export function ShopEcomTab({
             items={[
               { label: "Domain", value: ecom?.domain },
               {
-                label: "Min order amount",
-                value:
-                  ecom?.min_order_amount != null
-                    ? String(ecom.min_order_amount)
-                    : null,
+                label: "Guest QR checkout",
+                value: yesNo(ecom?.allow_anonymous_table_orders),
               },
               {
-                label: "Delivery radius (km)",
-                value:
-                  ecom?.delivery_radius_km != null
-                    ? String(ecom.delivery_radius_km)
-                    : null,
-              },
-              {
-                label: "Delivery charge",
-                value:
-                  ecom?.delivery_charge != null
-                    ? String(ecom.delivery_charge)
-                    : null,
+                label: "Service configs",
+                value: formatServiceConfigSummary(ecom?.service_configs) || null,
               },
               {
                 label: "Cooking notes",
@@ -363,6 +522,75 @@ export function ShopEcomTab({
             </p>
             <OperatingHoursDisplay value={ecom?.operating_hours} />
           </div>
+
+          {SERVICE_CONFIG_TYPES.some(
+            (type) => ecom?.service_configs?.[type] != null,
+          ) ? (
+            <div className="space-y-4">
+              <p className="border-b border-border/70 pb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                Per-service rules
+              </p>
+              {SERVICE_CONFIG_TYPES.map((serviceType) => {
+                const entry = ecom?.service_configs?.[serviceType];
+                if (!entry) return null;
+                return (
+                  <DetailList
+                    key={serviceType}
+                    items={[
+                      {
+                        label: SERVICE_CONFIG_LABELS[serviceType],
+                        value: entry.enabled ? "Enabled" : "Disabled",
+                      },
+                      {
+                        label: "Min order",
+                        value:
+                          entry.min_order_amount != null
+                            ? `AED ${entry.min_order_amount}`
+                            : "AED 0",
+                      },
+                      {
+                        label: "Prep time",
+                        value:
+                          entry.prep_time_minutes != null
+                            ? `${entry.prep_time_minutes} min`
+                            : null,
+                      },
+                      {
+                        label: "Requires phone",
+                        value: yesNo(entry.requires_phone),
+                      },
+                      ...(serviceType === "delivery"
+                        ? [
+                            {
+                              label: "Delivery charge",
+                              value:
+                                entry.delivery_charge != null
+                                  ? `AED ${entry.delivery_charge}`
+                                  : "AED 0",
+                            },
+                            {
+                              label: "Delivery radius",
+                              value:
+                                entry.delivery_radius_km != null
+                                  ? `${entry.delivery_radius_km} km`
+                                  : "Unrestricted",
+                            },
+                          ]
+                        : [
+                            {
+                              label: "Service charge",
+                              value:
+                                entry.service_charge != null
+                                  ? `AED ${entry.service_charge}`
+                                  : null,
+                            },
+                          ]),
+                    ]}
+                  />
+                );
+              })}
+            </div>
+          ) : null}
         </div>
       ) : (
         <form onSubmit={onSave} className="space-y-6">
@@ -379,27 +607,6 @@ export function ShopEcomTab({
                   {fieldErrors.domain}
                 </p>
               ) : null}
-            </Field>
-            <Field label="Min order amount">
-              <Input
-                inputMode="decimal"
-                value={form.min_order_amount}
-                onChange={(e) => setField("min_order_amount", e.target.value)}
-              />
-            </Field>
-            <Field label="Delivery radius (km)">
-              <Input
-                inputMode="decimal"
-                value={form.delivery_radius_km}
-                onChange={(e) => setField("delivery_radius_km", e.target.value)}
-              />
-            </Field>
-            <Field label="Delivery charge">
-              <Input
-                inputMode="decimal"
-                value={form.delivery_charge}
-                onChange={(e) => setField("delivery_charge", e.target.value)}
-              />
             </Field>
             <Field label="Twitter card">
               <Input
@@ -432,6 +639,124 @@ export function ShopEcomTab({
               checked={form.cutlery_enabled}
               onChange={(v) => setField("cutlery_enabled", v)}
             />
+            <FeatureToggleRow
+              id="ecom_allow_anonymous_table_orders"
+              label="Guest QR checkout"
+              description="Allow table / room / drive-thru orders without OTP when QR ordering is on."
+              checked={form.allow_anonymous_table_orders}
+              onChange={(v) => setField("allow_anonymous_table_orders", v)}
+            />
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <h4 className="text-sm font-semibold">Per-service rules</h4>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Min order, prep time, and delivery fee/radius live on each
+                service card. Delivery has no service charge.
+              </p>
+            </div>
+            {SERVICE_CONFIG_TYPES.map((serviceType) => {
+              const entry = form.service_configs[serviceType];
+              return (
+                <div
+                  key={serviceType}
+                  className="space-y-3 rounded-xl border border-border/70 p-3"
+                >
+                  <FeatureToggleRow
+                    id={`ecom_service_${serviceType}_enabled`}
+                    label={SERVICE_CONFIG_LABELS[serviceType]}
+                    description={`Offer ${SERVICE_CONFIG_LABELS[serviceType].toLowerCase()} when the matching feature flag is on.`}
+                    checked={entry.enabled}
+                    onChange={(v) =>
+                      setServiceConfigField(serviceType, "enabled", v)
+                    }
+                  />
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Field label="Min order (AED)">
+                      <Input
+                        inputMode="decimal"
+                        value={entry.min_order_amount}
+                        onChange={(e) =>
+                          setServiceConfigField(
+                            serviceType,
+                            "min_order_amount",
+                            e.target.value,
+                          )
+                        }
+                      />
+                    </Field>
+                    <Field label="Prep time (minutes)">
+                      <Input
+                        inputMode="numeric"
+                        value={entry.prep_time_minutes}
+                        onChange={(e) =>
+                          setServiceConfigField(
+                            serviceType,
+                            "prep_time_minutes",
+                            e.target.value,
+                          )
+                        }
+                      />
+                    </Field>
+                    {serviceType === "delivery" ? (
+                      <>
+                        <Field label="Delivery charge (AED)">
+                          <Input
+                            inputMode="decimal"
+                            value={entry.delivery_charge}
+                            onChange={(e) =>
+                              setServiceConfigField(
+                                serviceType,
+                                "delivery_charge",
+                                e.target.value,
+                              )
+                            }
+                          />
+                        </Field>
+                        <Field label="Delivery radius (km)">
+                          <Input
+                            inputMode="decimal"
+                            value={entry.delivery_radius_km}
+                            onChange={(e) =>
+                              setServiceConfigField(
+                                serviceType,
+                                "delivery_radius_km",
+                                e.target.value,
+                              )
+                            }
+                            placeholder="Leave empty for unrestricted"
+                          />
+                        </Field>
+                      </>
+                    ) : (
+                      <Field label="Service charge (AED)">
+                        <Input
+                          inputMode="decimal"
+                          value={entry.service_charge}
+                          onChange={(e) =>
+                            setServiceConfigField(
+                              serviceType,
+                              "service_charge",
+                              e.target.value,
+                            )
+                          }
+                        />
+                      </Field>
+                    )}
+                  </div>
+                  <FeatureToggleRow
+                    id={`ecom_service_${serviceType}_phone`}
+                    label="Requires phone"
+                    description="Require customer phone for this service (guest QR can still skip when enabled above)."
+                    checked={entry.requires_phone}
+                    onChange={(v) =>
+                      setServiceConfigField(serviceType, "requires_phone", v)
+                    }
+                  />
+                </div>
+              );
+            })}
           </div>
 
           <Field label="WhatsApp order template">

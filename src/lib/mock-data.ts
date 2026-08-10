@@ -533,14 +533,22 @@ export async function mockCreateShop(input: CreateShopInput): Promise<ShopDetail
     },
     ecom: {
       domain: null,
-      min_order_amount: "0",
-      delivery_radius_km: "5",
-      delivery_charge: 0,
       cooking_notes_enabled: false,
       delivery_instructions_enabled: false,
       cutlery_enabled: false,
       payment_methods: [],
       robots_index: true,
+      service_configs: {
+        delivery: {
+          enabled: true,
+          min_order_amount: 0,
+          prep_time_minutes: 30,
+          requires_phone: true,
+          delivery_charge: 0,
+          delivery_radius_km: 5,
+        },
+      },
+      allow_anonymous_table_orders: false,
       ...(input.ecom ?? {}),
     },
   });
@@ -649,14 +657,21 @@ export async function mockGetShop(shopId: string): Promise<ShopDetail> {
     },
     ecom: stored?.ecom ?? {
       domain: null,
-      min_order_amount: "0",
-      delivery_radius_km: "5",
-      delivery_charge: 0,
       cooking_notes_enabled: false,
       delivery_instructions_enabled: false,
       cutlery_enabled: false,
       payment_methods: ["online", "cash_on_delivery"],
       robots_index: true,
+      service_configs: {
+        delivery: {
+          enabled: true,
+          min_order_amount: 0,
+          prep_time_minutes: 30,
+          requires_phone: true,
+          delivery_charge: 0,
+          delivery_radius_km: 5,
+        },
+      },
     },
   } satisfies ShopDetail);
 }

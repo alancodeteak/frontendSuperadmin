@@ -152,13 +152,29 @@ export type ShopPromotionSettings = {
   [key: string]: unknown;
 };
 
+export type ShopServiceConfigEntry = {
+  enabled?: boolean;
+  min_order_amount?: number;
+  prep_time_minutes?: number;
+  requires_phone?: boolean;
+  /** Non-delivery services only. */
+  service_charge?: number;
+  /** Delivery only. */
+  delivery_charge?: number;
+  /** Delivery only; null = unlimited. */
+  delivery_radius_km?: number | null;
+};
+
+export type ShopServiceConfigs = Partial<
+  Record<
+    "delivery" | "pickup" | "drive_thru" | "dine_in" | "room_service",
+    ShopServiceConfigEntry
+  >
+>;
+
 export type ShopEcomSettings = {
   /** Hostname only; unique when set. Send null on PATCH to clear. */
   domain?: string | null;
-  min_order_amount?: string | number | null;
-  delivery_radius_km?: string | number | null;
-  /** Flat delivery fee shown on the storefront checkout. */
-  delivery_charge?: string | number | null;
   cooking_notes_enabled?: boolean | null;
   delivery_instructions_enabled?: boolean | null;
   cutlery_enabled?: boolean | null;
@@ -184,6 +200,13 @@ export type ShopEcomSettings = {
   robots_index?: boolean | null;
   /** Write-only on create/patch; never returned */
   structured_data?: unknown;
+  /**
+   * Per-service storefront rules. Delivery economics
+   * (min_order_amount, delivery_charge, delivery_radius_km) live under delivery.
+   */
+  service_configs?: ShopServiceConfigs | null;
+  /** Guest QR checkout without OTP for table/room/drive-thru. */
+  allow_anonymous_table_orders?: boolean | null;
   [key: string]: unknown;
 };
 
