@@ -38,6 +38,13 @@ export type ShopFeatures = {
   single_msg?: boolean;
   vat_enabled?: boolean;
   vat?: number;
+  /** Master venue / multi-service (superadmin only). */
+  venue_management_enabled?: boolean;
+  qr_ordering_enabled?: boolean;
+  table_ordering_enabled?: boolean;
+  room_service_enabled?: boolean;
+  pickup_ordering_enabled?: boolean;
+  drive_thru_enabled?: boolean;
 };
 
 export type ShopProfile = {
@@ -72,6 +79,12 @@ export type ShopListItem = {
   ecom_order_confirmation_enabled?: boolean;
   scheduled_order?: boolean;
   merge_order?: boolean;
+  venue_management_enabled?: boolean;
+  qr_ordering_enabled?: boolean;
+  table_ordering_enabled?: boolean;
+  room_service_enabled?: boolean;
+  pickup_ordering_enabled?: boolean;
+  drive_thru_enabled?: boolean;
   address?: ShopAddress | null;
   created_at?: string;
   updated_at?: string;
@@ -90,6 +103,12 @@ export type CreateShopInput = {
   merge_order?: boolean;
   return_option?: boolean;
   customer_ticket?: boolean;
+  venue_management_enabled?: boolean;
+  qr_ordering_enabled?: boolean;
+  table_ordering_enabled?: boolean;
+  room_service_enabled?: boolean;
+  pickup_ordering_enabled?: boolean;
+  drive_thru_enabled?: boolean;
   second_name?: string | null;
   status?: ShopStatus | string;
   status_reason?: string | null;
@@ -187,6 +206,12 @@ export type PatchShopInput = {
   scheduled_order?: boolean;
   merge_order?: boolean;
   customer_ticket?: boolean;
+  venue_management_enabled?: boolean;
+  qr_ordering_enabled?: boolean;
+  table_ordering_enabled?: boolean;
+  room_service_enabled?: boolean;
+  pickup_ordering_enabled?: boolean;
+  drive_thru_enabled?: boolean;
   vat_enabled?: boolean;
   vat?: number | string | null;
   enable_promotion?: boolean;

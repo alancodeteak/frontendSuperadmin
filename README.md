@@ -1,8 +1,8 @@
-# Yaadro Restaurant Superadmin
+﻿# Yaadro Restaurant Superadmin
 
 Next.js superadmin panel for the UAE restaurant ecommerce platform (**Yaadro**). Manage shops, riders, POS links, billing, analytics, and reports against the `admin-api` (`/api/v2`).
 
-**Public URL:** [https://superadmin.yaadro.online](https://superadmin.yaadro.online)
+**Public URL:** [https://uaesuperadmin.yaadro.online](https://uaesuperadmin.yaadro.online)
 
 ---
 
@@ -18,7 +18,7 @@ Next.js superadmin panel for the UAE restaurant ecommerce platform (**Yaadro**).
 | Search | **Meilisearch** (optional) with live API fallback |
 | Auth | Email OTP via admin-api |
 | Exports | **jsPDF**, **SheetJS (xlsx)** |
-| Tunnel | **Cloudflare Tunnel** → `superadmin.yaadro.online` |
+| Tunnel | **Cloudflare Tunnel** → `uaesuperadmin.yaadro.online` |
 
 ---
 
@@ -40,7 +40,7 @@ Next.js superadmin panel for the UAE restaurant ecommerce platform (**Yaadro**).
 - Searchable, filterable shop list with status badges and profile photos
 - Shops map modal (all shops on a map)
 - **Create shop wizard** (`/shops/new`) with:
-  - Multi-step flow: Basics → Address → Features → Review
+  - Multi-step flow: Basics â†’ Address â†’ Features â†’ Review
   - Step progress UI
   - Auto shop ID (`NAME_YYYYMMDD_XXXX`) and suggested login ID
   - Local draft persistence (fields only; password not saved)
@@ -49,18 +49,18 @@ Next.js superadmin panel for the UAE restaurant ecommerce platform (**Yaadro**).
   - Feature flags (ecom, confirmation, scheduled orders, merge, returns, tickets)
   - Confirm modal with loading, slow/background task, and success states
 - **Shop detail** (`/shops/[shopId]`) tabs:
-  - **Overview** — profile hero (map + photo), edit details, reset password, soft/hard delete, force logout
-  - **Features** — ecom and ops feature toggles
-  - **Products** — catalog table from shop data
-  - **Delivery** — delivery settings 
-  - **Subscription** — view active plan and create subscriptions
-  - **Promotion** — promotion settings
-  - **Riders** — list, create, edit, block/unblock, restore, reset password, delete
-  - **POS** — attach POS template link, sync status, link features
+  - **Overview** â€” profile hero (map + photo), edit details, reset password, soft/hard delete, force logout
+  - **Features** â€” ecom and ops feature toggles
+  - **Products** â€” catalog table from shop data
+  - **Delivery** â€” delivery settings 
+  - **Subscription** â€” view active plan and create subscriptions
+  - **Promotion** â€” promotion settings
+  - **Riders** â€” list, create, edit, block/unblock, restore, reset password, delete
+  - **POS** â€” attach POS template link, sync status, link features
 
 ### POS (`/pos`)
 - POS template list and detail
-- Attach / manage shop ↔ POS links from the shop POS tab
+- Attach / manage shop â†” POS links from the shop POS tab
 
 ### Reports (`/reports`)
 - Shop reports via DMS API proxy
@@ -104,11 +104,11 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Open [http://localhost:3002](http://localhost:3002) (dev server uses port **3002**).
+Open [http://localhost:3005](http://localhost:3005) (dev server uses port **3005**).
 
 ### Cloudflare tunnel (public URL)
 
-Named tunnel: `yaadro-superadmin-uae` → `https://superadmin.yaadro.online` (local Next.js on port **3002**).
+Named tunnel: `yaadro-superadmin-uae` → `https://uaesuperadmin.yaadro.online` (local Next.js on port **3005**).
 
 API stays on the separate tunnel/host: `https://superadmin-api.yaadro.ae` (or live tunnel `superadmin-api.yaadro.online` when that connector is up).
 
@@ -131,16 +131,16 @@ Or in two terminals: `npm run dev` and `npm run tunnel`.
 Browser traffic stays same-origin to avoid CORS through the tunnel:
 
 ```text
-https://superadmin.yaadro.online/api/...
-  → Next.js rewrite → API_PROXY_TARGET/api/...
+https://uaesuperadmin.yaadro.online/api/...
+  â†’ Next.js rewrite â†’ API_PROXY_TARGET/api/...
   (default: https://superadmin-api.yaadro.ae)
 
-https://superadmin.yaadro.online/dms-api/...
-  → Next.js rewrite → DMS_API_PROXY_TARGET/dms-api/...
+https://uaesuperadmin.yaadro.online/dms-api/...
+  â†’ Next.js rewrite â†’ DMS_API_PROXY_TARGET/dms-api/...
   (default: http://localhost:3001)
 
-https://superadmin.yaadro.online/health
-  → API health check
+https://uaesuperadmin.yaadro.online/health
+  â†’ API health check
 ```
 
 Local App Router routes such as `/api/search/*` are served by Next.js first; other `/api/*` paths proxy to admin-api.
@@ -169,18 +169,18 @@ src/
     dashboard/               # KPIs, charts, right sidebar, search
     shops/                   # Wizard, maps, photo, riders, profile
     layout/                  # Top bar, page shell, notifications
-    ui/                      # Shared UI (table, dialog, step-progress, …)
+    ui/                      # Shared UI (table, dialog, step-progress, â€¦)
   config/                    # Site + nav config
   constants/
   hooks/
   lib/
-    api/                     # admin-api clients (shops, riders, billing, …)
+    api/                     # admin-api clients (shops, riders, billing, â€¦)
     queries/                 # React Query definitions
     search/                  # Meilisearch + federated search
     mock-data.ts             # Dev mocks when development mode is on
   types/
 cloudflared/
-  config.yml                 # Tunnel ingress for superadmin.yaadro.online (yaadro-superadmin-uae)
+  config.yml                 # Tunnel ingress for uaesuperadmin.yaadro.online (yaadro-superadmin-uae)
 public/
   images/ icons/ animations/
 ```
@@ -191,7 +191,7 @@ public/
 
 | Command | Description |
 | ------- | ----------- |
-| `npm run dev` | Next.js on port **3002** |
+| `npm run dev` | Next.js on port **3005** |
 | `npm run tunnel` | Cloudflare tunnel only |
 | `npm run dev:tunnel` | Next.js + tunnel |
 | `npm run tunnel:dns` | Point DNS at the named tunnel |
@@ -203,7 +203,7 @@ public/
 
 ## Environment
 
-Copy `.env.example` → `.env.local`.
+Copy `.env.example` â†’ `.env.local`.
 
 | Variable | Purpose |
 | -------- | ------- |
@@ -233,8 +233,8 @@ This UI targets **admin-api** (`/api/v2`) for shops, riders, POS, billing, analy
 
 Useful references in the repo:
 
-- `admin-api.postman_collection (1).json` — API examples
-- `.env.example` — required env vars
+- `admin-api.postman_collection (1).json` â€” API examples
+- `.env.example` â€” required env vars
 
 ---
 

@@ -1,5 +1,6 @@
 import type { CreateShopInput, ShopAddress } from "@/types/api";
 import { humanizeApiMessage } from "@/lib/api-form-error";
+import { cascadeVenueMasterFlagsSnake, validateVenueMasterFlagsSnake } from "@/lib/venue-feature-flags";
 
 /** Matches admin-api / Postman create-shop contract. Cache-bust: wizard-step-valid-v2 */
 export const SHOP_ID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{2,49}$/;
@@ -31,6 +32,12 @@ export type CreateShopFormValues = {
   merge_order: boolean;
   return_option: boolean;
   customer_ticket: boolean;
+  venue_management_enabled: boolean;
+  qr_ordering_enabled: boolean;
+  table_ordering_enabled: boolean;
+  room_service_enabled: boolean;
+  pickup_ordering_enabled: boolean;
+  drive_thru_enabled: boolean;
   is_msg_activated: boolean;
   single_msg: boolean;
   address_line_1: string;
@@ -211,6 +218,27 @@ export function validateCreateShopField(
       }
       return null;
     }
+    case "venue_management_enabled":
+    case "qr_ordering_enabled":
+    case "table_ordering_enabled":
+    case "room_service_enabled":
+    case "pickup_ordering_enabled":
+    case "drive_thru_enabled": {
+      const venueError = validateVenueMasterFlagsSnake({
+        ecom_enabled: form.ecom_enabled,
+        venue_management_enabled: form.venue_management_enabled,
+        qr_ordering_enabled: form.qr_ordering_enabled,
+        table_ordering_enabled: form.table_ordering_enabled,
+        room_service_enabled: form.room_service_enabled,
+        pickup_ordering_enabled: form.pickup_ordering_enabled,
+        drive_thru_enabled: form.drive_thru_enabled,
+      });
+      if (!venueError) return null;
+      // Only attach the error to the field that is currently on and invalid.
+      if (value !== true) return null;
+      if (venueError.includes(String(field))) return humanizeApiMessage(venueError);
+      return null;
+    }
     case "single_msg": {
       if (value === true && !form.is_msg_activated) {
         return "Requires messaging to be activated";
@@ -287,6 +315,12 @@ export function validateCreateShopForm(
     "ecom_slug",
     "ecom_order_confirmation_enabled",
     "customer_ticket",
+    "venue_management_enabled",
+    "qr_ordering_enabled",
+    "table_ordering_enabled",
+    "room_service_enabled",
+    "pickup_ordering_enabled",
+    "drive_thru_enabled",
     "is_msg_activated",
     "single_msg",
     "address_line_1",
@@ -342,6 +376,12 @@ export const SHOP_CREATE_STEP_FIELDS: Record<
   2: [
     "ecom_order_confirmation_enabled",
     "customer_ticket",
+    "venue_management_enabled",
+    "qr_ordering_enabled",
+    "table_ordering_enabled",
+    "room_service_enabled",
+    "pickup_ordering_enabled",
+    "drive_thru_enabled",
     "is_msg_activated",
     "single_msg",
   ],
@@ -405,6 +445,15 @@ export function buildCreateShopPayload(
 
   const shop_id = normalizeShopId(form.shop_id);
   const ecom_enabled = form.ecom_enabled;
+  const venueFlags = cascadeVenueMasterFlagsSnake({
+    ecom_enabled,
+    venue_management_enabled: form.venue_management_enabled,
+    qr_ordering_enabled: form.qr_ordering_enabled,
+    table_ordering_enabled: form.table_ordering_enabled,
+    room_service_enabled: form.room_service_enabled,
+    pickup_ordering_enabled: form.pickup_ordering_enabled,
+    drive_thru_enabled: form.drive_thru_enabled,
+  });
   const payload: CreateShopInput = {
     shop_name: form.shop_name.trim(),
     shop_id,
@@ -418,6 +467,12 @@ export function buildCreateShopPayload(
     merge_order: form.merge_order,
     return_option: form.return_option,
     customer_ticket: ecom_enabled ? form.customer_ticket : false,
+    venue_management_enabled: venueFlags.venue_management_enabled,
+    qr_ordering_enabled: venueFlags.qr_ordering_enabled,
+    table_ordering_enabled: venueFlags.table_ordering_enabled,
+    room_service_enabled: venueFlags.room_service_enabled,
+    pickup_ordering_enabled: venueFlags.pickup_ordering_enabled,
+    drive_thru_enabled: venueFlags.drive_thru_enabled,
     // Integration is only enabled from shop edit (Features tab).
     integration_enabled: false,
     is_msg_activated: form.is_msg_activated,

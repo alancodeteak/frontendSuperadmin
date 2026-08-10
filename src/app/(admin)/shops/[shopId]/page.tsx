@@ -92,6 +92,10 @@ import {
   UAE_COUNTRY_CODE,
 } from "@/lib/shop-create-validation";
 import { cn, formatCurrency } from "@/lib/utils";
+import {
+  cascadeVenueMasterFlagsSnake,
+  validateVenueMasterFlagsSnake,
+} from "@/lib/venue-feature-flags";
 import type {
   Rider,
   ShopDeliverySettings,
@@ -1142,6 +1146,12 @@ function readShopFeatures(shop: ShopDetail): Required<
     | "merge_order"
     | "return_option"
     | "customer_ticket"
+    | "venue_management_enabled"
+    | "qr_ordering_enabled"
+    | "table_ordering_enabled"
+    | "room_service_enabled"
+    | "pickup_ordering_enabled"
+    | "drive_thru_enabled"
     | "integration_enabled"
     | "is_msg_activated"
     | "single_msg"
@@ -1161,6 +1171,24 @@ function readShopFeatures(shop: ShopDetail): Required<
     merge_order: Boolean(f.merge_order ?? shop.merge_order),
     return_option: Boolean(f.return_option),
     customer_ticket: Boolean(f.customer_ticket),
+    venue_management_enabled: Boolean(
+      f.venue_management_enabled ?? shop.venue_management_enabled,
+    ),
+    qr_ordering_enabled: Boolean(
+      f.qr_ordering_enabled ?? shop.qr_ordering_enabled,
+    ),
+    table_ordering_enabled: Boolean(
+      f.table_ordering_enabled ?? shop.table_ordering_enabled,
+    ),
+    room_service_enabled: Boolean(
+      f.room_service_enabled ?? shop.room_service_enabled,
+    ),
+    pickup_ordering_enabled: Boolean(
+      f.pickup_ordering_enabled ?? shop.pickup_ordering_enabled,
+    ),
+    drive_thru_enabled: Boolean(
+      f.drive_thru_enabled ?? shop.drive_thru_enabled,
+    ),
     ecom_slug: String(f.ecom_slug ?? shop.ecom_slug ?? ""),
     integration_enabled: Boolean(f.integration_enabled),
     integration_rate_limit: String(f.integration_rate_limit ?? 100),
@@ -1279,7 +1307,7 @@ function FeaturesTab({
     clearFieldError(String(key));
     setError(null);
     setForm((prev) => {
-      const next = { ...prev, [key]: value };
+      let next = { ...prev, [key]: value };
       if (key === "ecom_enabled" && value === false) {
         next.ecom_order_confirmation_enabled = false;
         next.customer_ticket = false;
@@ -1290,6 +1318,16 @@ function FeaturesTab({
         next.single_msg = false;
         clearFieldError("single_msg");
       }
+      const cascaded = cascadeVenueMasterFlagsSnake({
+        ecom_enabled: next.ecom_enabled,
+        venue_management_enabled: next.venue_management_enabled,
+        qr_ordering_enabled: next.qr_ordering_enabled,
+        table_ordering_enabled: next.table_ordering_enabled,
+        room_service_enabled: next.room_service_enabled,
+        pickup_ordering_enabled: next.pickup_ordering_enabled,
+        drive_thru_enabled: next.drive_thru_enabled,
+      });
+      next = { ...next, ...cascaded };
       return next;
     });
   }
@@ -1345,8 +1383,41 @@ function FeaturesTab({
       return;
     }
 
+    const venueError = validateVenueMasterFlagsSnake({
+      ecom_enabled: form.ecom_enabled,
+      venue_management_enabled: form.venue_management_enabled,
+      qr_ordering_enabled: form.qr_ordering_enabled,
+      table_ordering_enabled: form.table_ordering_enabled,
+      room_service_enabled: form.room_service_enabled,
+      pickup_ordering_enabled: form.pickup_ordering_enabled,
+      drive_thru_enabled: form.drive_thru_enabled,
+    });
+    if (venueError) {
+      const parsed = parseApiFormError(new ApiError(400, venueError), venueError);
+      setError(parsed.message);
+      setFieldErrors(parsed.fields);
+      setHighlightFields(parsed.highlightFields);
+      appToast.error(parsed.message);
+      window.requestAnimationFrame(() =>
+        focusHighlightedField(
+          parsed.highlightFields.map((f) => `feat_${f}`),
+        ),
+      );
+      setSaving(false);
+      return;
+    }
+
     try {
       const ecomEnabled = form.ecom_enabled;
+      const venueFlags = cascadeVenueMasterFlagsSnake({
+        ecom_enabled: ecomEnabled,
+        venue_management_enabled: form.venue_management_enabled,
+        qr_ordering_enabled: form.qr_ordering_enabled,
+        table_ordering_enabled: form.table_ordering_enabled,
+        room_service_enabled: form.room_service_enabled,
+        pickup_ordering_enabled: form.pickup_ordering_enabled,
+        drive_thru_enabled: form.drive_thru_enabled,
+      });
       const result = await patchShop(shop.shop_id, {
         ecom_enabled: ecomEnabled,
         ecom_slug: form.ecom_slug || null,
@@ -1357,6 +1428,12 @@ function FeaturesTab({
         merge_order: form.merge_order,
         return_option: form.return_option,
         customer_ticket: ecomEnabled ? form.customer_ticket : false,
+        venue_management_enabled: venueFlags.venue_management_enabled,
+        qr_ordering_enabled: venueFlags.qr_ordering_enabled,
+        table_ordering_enabled: venueFlags.table_ordering_enabled,
+        room_service_enabled: venueFlags.room_service_enabled,
+        pickup_ordering_enabled: venueFlags.pickup_ordering_enabled,
+        drive_thru_enabled: venueFlags.drive_thru_enabled,
         integration_enabled: form.integration_enabled,
         integration_rate_limit: Number(form.integration_rate_limit) || 100,
         is_msg_activated: form.is_msg_activated,
@@ -1502,6 +1579,70 @@ function FeaturesTab({
             invalid={isHighlighted("customer_ticket")}
             error={fieldErrors.customer_ticket}
             onChange={(v) => setFlag("customer_ticket", v)}
+          />
+          <FeatureToggleRow
+            id="feat_venue_management_enabled"
+            label="Venue management"
+            description="Dining areas, serve locations, and QR setup in the shop app."
+            checked={form.venue_management_enabled}
+            disabled={!form.ecom_enabled}
+            invalid={isHighlighted("venue_management_enabled")}
+            error={fieldErrors.venue_management_enabled}
+            onChange={(v) => setFlag("venue_management_enabled", v)}
+          />
+          <FeatureToggleRow
+            id="feat_table_ordering_enabled"
+            label="Table ordering"
+            description="Dine-in / table service. Requires venue + ecom."
+            checked={form.table_ordering_enabled}
+            disabled={!form.ecom_enabled || !form.venue_management_enabled}
+            invalid={isHighlighted("table_ordering_enabled")}
+            error={fieldErrors.table_ordering_enabled}
+            onChange={(v) => setFlag("table_ordering_enabled", v)}
+          />
+          <FeatureToggleRow
+            id="feat_room_service_enabled"
+            label="Room service"
+            description="In-room ordering. Requires venue + ecom."
+            checked={form.room_service_enabled}
+            disabled={!form.ecom_enabled || !form.venue_management_enabled}
+            invalid={isHighlighted("room_service_enabled")}
+            error={fieldErrors.room_service_enabled}
+            onChange={(v) => setFlag("room_service_enabled", v)}
+          />
+          <FeatureToggleRow
+            id="feat_qr_ordering_enabled"
+            label="QR ordering"
+            description="Table / room QR deep links. Requires venue + table or room."
+            checked={form.qr_ordering_enabled}
+            disabled={
+              !form.ecom_enabled ||
+              !form.venue_management_enabled ||
+              (!form.table_ordering_enabled && !form.room_service_enabled)
+            }
+            invalid={isHighlighted("qr_ordering_enabled")}
+            error={fieldErrors.qr_ordering_enabled}
+            onChange={(v) => setFlag("qr_ordering_enabled", v)}
+          />
+          <FeatureToggleRow
+            id="feat_pickup_ordering_enabled"
+            label="Pickup ordering"
+            description="Customer pickup orders. Requires ecom."
+            checked={form.pickup_ordering_enabled}
+            disabled={!form.ecom_enabled}
+            invalid={isHighlighted("pickup_ordering_enabled")}
+            error={fieldErrors.pickup_ordering_enabled}
+            onChange={(v) => setFlag("pickup_ordering_enabled", v)}
+          />
+          <FeatureToggleRow
+            id="feat_drive_thru_enabled"
+            label="Drive-thru"
+            description="Drive-thru lane ordering. Requires ecom."
+            checked={form.drive_thru_enabled}
+            disabled={!form.ecom_enabled}
+            invalid={isHighlighted("drive_thru_enabled")}
+            error={fieldErrors.drive_thru_enabled}
+            onChange={(v) => setFlag("drive_thru_enabled", v)}
           />
           <FeatureToggleRow
             id="feat_integration_enabled"

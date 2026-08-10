@@ -21,12 +21,22 @@ const dmsApiProxyTarget = normalizeOrigin(
   "http://localhost:3001",
 );
 
-const tunnelHost =
-  process.env.NEXT_PUBLIC_TUNNEL_HOST ?? "superadmin.yaadro.online";
+const tunnelHostRaw =
+  process.env.NEXT_PUBLIC_TUNNEL_HOST ?? "uaesuperadmin.yaadro.online";
+/** Hostname only — allowedDevOrigins must not include protocol. */
+const tunnelHost = tunnelHostRaw
+  .trim()
+  .replace(/^https?:\/\//i, "")
+  .replace(/\/.*$/, "")
+  .replace(/:\d+$/, "");
 
 const nextConfig: NextConfig = {
-  // Allow Next.js dev assets/HMR when accessed via a custom hostname (local tunnel)
-  allowedDevOrigins: [tunnelHost],
+  // Allow Next.js dev assets/HMR when accessed via Cloudflare tunnel hostname
+  allowedDevOrigins: [
+    tunnelHost,
+    "uaesuperadmin.yaadro.online",
+    "*.yaadro.online",
+  ],
 
   async rewrites() {
     return {

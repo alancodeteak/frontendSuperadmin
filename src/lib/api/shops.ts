@@ -120,6 +120,12 @@ export function createShop(input: CreateShopInput) {
     "merge_order",
     "return_option",
     "customer_ticket",
+    "venue_management_enabled",
+    "qr_ordering_enabled",
+    "table_ordering_enabled",
+    "room_service_enabled",
+    "pickup_ordering_enabled",
+    "drive_thru_enabled",
     "ecom_slug",
     "second_name",
     "status",
@@ -253,6 +259,12 @@ export function shopFeatureFlagsFromDetail(
     | "ecom_order_confirmation_enabled"
     | "scheduled_order"
     | "merge_order"
+    | "venue_management_enabled"
+    | "qr_ordering_enabled"
+    | "table_ordering_enabled"
+    | "room_service_enabled"
+    | "pickup_ordering_enabled"
+    | "drive_thru_enabled"
     | "features"
   >,
 ): PatchShopInput {
@@ -266,6 +278,24 @@ export function shopFeatureFlagsFromDetail(
     merge_order: Boolean(f.merge_order ?? shop.merge_order),
     return_option: Boolean(f.return_option),
     customer_ticket: Boolean(f.customer_ticket),
+    venue_management_enabled: Boolean(
+      f.venue_management_enabled ?? shop.venue_management_enabled,
+    ),
+    qr_ordering_enabled: Boolean(
+      f.qr_ordering_enabled ?? shop.qr_ordering_enabled,
+    ),
+    table_ordering_enabled: Boolean(
+      f.table_ordering_enabled ?? shop.table_ordering_enabled,
+    ),
+    room_service_enabled: Boolean(
+      f.room_service_enabled ?? shop.room_service_enabled,
+    ),
+    pickup_ordering_enabled: Boolean(
+      f.pickup_ordering_enabled ?? shop.pickup_ordering_enabled,
+    ),
+    drive_thru_enabled: Boolean(
+      f.drive_thru_enabled ?? shop.drive_thru_enabled,
+    ),
     ecom_slug: f.ecom_slug ?? shop.ecom_slug ?? undefined,
     integration_enabled: Boolean(f.integration_enabled),
     integration_rate_limit:

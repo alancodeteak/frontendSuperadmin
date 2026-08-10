@@ -3,11 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 3002",
+    "dev": "next dev -p 3005",
     "dev:tunnel": "concurrently -k -n next,tunnel -c cyan,magenta \"npm run dev\" \"npm run tunnel\"",
     "dev:app": "npm run dev",
     "tunnel": "cloudflared tunnel --config cloudflared/config.yml run",
-    "tunnel:dns": "cloudflared tunnel route dns -f 71bc6dd4-3ef7-42bf-aad1-13e118fc85f0 superadmin.yaadro.online",
+    "tunnel:dns": "cloudflared tunnel route dns -f 71bc6dd4-3ef7-42bf-aad1-13e118fc85f0 uaesuperadmin.yaadro.online",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"

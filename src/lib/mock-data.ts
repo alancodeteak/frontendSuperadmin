@@ -507,6 +507,12 @@ export async function mockCreateShop(input: CreateShopInput): Promise<ShopDetail
       merge_order: shop.merge_order,
       return_option: input.return_option ?? false,
       customer_ticket: input.customer_ticket ?? false,
+      venue_management_enabled: input.venue_management_enabled ?? false,
+      qr_ordering_enabled: input.qr_ordering_enabled ?? false,
+      table_ordering_enabled: input.table_ordering_enabled ?? false,
+      room_service_enabled: input.room_service_enabled ?? false,
+      pickup_ordering_enabled: input.pickup_ordering_enabled ?? false,
+      drive_thru_enabled: input.drive_thru_enabled ?? false,
       ecom_slug: shop.ecom_slug,
       integration_enabled: input.integration_enabled ?? false,
       integration_rate_limit: input.integration_rate_limit ?? 300,
@@ -589,6 +595,26 @@ export async function mockGetShop(shopId: string): Promise<ShopDetail> {
       return_option: Boolean(stored?.features?.return_option),
       customer_ticket: Boolean(
         stored?.features?.customer_ticket ?? shop.ecom_enabled,
+      ),
+      venue_management_enabled: Boolean(
+        stored?.features?.venue_management_enabled ??
+          shop.venue_management_enabled,
+      ),
+      qr_ordering_enabled: Boolean(
+        stored?.features?.qr_ordering_enabled ?? shop.qr_ordering_enabled,
+      ),
+      table_ordering_enabled: Boolean(
+        stored?.features?.table_ordering_enabled ?? shop.table_ordering_enabled,
+      ),
+      room_service_enabled: Boolean(
+        stored?.features?.room_service_enabled ?? shop.room_service_enabled,
+      ),
+      pickup_ordering_enabled: Boolean(
+        stored?.features?.pickup_ordering_enabled ??
+          shop.pickup_ordering_enabled,
+      ),
+      drive_thru_enabled: Boolean(
+        stored?.features?.drive_thru_enabled ?? shop.drive_thru_enabled,
       ),
       ecom_slug: shop.ecom_slug,
       integration_enabled: Boolean(stored?.features?.integration_enabled),
@@ -721,6 +747,12 @@ export async function mockPatchShop(
     "merge_order",
     "return_option",
     "customer_ticket",
+    "venue_management_enabled",
+    "qr_ordering_enabled",
+    "table_ordering_enabled",
+    "room_service_enabled",
+    "pickup_ordering_enabled",
+    "drive_thru_enabled",
     "ecom_slug",
     "integration_enabled",
     "integration_rate_limit",

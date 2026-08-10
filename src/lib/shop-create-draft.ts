@@ -1,7 +1,7 @@
 import type { CreateShopFormValues } from "@/lib/shop-create-validation";
 
 const DRAFT_KEY = "yaadro:shop-create-draft";
-const DRAFT_VERSION = 3;
+const DRAFT_VERSION = 4;
 
 export type ShopCreateWizardStep = 0 | 1 | 2 | 3;
 
@@ -37,6 +37,12 @@ export const INITIAL_CREATE_SHOP_FORM: CreateShopFormValues = {
   merge_order: false,
   return_option: false,
   customer_ticket: false,
+  venue_management_enabled: false,
+  qr_ordering_enabled: false,
+  table_ordering_enabled: false,
+  room_service_enabled: false,
+  pickup_ordering_enabled: false,
+  drive_thru_enabled: false,
   is_msg_activated: false,
   single_msg: false,
   address_line_1: "",

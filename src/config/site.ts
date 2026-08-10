@@ -10,7 +10,7 @@ export const siteConfig = {
   apiBaseUrl: process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api",
   /** Same-origin DMS API base (proxied by Next.js rewrites). */
   dmsApiBaseUrl: process.env.NEXT_PUBLIC_DMS_API_BASE_URL ?? "/dms-api",
-  tunnelHost: process.env.NEXT_PUBLIC_TUNNEL_HOST ?? "superadmin.yaadro.online",
+  tunnelHost: process.env.NEXT_PUBLIC_TUNNEL_HOST ?? "uaesuperadmin.yaadro.online",
   developmentMode: process.env.NEXT_PUBLIC_DEVELOPMENT_MODE === "true",
   numverifyAccessKey: process.env.NEXT_PUBLIC_NUMVERIFY_ACCESS_KEY ?? "",
   googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "",

@@ -1,5 +1,5 @@
 # Cloudflare Tunnel — local superadmin frontend
-# Hostname: https://superadmin.yaadro.online → http://127.0.0.1:3002
+# Hostname: https://uaesuperadmin.yaadro.online → http://127.0.0.1:3005
 #
 # Tunnel name: yaadro-superadmin-uae
 # Tunnel id:   71bc6dd4-3ef7-42bf-aad1-13e118fc85f0
@@ -11,9 +11,10 @@ tunnel: 71bc6dd4-3ef7-42bf-aad1-13e118fc85f0
 credentials-file: C:\Users\codet\.cloudflared\71bc6dd4-3ef7-42bf-aad1-13e118fc85f0.json
 
 ingress:
-  - hostname: superadmin.yaadro.online
-    service: http://127.0.0.1:3002
+  - hostname: uaesuperadmin.yaadro.online
+    service: http://127.0.0.1:3005
     originRequest:
+      httpHostHeader: uaesuperadmin.yaadro.online
       noTLSVerify: false
       connectTimeout: 30s
   - service: http_status:404

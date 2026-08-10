@@ -59,6 +59,7 @@ import {
   revokeShopPhotoPreview,
   type ShopPhotoSelection,
 } from "@/lib/shop-photo";
+import { cascadeVenueMasterFlagsSnake } from "@/lib/venue-feature-flags";
 import { cn } from "@/lib/utils";
 
 const STEPS = [
@@ -445,7 +446,7 @@ export function CreateShopWizard() {
     }
 
     setForm((prev) => {
-      const next = { ...prev, [key]: value };
+      let next = { ...prev, [key]: value };
       if (key === "ecom_enabled" && value === false) {
         next.ecom_order_confirmation_enabled = false;
         next.customer_ticket = false;
@@ -453,6 +454,16 @@ export function CreateShopWizard() {
       if (key === "is_msg_activated" && value === false) {
         next.single_msg = false;
       }
+      const cascaded = cascadeVenueMasterFlagsSnake({
+        ecom_enabled: next.ecom_enabled,
+        venue_management_enabled: next.venue_management_enabled,
+        qr_ordering_enabled: next.qr_ordering_enabled,
+        table_ordering_enabled: next.table_ordering_enabled,
+        room_service_enabled: next.room_service_enabled,
+        pickup_ordering_enabled: next.pickup_ordering_enabled,
+        drive_thru_enabled: next.drive_thru_enabled,
+      });
+      next = { ...next, ...cascaded };
       if (key === "shop_name") {
         next.shop_name = String(value).slice(0, SHOP_NAME_MAX_LENGTH);
         const trimmedName = next.shop_name.trim();
@@ -912,6 +923,12 @@ export function CreateShopWizard() {
     { key: "merge_order", label: "Merge orders" },
     { key: "return_option", label: "Return option" },
     { key: "customer_ticket", label: "Customer tickets" },
+    { key: "venue_management_enabled", label: "Venue management" },
+    { key: "table_ordering_enabled", label: "Table ordering" },
+    { key: "room_service_enabled", label: "Room service" },
+    { key: "qr_ordering_enabled", label: "QR ordering" },
+    { key: "pickup_ordering_enabled", label: "Pickup ordering" },
+    { key: "drive_thru_enabled", label: "Drive-thru" },
     { key: "is_msg_activated", label: "Messaging activated" },
     { key: "single_msg", label: "Single message" },
   ];
@@ -1342,6 +1359,64 @@ export function CreateShopWizard() {
                 disabled={!form.ecom_enabled}
                 error={showError("customer_ticket")}
                 onChange={(v) => update("customer_ticket", v)}
+              />
+              <FeatureToggleRow
+                id="venue_management_enabled"
+                label="Venue management"
+                description="Dining areas, serve locations, and QR setup."
+                checked={form.venue_management_enabled}
+                disabled={!form.ecom_enabled}
+                error={showError("venue_management_enabled")}
+                onChange={(v) => update("venue_management_enabled", v)}
+              />
+              <FeatureToggleRow
+                id="table_ordering_enabled"
+                label="Table ordering"
+                description="Dine-in / table service. Requires venue + ecom."
+                checked={form.table_ordering_enabled}
+                disabled={!form.ecom_enabled || !form.venue_management_enabled}
+                error={showError("table_ordering_enabled")}
+                onChange={(v) => update("table_ordering_enabled", v)}
+              />
+              <FeatureToggleRow
+                id="room_service_enabled"
+                label="Room service"
+                description="In-room ordering. Requires venue + ecom."
+                checked={form.room_service_enabled}
+                disabled={!form.ecom_enabled || !form.venue_management_enabled}
+                error={showError("room_service_enabled")}
+                onChange={(v) => update("room_service_enabled", v)}
+              />
+              <FeatureToggleRow
+                id="qr_ordering_enabled"
+                label="QR ordering"
+                description="Table / room QR deep links. Requires venue + table or room."
+                checked={form.qr_ordering_enabled}
+                disabled={
+                  !form.ecom_enabled ||
+                  !form.venue_management_enabled ||
+                  (!form.table_ordering_enabled && !form.room_service_enabled)
+                }
+                error={showError("qr_ordering_enabled")}
+                onChange={(v) => update("qr_ordering_enabled", v)}
+              />
+              <FeatureToggleRow
+                id="pickup_ordering_enabled"
+                label="Pickup ordering"
+                description="Customer pickup. Requires ecom."
+                checked={form.pickup_ordering_enabled}
+                disabled={!form.ecom_enabled}
+                error={showError("pickup_ordering_enabled")}
+                onChange={(v) => update("pickup_ordering_enabled", v)}
+              />
+              <FeatureToggleRow
+                id="drive_thru_enabled"
+                label="Drive-thru"
+                description="Drive-thru lanes. Requires ecom."
+                checked={form.drive_thru_enabled}
+                disabled={!form.ecom_enabled}
+                error={showError("drive_thru_enabled")}
+                onChange={(v) => update("drive_thru_enabled", v)}
               />
               <FeatureToggleRow
                 id="is_msg_activated"
