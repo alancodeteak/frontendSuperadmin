@@ -65,6 +65,21 @@ function normalizeSlot(raw: unknown): OperatingTimeSlot | null {
   return { open, close };
 }
 
+/** True when close is earlier than open → crosses midnight into the next day. */
+export function isOvernightSlot(slot: OperatingTimeSlot): boolean {
+  const open = normalizeTime(slot.open);
+  const close = normalizeTime(slot.close);
+  if (!open || !close) return false;
+  return open > close;
+}
+
+function formatSlotLabel(slot: OperatingTimeSlot): string {
+  if (isOvernightSlot(slot)) {
+    return `${slot.open} – ${slot.close} (+1 day)`;
+  }
+  return `${slot.open} – ${slot.close}`;
+}
+
 /** Parse API / legacy values into the sun–sat week payload. */
 export function parseOperatingHours(value: unknown): ShopOperatingHours {
   const base = emptyHours();
@@ -108,6 +123,11 @@ export function parseOperatingHours(value: unknown): ShopOperatingHours {
   return base;
 }
 
+/**
+ * Same-day: open < close (e.g. 09:00–22:00).
+ * Overnight: open > close (e.g. 05:00–03:00 next morning) — JSON shape unchanged.
+ * open === close is invalid.
+ */
 export function validateOperatingHours(
   hours: ShopOperatingHours,
 ): string | null {
@@ -119,8 +139,8 @@ export function validateOperatingHours(
       if (!open || !close) {
         return `${DAY_LABELS[day]}: times must be HH:MM (24-hour)`;
       }
-      if (open >= close) {
-        return `${DAY_LABELS[day]} slot ${i + 1}: close must be after open`;
+      if (open === close) {
+        return `${DAY_LABELS[day]} slot ${i + 1}: open and close must differ (use open > close for overnight, e.g. 05:00–03:00)`;
       }
     }
   }
@@ -152,7 +172,7 @@ export function formatOperatingHoursSummary(value: unknown): string {
     const slots = hours[day];
     if (slots.length === 0) return `${DAY_LABELS[day].slice(0, 3)} closed`;
     return `${DAY_LABELS[day].slice(0, 3)} ${slots
-      .map((s) => `${s.open}–${s.close}`)
+      .map((s) => formatSlotLabel(s).replace(/\s+/g, ""))
       .join(", ")}`;
   });
   return parts.join(" · ");
@@ -217,7 +237,8 @@ export function OperatingHoursEditor({
             Operating hours
           </p>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Empty day = closed. Times use 24-hour HH:MM.
+            Empty day = closed. Times use 24-hour HH:MM. Overnight: set close
+            earlier than open (e.g. 05:00–03:00 closes next morning).
           </p>
         </div>
       </div>
@@ -290,6 +311,7 @@ export function OperatingHoursEditor({
                       <div className="space-y-1">
                         <p className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
                           Close
+                          {isOvernightSlot(slot) ? " (+1 day)" : ""}
                         </p>
                         <Input
                           type="time"
@@ -359,7 +381,7 @@ export function OperatingHoursDisplay({ value }: { value: unknown }) {
             <span className="min-w-0 flex-1 truncate text-sm font-medium">
               {slots.length === 0
                 ? "Closed"
-                : slots.map((s) => `${s.open} – ${s.close}`).join(", ")}
+                : slots.map((s) => formatSlotLabel(s)).join(", ")}
             </span>
           </div>
         );
