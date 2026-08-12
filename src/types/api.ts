@@ -396,6 +396,47 @@ export type CreateRiderInput = {
   delivery_partner_id?: string;
 };
 
+export type VenuePickerScope =
+  | "table"
+  | "room"
+  | "pickup_counter"
+  | "all_venue";
+
+export type VenuePicker = {
+  venue_picker_id: string;
+  shop_id?: string;
+  name: string;
+  phone: string;
+  scope: VenuePickerScope;
+  is_blocked?: boolean;
+  is_deleted?: boolean;
+  requires_password_reset?: boolean;
+  dining_area_ids?: number[];
+  third_party_id?: string | null;
+  last_login?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  [key: string]: unknown;
+};
+
+export type VenuePickerListItem = {
+  venue_picker_id: string;
+  name: string;
+  phone: string;
+  scope: VenuePickerScope;
+  is_blocked: boolean;
+  last_login?: string | null;
+};
+
+export type CreateVenuePickerInput = {
+  name: string;
+  phone: string;
+  password: string;
+  scope: VenuePickerScope;
+  dining_area_ids?: number[];
+  third_party_id?: string | null;
+};
+
 /** Flattened on list; full `config` only on GET by id / create / patch / clone. */
 export type PosTemplateSummary = {
   id: number;
@@ -721,6 +762,7 @@ export type ReportDataset =
   | "orders"
   | "customers"
   | "delivery_partners"
+  | "venue_pickers"
   | "analytics";
 
 export type TriggerShopLogoutResponse = {

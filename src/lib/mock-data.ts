@@ -2,6 +2,7 @@ import type {
   AnalyticsCustomerRow,
   AnalyticsTicket,
   CreateRiderInput,
+  CreateVenuePickerInput,
   CreateShopInput,
   DashboardChartsResponse,
   DashboardSummaryResponse,
@@ -26,6 +27,9 @@ import type {
   UpdatePosTemplateInput,
   RestaurantPerformanceRow,
   Rider,
+  VenuePicker,
+  VenuePickerListItem,
+  VenuePickerScope,
   RotateIntegrationTokenResponse,
   ShopActivityResponse,
   ShopDeliverySettings,
@@ -247,6 +251,60 @@ const mockRidersByShop: Record<string, Rider[]> = {
     },
   ],
 };
+
+const mockVenuePickersByShop: Record<string, VenuePicker[]> = {
+  SHOP001: [
+    {
+      venue_picker_id: "VP1001",
+      shop_id: "SHOP001",
+      name: "Table Host A",
+      phone: "971500004444",
+      scope: "table",
+      is_blocked: false,
+      is_deleted: false,
+      dining_area_ids: [1, 2],
+      third_party_id: null,
+      last_login: null,
+    },
+    {
+      venue_picker_id: "VP1002",
+      shop_id: "SHOP001",
+      name: "Pickup Desk",
+      phone: "971500005555",
+      scope: "pickup_counter",
+      is_blocked: false,
+      is_deleted: false,
+      dining_area_ids: [],
+      third_party_id: "POS-PK1",
+      last_login: "2026-07-10T08:00:00Z",
+    },
+  ],
+  SHOP002: [
+    {
+      venue_picker_id: "VP2001",
+      shop_id: "SHOP002",
+      name: "Room Attendant",
+      phone: "971500006666",
+      scope: "room",
+      is_blocked: true,
+      is_deleted: false,
+      dining_area_ids: [3],
+      third_party_id: null,
+      last_login: null,
+    },
+  ],
+};
+
+function toVenuePickerListItem(picker: VenuePicker): VenuePickerListItem {
+  return {
+    venue_picker_id: picker.venue_picker_id,
+    name: picker.name,
+    phone: picker.phone,
+    scope: picker.scope,
+    is_blocked: Boolean(picker.is_blocked),
+    last_login: picker.last_login ?? null,
+  };
+}
 
 function seededPosTemplate(
   id: number,
@@ -1182,6 +1240,130 @@ export async function mockDeleteRider(shopId: string, dpId: string, hard = false
       : r,
   );
   return delay({ ok: true, is_deleted: true, mode: "soft" });
+}
+
+export async function mockListVenuePickers(
+  shopId: string,
+  params?: {
+    page?: number;
+    limit?: number;
+    q?: string;
+    is_blocked?: boolean;
+    scope?: VenuePickerScope;
+    dining_area_id?: number;
+  },
+): Promise<Paginated<VenuePickerListItem>> {
+  let items = (mockVenuePickersByShop[shopId] ?? []).filter(
+    (p) => p.is_deleted !== true,
+  );
+  if (params?.q) {
+    const q = params.q.toLowerCase();
+    items = items.filter(
+      (p) =>
+        p.name.toLowerCase().includes(q) ||
+        p.phone.toLowerCase().includes(q) ||
+        p.venue_picker_id.toLowerCase().includes(q),
+    );
+  }
+  if (typeof params?.is_blocked === "boolean") {
+    items = items.filter((p) => Boolean(p.is_blocked) === params.is_blocked);
+  }
+  if (params?.scope) {
+    items = items.filter((p) => p.scope === params.scope);
+  }
+  if (typeof params?.dining_area_id === "number") {
+    items = items.filter((p) =>
+      (p.dining_area_ids ?? []).includes(params.dining_area_id!),
+    );
+  }
+  const page = params?.page ?? 1;
+  const limit = params?.limit ?? 50;
+  const start = (page - 1) * limit;
+  const pageItems = items.slice(start, start + limit).map(toVenuePickerListItem);
+  return delay({
+    items: pageItems,
+    total: items.length,
+    page,
+    limit,
+  });
+}
+
+export async function mockCreateVenuePicker(
+  shopId: string,
+  input: CreateVenuePickerInput,
+) {
+  const list = mockVenuePickersByShop[shopId] ?? [];
+  const picker: VenuePicker = {
+    venue_picker_id: `VP${1000 + list.length + 1}`,
+    shop_id: shopId,
+    name: input.name,
+    phone: input.phone,
+    scope: input.scope,
+    dining_area_ids: input.dining_area_ids ?? [],
+    third_party_id: input.third_party_id ?? null,
+    is_blocked: false,
+    is_deleted: false,
+    requires_password_reset: false,
+    last_login: null,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+  if (!mockVenuePickersByShop[shopId]) mockVenuePickersByShop[shopId] = [];
+  mockVenuePickersByShop[shopId].unshift(picker);
+  return delay(picker);
+}
+
+export async function mockGetVenuePicker(shopId: string, pickerId: string) {
+  const picker = (mockVenuePickersByShop[shopId] ?? []).find(
+    (p) => p.venue_picker_id === pickerId,
+  );
+  if (!picker) {
+    throw Object.assign(new Error("Venue picker not found"), { status: 404 });
+  }
+  return delay(picker);
+}
+
+export async function mockPatchVenuePicker(
+  shopId: string,
+  pickerId: string,
+  input: Record<string, unknown>,
+) {
+  const list = mockVenuePickersByShop[shopId] ?? [];
+  const idx = list.findIndex((p) => p.venue_picker_id === pickerId);
+  if (idx >= 0) {
+    list[idx] = {
+      ...list[idx],
+      ...input,
+      updated_at: new Date().toISOString(),
+    } as VenuePicker;
+    return delay(list[idx]);
+  }
+  return delay({ venue_picker_id: pickerId, ...input });
+}
+
+export async function mockResetVenuePickerPassword() {
+  return delay({ password_reset: true });
+}
+
+export async function mockBlockVenuePicker(shopId: string, pickerId: string) {
+  return mockPatchVenuePicker(shopId, pickerId, { is_blocked: true });
+}
+
+export async function mockUnblockVenuePicker(shopId: string, pickerId: string) {
+  return mockPatchVenuePicker(shopId, pickerId, { is_blocked: false });
+}
+
+export async function mockDeleteVenuePicker(shopId: string, pickerId: string) {
+  mockVenuePickersByShop[shopId] = (mockVenuePickersByShop[shopId] ?? []).map(
+    (p) =>
+      p.venue_picker_id === pickerId
+        ? { ...p, is_deleted: true, updated_at: new Date().toISOString() }
+        : p,
+  );
+  const picker = (mockVenuePickersByShop[shopId] ?? []).find(
+    (p) => p.venue_picker_id === pickerId,
+  );
+  return delay(picker ?? { venue_picker_id: pickerId, is_deleted: true });
 }
 
 function toPosTemplateSummary(template: PosTemplate): PosTemplateSummary {
@@ -2262,6 +2444,21 @@ export async function mockExportReportBlob(
       ["DP1001", "Ahmed Hassan", 54, 96.2, 24, 4.8],
       ["DP1002", "Ravi Kumar", 41, 91.5, 28, 4.6],
       ["DP1003", "Sara Khan", 33, 94.1, 26, 4.7],
+    ];
+  } else if (params.dataset === "venue_pickers") {
+    sheetName = "Venue pickers";
+    rows = [
+      [
+        "venue_picker_id",
+        "venue_picker_name",
+        "phone",
+        "scope",
+        "is_blocked",
+        "orders",
+      ],
+      ["VP1001", "Table Host A", "971500004444", "table", "false", 18],
+      ["VP1002", "Pickup Desk", "971500005555", "pickup_counter", "false", 12],
+      ["VP2001", "Room Attendant", "971500006666", "room", "true", 3],
     ];
   } else {
     sheetName = "Orders";

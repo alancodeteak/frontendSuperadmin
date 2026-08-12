@@ -5,6 +5,7 @@ import {
   BikeIcon,
   BracesIcon,
   CalendarRangeIcon,
+  ClipboardListIcon,
   EyeIcon,
   FileDownIcon,
   FileSpreadsheetIcon,
@@ -65,6 +66,13 @@ const DATASETS: DatasetMeta[] = [
     description: "Riders linked to the shop and their assignments.",
     formats: "XLSX",
     icon: BikeIcon,
+  },
+  {
+    value: "venue_pickers",
+    label: "Venue pickers",
+    description: "Venue picker accounts, scope and activity for the shop.",
+    formats: "XLSX",
+    icon: ClipboardListIcon,
   },
   {
     value: "analytics",

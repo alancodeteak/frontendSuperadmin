@@ -12,10 +12,14 @@ import {
 } from "@/lib/api/shops";
 import { getRider, listRiders } from "@/lib/api/riders";
 import {
+  getVenuePicker,
+  listVenuePickers,
+} from "@/lib/api/venue-pickers";
+import {
   getShopLink,
   getSyncStatus,
 } from "@/lib/api/pos";
-import type { ShopStatus } from "@/types/api";
+import type { ShopStatus, VenuePickerScope } from "@/types/api";
 
 type ShopListParams = {
   page?: number;
@@ -41,6 +45,10 @@ export const shopKeys = {
     [...shopKeys.all, "riders", shopId, params] as const,
   rider: (shopId: string, dpId: string) =>
     [...shopKeys.all, "rider", shopId, dpId] as const,
+  venuePickers: (shopId: string, params: Record<string, unknown>) =>
+    [...shopKeys.all, "venue-pickers", shopId, params] as const,
+  venuePicker: (shopId: string, pickerId: string) =>
+    [...shopKeys.all, "venue-picker", shopId, pickerId] as const,
   posLink: (shopId: string) => [...shopKeys.all, "pos-link", shopId] as const,
   syncStatus: (shopId: string) =>
     [...shopKeys.all, "sync-status", shopId] as const,
@@ -129,6 +137,32 @@ export function shopRiderQuery(shopId: string, dpId: string) {
     queryKey: shopKeys.rider(shopId, dpId),
     queryFn: () => getRider(shopId, dpId),
     enabled: Boolean(shopId && dpId),
+  });
+}
+
+export function shopVenuePickersQuery(
+  shopId: string,
+  params: {
+    page?: number;
+    limit?: number;
+    q?: string;
+    is_blocked?: boolean;
+    scope?: VenuePickerScope;
+    dining_area_id?: number;
+  },
+) {
+  return queryOptions({
+    queryKey: shopKeys.venuePickers(shopId, params),
+    queryFn: () => listVenuePickers(shopId, params),
+    enabled: Boolean(shopId),
+  });
+}
+
+export function shopVenuePickerQuery(shopId: string, pickerId: string) {
+  return queryOptions({
+    queryKey: shopKeys.venuePicker(shopId, pickerId),
+    queryFn: () => getVenuePicker(shopId, pickerId),
+    enabled: Boolean(shopId && pickerId),
   });
 }
 

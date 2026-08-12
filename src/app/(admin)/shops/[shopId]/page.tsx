@@ -25,6 +25,7 @@ import {
 } from "@/components/shops/shop-confirm-dialog";
 import { IntegrationTokenDialog } from "@/components/shops/integration-token-dialog";
 import { RiderEditDialog } from "@/components/shops/rider-edit-dialog";
+import { VenuePickerEditDialog } from "@/components/shops/venue-picker-edit-dialog";
 import { CopyButton } from "@/components/shared/copy-button";
 import { DetailList } from "@/components/shared/detail-list";
 import {
@@ -78,12 +79,20 @@ import {
   unblockRider,
 } from "@/lib/api/riders";
 import {
+  blockVenuePicker,
+  createVenuePicker,
+  deleteVenuePicker,
+  resetVenuePickerPassword,
+  unblockVenuePicker,
+} from "@/lib/api/venue-pickers";
+import {
   shopDetailQuery,
   shopPosLinkQuery,
   shopPromotionQuery,
   shopProductsQuery,
   shopRidersQuery,
   shopSubscriptionQuery,
+  shopVenuePickersQuery,
 } from "@/lib/queries/shops";
 import {
   digitsOnly,
@@ -98,6 +107,11 @@ import {
   validateVenueMasterFlagsSnake,
   venueEcomSyncHint,
 } from "@/lib/venue-feature-flags";
+import {
+  formatVenuePickerScope,
+  parseDiningAreaIds,
+  VENUE_PICKER_SCOPE_OPTIONS,
+} from "@/lib/venue-picker-form";
 import type {
   Rider,
   ShopDeliverySettings,
@@ -105,6 +119,8 @@ import type {
   ShopFeatures,
   ShopProduct,
   ShopPromotionSettings,
+  VenuePickerListItem,
+  VenuePickerScope,
 } from "@/types/api";
 
 const TABS = [
@@ -116,6 +132,7 @@ const TABS = [
   "subscription",
   "promotion",
   "riders",
+  "pickers",
   "pos",
 ] as const;
 
@@ -130,6 +147,7 @@ const TAB_LABELS: Record<Tab, string> = {
   subscription: "Subscription",
   promotion: "Promotion",
   riders: "Riders",
+  pickers: "Pickers",
   pos: "POS",
 };
 
@@ -542,6 +560,7 @@ export default function ShopDetailPage() {
           <PromotionTab shopId={shopId} shop={shop} />
         ) : null}
         {tab === "riders" ? <RidersTab shopId={shopId} /> : null}
+        {tab === "pickers" ? <PickersTab shopId={shopId} /> : null}
         {tab === "pos" ? <ShopPosTab shopId={shopId} /> : null}
       </div>
 
@@ -3177,6 +3196,445 @@ function RidersTab({ shopId }: { shopId: string }) {
         open={Boolean(editDpId)}
         onOpenChange={(next) => {
           if (!next) setEditDpId(null);
+        }}
+        onChanged={load}
+      />
+    </div>
+  );
+}
+
+function PickersTab({ shopId }: { shopId: string }) {
+  const [form, setForm] = useState({
+    name: "",
+    phone: "",
+    password: "",
+    scope: "all_venue" as VenuePickerScope,
+    dining_area_ids: "",
+    third_party_id: "",
+  });
+  const [message, setMessage] = useState<string | null>(null);
+  const [editPickerId, setEditPickerId] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [blockedFilter, setBlockedFilter] = useState<"all" | "blocked" | "active">(
+    "all",
+  );
+
+  const pickersQuery = useQuery(
+    shopVenuePickersQuery(shopId, {
+      page: 1,
+      limit: 50,
+      is_blocked:
+        blockedFilter === "all"
+          ? undefined
+          : blockedFilter === "blocked",
+    }),
+  );
+  const items = pickersQuery.data?.items ?? [];
+  const loading = pickersQuery.isPending;
+  const error = pickersQuery.error
+    ? pickersQuery.error instanceof Error
+      ? pickersQuery.error.message
+      : "Failed to load pickers"
+    : null;
+  const load = async () => {
+    await pickersQuery.refetch();
+  };
+
+  const pickerColumns: ColumnDef<VenuePickerListItem>[] = [
+    {
+      id: "venue_picker_id",
+      accessorFn: (row) => String(row.venue_picker_id ?? ""),
+      header: "ID",
+      cell: ({ row }) => {
+        const id = String(row.original.venue_picker_id ?? "");
+        if (!id) return "—";
+        return (
+          <div className="flex min-w-0 items-center gap-1">
+            <span className="truncate font-mono text-xs">{id}</span>
+            <CopyButton
+              value={id}
+              iconOnly
+              size={13}
+              label={`Copy ${id}`}
+              className="size-6 shrink-0 p-0"
+            />
+          </div>
+        );
+      },
+      meta: { label: "ID" },
+      size: 140,
+    },
+    {
+      accessorKey: "name",
+      header: "Name",
+      cell: ({ row }) => (
+        <span className="truncate font-medium">
+          {row.original.name || "—"}
+        </span>
+      ),
+      meta: { label: "Name" },
+      size: 180,
+    },
+    {
+      accessorKey: "phone",
+      header: "Phone",
+      cell: ({ row }) => {
+        const phone = row.original.phone;
+        if (!phone) return "—";
+        return (
+          <div className="flex min-w-0 items-center gap-1">
+            <span className="truncate tabular-nums">{phone}</span>
+            <CopyButton
+              value={phone}
+              iconOnly
+              size={13}
+              label={`Copy ${phone}`}
+              className="size-6 shrink-0 p-0"
+            />
+          </div>
+        );
+      },
+      meta: { label: "Phone" },
+      size: 160,
+    },
+    {
+      id: "scope",
+      accessorFn: (row) => String(row.scope ?? ""),
+      header: "Scope",
+      cell: ({ row }) => (
+        <span className="truncate text-muted-foreground">
+          {formatVenuePickerScope(row.original.scope)}
+        </span>
+      ),
+      meta: { label: "Scope" },
+      size: 140,
+    },
+    {
+      id: "status",
+      accessorFn: (row) => (row.is_blocked ? "blocked" : "active"),
+      header: "Status",
+      cell: ({ row }) =>
+        row.original.is_blocked ? (
+          <StatusBadge status="blocked" />
+        ) : (
+          <StatusBadge status="active" />
+        ),
+      meta: { label: "Status" },
+      size: 110,
+    },
+    {
+      id: "actions",
+      enableSorting: false,
+      enableHiding: false,
+      header: () => <span className="sr-only">Actions</span>,
+      cell: ({ row }) => {
+        const picker = row.original;
+        const id = String(picker.venue_picker_id ?? "");
+        const blocked = Boolean(picker.is_blocked);
+
+        async function onToggleBlock() {
+          try {
+            if (blocked) await unblockVenuePicker(shopId, id);
+            else await blockVenuePicker(shopId, id);
+            await load();
+            appToast.success(
+              blocked ? "Picker unblocked." : "Picker blocked.",
+            );
+          } catch (err) {
+            const msg = parseApiFormError(err, "Action failed").message;
+            setMessage(msg);
+            appToast.error(msg);
+          }
+        }
+
+        async function onResetPassword() {
+          const password = prompt("New password");
+          if (!password) return;
+          try {
+            await resetVenuePickerPassword(shopId, id, password);
+            appToast.success("Picker password reset.");
+          } catch (err) {
+            const msg = parseApiFormError(err, "Reset failed").message;
+            setMessage(msg);
+            appToast.error(msg);
+          }
+        }
+
+        async function onSoftDelete() {
+          if (!confirm("Soft delete picker?")) return;
+          try {
+            await deleteVenuePicker(shopId, id);
+            await load();
+            appToast.success("Picker soft-deleted.");
+          } catch (err) {
+            const msg = parseApiFormError(err, "Delete failed").message;
+            setMessage(msg);
+            appToast.error(msg);
+          }
+        }
+
+        return (
+          <div className="flex items-center justify-end gap-0.5">
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    type="button"
+                    size="icon-xs"
+                    variant="ghost"
+                    aria-label="Edit picker"
+                    onClick={() => setEditPickerId(id)}
+                  />
+                }
+              >
+                <PencilIcon className="size-3.5" />
+              </TooltipTrigger>
+              <TooltipContent>Edit</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    type="button"
+                    size="icon-xs"
+                    variant="ghost"
+                    aria-label={blocked ? "Unblock picker" : "Block picker"}
+                    onClick={() => void onToggleBlock()}
+                  />
+                }
+              >
+                {blocked ? (
+                  <ShieldCheckIcon className="size-3.5" />
+                ) : (
+                  <BanIcon className="size-3.5" />
+                )}
+              </TooltipTrigger>
+              <TooltipContent>{blocked ? "Unblock" : "Block"}</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    type="button"
+                    size="icon-xs"
+                    variant="ghost"
+                    aria-label="Reset password"
+                    onClick={() => void onResetPassword()}
+                  />
+                }
+              >
+                <KeyRoundIcon className="size-3.5" />
+              </TooltipTrigger>
+              <TooltipContent>Reset password</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    type="button"
+                    size="icon-xs"
+                    variant="ghost"
+                    aria-label="Soft delete picker"
+                    onClick={() => void onSoftDelete()}
+                  />
+                }
+              >
+                <UserMinusIcon className="size-3.5" />
+              </TooltipTrigger>
+              <TooltipContent>Soft delete</TooltipContent>
+            </Tooltip>
+          </div>
+        );
+      },
+      meta: { label: "Actions" },
+      size: 140,
+    },
+  ];
+
+  async function onCreate(e: React.FormEvent) {
+    e.preventDefault();
+    setMessage(null);
+    if (!isValidUaePhone(form.phone, "mobile")) {
+      const msg = "Enter a valid UAE mobile number. Leading 0 is optional.";
+      setMessage(msg);
+      appToast.error(msg);
+      return;
+    }
+    const diningAreaIds = parseDiningAreaIds(form.dining_area_ids);
+    if (diningAreaIds === null) {
+      const msg =
+        "Dining area IDs must be positive integers (comma-separated).";
+      setMessage(msg);
+      appToast.error(msg);
+      return;
+    }
+    setCreating(true);
+    try {
+      await createVenuePicker(shopId, {
+        name: form.name.trim(),
+        phone: digitsOnly(form.phone),
+        password: form.password,
+        scope: form.scope,
+        dining_area_ids: diningAreaIds,
+        third_party_id: form.third_party_id.trim() || null,
+      });
+      setForm({
+        name: "",
+        phone: "",
+        password: "",
+        scope: "all_venue",
+        dining_area_ids: "",
+        third_party_id: "",
+      });
+      await load();
+      appToast.success("Picker created.");
+    } catch (err) {
+      const msg = parseApiFormError(err, "Create failed").message;
+      setMessage(msg);
+      appToast.error(msg);
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  return (
+    <div className="space-y-12">
+      <ShopSection
+        title="Add picker"
+        description="Creates a venue picker linked to this shop."
+        className="max-w-3xl"
+      >
+        <form onSubmit={onCreate} className="grid gap-4 sm:grid-cols-2">
+          <Field label="Name" className="space-y-1.5 sm:col-span-2">
+            <Input
+              required
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+            />
+          </Field>
+          <Field label="Phone">
+            <div className="flex overflow-hidden rounded-md border border-input bg-background focus-within:ring-1 focus-within:ring-ring">
+              <div className="flex items-center border-r border-input bg-muted px-3 text-sm text-muted-foreground">
+                {UAE_COUNTRY_CODE}
+              </div>
+              <Input
+                required
+                value={form.phone}
+                className="border-0 shadow-none focus-visible:ring-0"
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    phone: digitsOnly(e.target.value).slice(0, 10),
+                  })
+                }
+                placeholder="501234567 or 0501234567"
+              />
+            </div>
+          </Field>
+          <Field label="Password">
+            <Input
+              required
+              type="password"
+              minLength={8}
+              value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
+            />
+          </Field>
+          <Field label="Scope">
+            <Select
+              value={form.scope}
+              onValueChange={(value) =>
+                setForm({
+                  ...form,
+                  scope: (value as VenuePickerScope) ?? "all_venue",
+                })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {VENUE_PICKER_SCOPE_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Dining area IDs">
+            <Input
+              placeholder="e.g. 1, 2, 3"
+              value={form.dining_area_ids}
+              onChange={(e) =>
+                setForm({ ...form, dining_area_ids: e.target.value })
+              }
+            />
+          </Field>
+          <Field label="Third party ID" className="space-y-1.5 sm:col-span-2">
+            <Input
+              placeholder="Optional"
+              value={form.third_party_id}
+              onChange={(e) =>
+                setForm({ ...form, third_party_id: e.target.value })
+              }
+            />
+          </Field>
+          <div className="sm:col-span-2">
+            <Button type="submit" disabled={creating}>
+              {creating ? "Creating picker…" : "Create picker"}
+            </Button>
+          </div>
+        </form>
+      </ShopSection>
+
+      {message ? <p className="text-sm text-destructive">{message}</p> : null}
+      {loading ? <LoadingState /> : null}
+      {error ? <ErrorState message={error} onRetry={() => void load()} /> : null}
+
+      {!loading && !error ? (
+        <ShopSection title="Pickers" className="max-w-none">
+          <div className="mb-4 flex justify-end">
+            <Select
+              value={blockedFilter}
+              onValueChange={(value) =>
+                setBlockedFilter(
+                  (value as "all" | "blocked" | "active") ?? "all",
+                )
+              }
+            >
+              <SelectTrigger className="w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All pickers</SelectItem>
+                <SelectItem value="active">Active only</SelectItem>
+                <SelectItem value="blocked">Blocked only</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <DataTable
+            columns={pickerColumns}
+            data={items}
+            searchPlaceholder="Search pickers…"
+            emptyMessage="No pickers yet."
+            getRowId={(row, index) =>
+              String(row.venue_picker_id ?? index)
+            }
+            initialPageSize={10}
+          />
+        </ShopSection>
+      ) : null}
+
+      <VenuePickerEditDialog
+        shopId={shopId}
+        pickerId={editPickerId}
+        open={Boolean(editPickerId)}
+        onOpenChange={(next) => {
+          if (!next) setEditPickerId(null);
         }}
         onChanged={load}
       />
