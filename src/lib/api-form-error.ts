@@ -50,6 +50,7 @@ export const SHOP_FIELD_LABELS: Record<string, string> = {
   is_marketing_enabled: "Marketing enabled",
   service_configs: "Service configs",
   allow_anonymous_table_orders: "Guest QR checkout",
+  table_session_policy: "Table session policy",
   min_order_amount: "Min order amount",
   delivery_charge: "Delivery charge",
   delivery_radius_km: "Delivery radius",

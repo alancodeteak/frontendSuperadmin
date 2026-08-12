@@ -172,6 +172,11 @@ export type ShopServiceConfigs = Partial<
   >
 >;
 
+export type TableSessionPolicyValue =
+  | "single_order"
+  | "one_active_order"
+  | "multi_order";
+
 export type ShopEcomSettings = {
   /** Hostname only; unique when set. Send null on PATCH to clear. */
   domain?: string | null;
@@ -207,6 +212,8 @@ export type ShopEcomSettings = {
   service_configs?: ShopServiceConfigs | null;
   /** Guest QR checkout without OTP for table/room/drive-thru. */
   allow_anonymous_table_orders?: boolean | null;
+  /** Table/room session behaviour for concurrent orders. */
+  table_session_policy?: TableSessionPolicyValue | null;
   [key: string]: unknown;
 };
 

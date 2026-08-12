@@ -549,6 +549,7 @@ export async function mockCreateShop(input: CreateShopInput): Promise<ShopDetail
         },
       },
       allow_anonymous_table_orders: false,
+      table_session_policy: "single_order",
       ...(input.ecom ?? {}),
     },
   });

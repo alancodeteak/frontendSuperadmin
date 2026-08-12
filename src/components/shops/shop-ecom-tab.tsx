@@ -14,15 +14,28 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { parseApiFormError } from "@/lib/api-form-error";
 import { appToast } from "@/lib/app-toast";
 import { patchShop } from "@/lib/api/shops";
+import {
+  normalizeTableSessionPolicy,
+  TABLE_SESSION_POLICY_OPTIONS,
+  tableSessionPolicyLabel,
+} from "@/lib/table-session-policy";
 import type {
   ShopDetail,
   ShopEcomSettings,
   ShopServiceConfigEntry,
   ShopServiceConfigs,
+  TableSessionPolicyValue,
 } from "@/types/api";
 
 const SERVICE_CONFIG_TYPES = [
@@ -312,8 +325,19 @@ function ecomFormFromData(ecom: ShopEcomSettings | null | undefined) {
     twitter_card: String(ecom?.twitter_card ?? ""),
     robots_index: Boolean(ecom?.robots_index ?? true),
     allow_anonymous_table_orders: Boolean(ecom?.allow_anonymous_table_orders),
+    table_session_policy: normalizeTableSessionPolicy(ecom?.table_session_policy),
     service_configs: serviceConfigsFormFromData(ecom?.service_configs),
   };
+}
+
+function isShopTableSessionPolicyEnabled(shop: ShopDetail) {
+  const tableOrdering = Boolean(
+    shop.features?.table_ordering_enabled ?? shop.table_ordering_enabled,
+  );
+  const roomService = Boolean(
+    shop.features?.room_service_enabled ?? shop.room_service_enabled,
+  );
+  return tableOrdering || roomService;
 }
 
 function isShopEcomEnabled(shop: ShopDetail) {
@@ -328,6 +352,7 @@ export function ShopEcomTab({
   onSaved: () => Promise<void>;
 }) {
   const ecomEnabled = isShopEcomEnabled(shop);
+  const showTableSessionPolicy = isShopTableSessionPolicyEnabled(shop);
   const initialForm = useMemo(() => ecomFormFromData(shop.ecom), [shop.ecom]);
   const [form, setForm] = useState(initialForm);
   const [editing, setEditing] = useState(false);
@@ -419,6 +444,9 @@ export function ShopEcomTab({
       twitter_card: form.twitter_card.trim() || null,
       robots_index: form.robots_index,
       allow_anonymous_table_orders: form.allow_anonymous_table_orders,
+      ...(showTableSessionPolicy
+        ? { table_session_policy: form.table_session_policy }
+        : {}),
       service_configs: serializeServiceConfigs(form.service_configs),
     };
 
@@ -478,6 +506,14 @@ export function ShopEcomTab({
                 label: "Guest QR checkout",
                 value: yesNo(ecom?.allow_anonymous_table_orders),
               },
+              ...(showTableSessionPolicy
+                ? [
+                    {
+                      label: "Table session policy",
+                      value: tableSessionPolicyLabel(ecom?.table_session_policy),
+                    },
+                  ]
+                : []),
               {
                 label: "Service configs",
                 value: formatServiceConfigSummary(ecom?.service_configs) || null,
@@ -646,6 +682,42 @@ export function ShopEcomTab({
               checked={form.allow_anonymous_table_orders}
               onChange={(v) => setField("allow_anonymous_table_orders", v)}
             />
+            {showTableSessionPolicy ? (
+              <div className="space-y-2 border-t border-border/70 px-3 py-3">
+                <Label htmlFor="ecom_table_session_policy">Table session policy</Label>
+                <p className="text-xs text-muted-foreground">
+                  Applies to table and room serve locations only. Pickup counters and
+                  drive-thru lanes are not session-gated.
+                </p>
+                <Select
+                  value={form.table_session_policy}
+                  onValueChange={(value) =>
+                    setField(
+                      "table_session_policy",
+                      value as TableSessionPolicyValue,
+                    )
+                  }
+                >
+                  <SelectTrigger id="ecom_table_session_policy">
+                    <SelectValue placeholder="Select policy" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TABLE_SESSION_POLICY_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  {
+                    TABLE_SESSION_POLICY_OPTIONS.find(
+                      (opt) => opt.value === form.table_session_policy,
+                    )?.description
+                  }
+                </p>
+              </div>
+            ) : null}
           </div>
 
           <div className="space-y-4">
