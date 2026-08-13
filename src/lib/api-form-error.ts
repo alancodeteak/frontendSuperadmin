@@ -53,6 +53,7 @@ export const SHOP_FIELD_LABELS: Record<string, string> = {
   table_session_policy: "Table session policy",
   min_order_amount: "Min order amount",
   delivery_charge: "Delivery charge",
+  free_delivery_above_amount: "Free delivery above",
   delivery_radius_km: "Delivery radius",
   address_line_1: "Address line 1",
   address_line_2: "Address line 2",

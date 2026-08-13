@@ -161,6 +161,8 @@ export type ShopServiceConfigEntry = {
   service_charge?: number;
   /** Delivery only. */
   delivery_charge?: number;
+  /** Delivery only; 0 = disabled (always apply delivery_charge). */
+  free_delivery_above_amount?: number;
   /** Delivery only; null = unlimited. */
   delivery_radius_km?: number | null;
 };

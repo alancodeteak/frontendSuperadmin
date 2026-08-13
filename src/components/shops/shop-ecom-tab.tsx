@@ -63,6 +63,7 @@ type ServiceConfigFormEntry = {
   requires_phone: boolean;
   service_charge: string;
   delivery_charge: string;
+  free_delivery_above_amount: string;
   delivery_radius_km: string;
 };
 
@@ -94,6 +95,12 @@ function defaultServiceConfigEntry(
       serviceType === "delivery"
         ? raw?.delivery_charge != null
           ? String(raw.delivery_charge)
+          : "0"
+        : "",
+    free_delivery_above_amount:
+      serviceType === "delivery"
+        ? raw?.free_delivery_above_amount != null
+          ? String(raw.free_delivery_above_amount)
           : "0"
         : "",
     delivery_radius_km:
@@ -139,11 +146,14 @@ function serializeServiceConfigs(form: ServiceConfigsForm): ShopServiceConfigs {
     };
     if (serviceType === "delivery") {
       const charge = Number(entry.delivery_charge.trim() || "0");
+      const freeAbove = Number(entry.free_delivery_above_amount.trim() || "0");
       const radiusRaw = entry.delivery_radius_km.trim();
       const radius = radiusRaw === "" ? null : Number(radiusRaw);
       out[serviceType] = {
         ...base,
         delivery_charge: Number.isFinite(charge) && charge >= 0 ? charge : 0,
+        free_delivery_above_amount:
+          Number.isFinite(freeAbove) && freeAbove >= 0 ? freeAbove : 0,
         delivery_radius_km:
           radius == null
             ? null
@@ -184,6 +194,13 @@ function formatServiceConfigSummary(
         entry.delivery_charge > 0
       ) {
         parts.push(`fee AED ${entry.delivery_charge}`);
+      }
+      if (
+        type === "delivery" &&
+        entry.free_delivery_above_amount != null &&
+        entry.free_delivery_above_amount > 0
+      ) {
+        parts.push(`free above AED ${entry.free_delivery_above_amount}`);
       }
       if (
         type === "delivery" &&
@@ -605,6 +622,14 @@ export function ShopEcomTab({
                                   : "AED 0",
                             },
                             {
+                              label: "Free delivery above",
+                              value:
+                                entry.free_delivery_above_amount != null &&
+                                entry.free_delivery_above_amount > 0
+                                  ? `AED ${entry.free_delivery_above_amount}`
+                                  : "Off",
+                            },
+                            {
                               label: "Delivery radius",
                               value:
                                 entry.delivery_radius_km != null
@@ -784,6 +809,20 @@ export function ShopEcomTab({
                                 e.target.value,
                               )
                             }
+                          />
+                        </Field>
+                        <Field label="Free delivery above (AED)">
+                          <Input
+                            inputMode="decimal"
+                            value={entry.free_delivery_above_amount}
+                            onChange={(e) =>
+                              setServiceConfigField(
+                                serviceType,
+                                "free_delivery_above_amount",
+                                e.target.value,
+                              )
+                            }
+                            placeholder="0 = always charge"
                           />
                         </Field>
                         <Field label="Delivery radius (km)">
