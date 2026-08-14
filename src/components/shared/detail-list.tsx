@@ -2,12 +2,15 @@
 
 import { CopyButton } from "@/components/shared/copy-button";
 import { cn } from "@/lib/utils";
+import { phoneDisplayValue } from "@/lib/phone-display";
+import { isDummyPhone, toE164Phone, type PhoneMode } from "@yaadro/phone-kit";
 
 export type DetailItem = {
   label: string;
   value?: string | number | boolean | null;
   /** Override string used for copy (defaults to displayed text). */
   copyValue?: string | null;
+  phoneMode?: PhoneMode;
   /** Hide empty rows when true */
   hideIfEmpty?: boolean;
 };
@@ -22,15 +25,22 @@ export function DetailRow({
   label,
   value,
   copyValue,
+  phoneMode,
   className,
 }: {
   label: string;
   value?: DetailItem["value"];
   copyValue?: string | null;
+  phoneMode?: PhoneMode;
   className?: string;
 }) {
-  const text = toDisplayText(value);
-  const copyText = (copyValue ?? text).trim();
+  const rawText = toDisplayText(value);
+  const text = phoneMode ? phoneDisplayValue(rawText, phoneMode) ?? "" : rawText;
+  const copyText = (
+    copyValue ??
+    (phoneMode && !isDummyPhone(rawText) ? toE164Phone(rawText, phoneMode) : null) ??
+    text
+  ).trim();
 
   return (
     <div
@@ -84,6 +94,7 @@ export function DetailList({
           label={item.label}
           value={item.value}
           copyValue={item.copyValue}
+          phoneMode={item.phoneMode}
         />
       ))}
     </dl>

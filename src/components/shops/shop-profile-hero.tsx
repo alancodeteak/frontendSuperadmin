@@ -5,6 +5,7 @@ import { CameraIcon, Loader2Icon, MapPinIcon, StoreIcon, Trash2Icon } from "luci
 
 import { CopyButton } from "@/components/shared/copy-button";
 import { StatusBadge } from "@/components/shared/states";
+import { PhoneValue } from "@/components/shared/phone-value";
 import { Button } from "@/components/ui/button";
 import { siteConfig } from "@/config/site";
 import { ApiError } from "@/lib/api";
@@ -301,7 +302,7 @@ export function ShopProfileHero({
                 </span>
               ) : null}
               {email ? <span>{email}</span> : null}
-              {phone ? <span>{phone}</span> : null}
+              {phone ? <PhoneValue value={phone} copyable={false} /> : null}
             </div>
             {location ? (
               <p className="mt-2 flex items-start gap-1.5 text-sm text-muted-foreground">

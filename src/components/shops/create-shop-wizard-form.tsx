@@ -15,14 +15,9 @@ import {
 import { CopyButton } from "@/components/shared/copy-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { InternationalPhoneInput } from "@/components/ui/international-phone-input";
+import { PhoneValue } from "@/components/shared/phone-value";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { StepProgress } from "@/components/ui/step-progress";
 import { ApiError } from "@/lib/api";
 import { appToast } from "@/lib/app-toast";
@@ -42,16 +37,13 @@ import {
 } from "@/lib/shop-create-draft";
 import {
   buildCreateShopPayload,
-  getUaePhoneDisplayPart,
   isCreateShopFormValid,
   mapApiErrorsToFields,
   normalizeEcomSlug,
   normalizeShopId,
-  normalizeUaePhoneInput,
   SHOP_NAME_MAX_LENGTH,
   validateCreateShopField,
   validateCreateShopForm,
-  UAE_COUNTRY_CODE,
   type CreateShopFormValues,
   type FieldErrors,
 } from "@/lib/shop-create-validation";
@@ -282,7 +274,6 @@ function toLocationValue(form: CreateShopFormValues): ShopLocationPickerValue {
     address_line_2: form.address_line_2,
     locality: form.locality,
     city: form.city,
-    contact_number_type: form.contact_number_type,
     contact_number: form.contact_number,
     latitude: form.latitude,
     longitude: form.longitude,
@@ -299,9 +290,7 @@ const STEP_FIELDS: Record<
     "shop_id",
     "user_id",
     "password",
-    "phone_type",
     "phone",
-    "contact_person_number_type",
     "contact_person_number",
     "email",
     "ecom_slug",
@@ -311,7 +300,6 @@ const STEP_FIELDS: Record<
     "address_line_2",
     "locality",
     "city",
-    "contact_number_type",
     "latitude",
     "longitude",
     "contact_number",
@@ -489,10 +477,6 @@ export function CreateShopWizard() {
       if (key === "phone") {
         // Keep address phone in sync with shop phone.
         next.contact_number = String(value);
-        next.contact_number_type = next.phone_type;
-      }
-      if (key === "phone_type") {
-        next.contact_number_type = value as CreateShopFormValues["phone_type"];
       }
       return next;
     });
@@ -513,7 +497,6 @@ export function CreateShopWizard() {
       address_line_2: value.address_line_2,
       locality: value.locality,
       city: value.city,
-      contact_number_type: value.contact_number_type,
       contact_number: value.contact_number,
       latitude: value.latitude,
       longitude: value.longitude,
@@ -526,7 +509,6 @@ export function CreateShopWizard() {
         "address_line_2",
         "locality",
         "city",
-        "contact_number_type",
         "contact_number",
         "latitude",
         "longitude",
@@ -620,9 +602,7 @@ export function CreateShopWizard() {
       "shop_id",
       "user_id",
       "password",
-      "phone_type",
       "phone",
-      "contact_person_number_type",
       "contact_person_number",
       "email",
       "ecom_slug",
@@ -630,7 +610,6 @@ export function CreateShopWizard() {
       "address_line_2",
       "locality",
       "city",
-      "contact_number_type",
       "latitude",
       "longitude",
       "contact_number",
@@ -648,9 +627,7 @@ export function CreateShopWizard() {
         "shop_id",
         "user_id",
         "password",
-        "phone_type",
         "phone",
-        "contact_person_number_type",
         "contact_person_number",
         "email",
         "ecom_slug",
@@ -660,7 +637,6 @@ export function CreateShopWizard() {
         "address_line_2",
         "locality",
         "city",
-        "contact_number_type",
         "latitude",
         "longitude",
         "contact_number",
@@ -692,7 +668,6 @@ export function CreateShopWizard() {
       nextForm = {
         ...form,
         contact_number: form.phone,
-        contact_number_type: form.phone_type,
       };
       setForm(nextForm);
     }
@@ -1180,67 +1155,35 @@ export function CreateShopWizard() {
                   label="Shop phone"
                   htmlFor="phone"
                   required
-                  hint="UAE mobile number. Starts with +971."
+                  hint="Mobile or landline; UAE is selected by default."
                   error={showError("phone")}
                   className="xl:col-span-6"
                 >
-                  <div className="flex min-w-0 overflow-hidden rounded-md border border-input bg-background focus-within:ring-1 focus-within:ring-ring">
-                    <div className="flex items-center border-r border-input bg-muted px-3 text-sm text-muted-foreground">
-                      {UAE_COUNTRY_CODE}
-                    </div>
-                    <Input
-                      id="phone"
-                      value={getUaePhoneDisplayPart(form.phone)}
-                      aria-invalid={Boolean(showError("phone"))}
-                      className="min-w-0 flex-1 border-0 shadow-none focus-visible:ring-0"
-                      onBlur={() => {
-                        markTouched("phone");
-                        if (form.phone.trim()) {
-                          update("phone", normalizeUaePhoneInput(form.phone));
-                        }
-                      }}
-                      onChange={(e) =>
-                        update("phone", normalizeUaePhoneInput(e.target.value))
-                      }
-                      placeholder="501234567"
-                    />
-                  </div>
+                  <InternationalPhoneInput
+                    id="phone"
+                    mode="contact"
+                    value={form.phone}
+                    aria-invalid={Boolean(showError("phone"))}
+                    onChange={(value) => update("phone", value)}
+                    placeholder="Phone number"
+                  />
                 </FormField>
 
                 <FormField
                   label="Contact number"
                   htmlFor="contact_person_number"
-                  hint="Optional contact person mobile."
+                  hint="Optional mobile or landline."
                   error={showError("contact_person_number")}
                   className="xl:col-span-6"
                 >
-                  <div className="flex min-w-0 overflow-hidden rounded-md border border-input bg-background focus-within:ring-1 focus-within:ring-ring">
-                    <div className="flex items-center border-r border-input bg-muted px-3 text-sm text-muted-foreground">
-                      {UAE_COUNTRY_CODE}
-                    </div>
-                    <Input
-                      id="contact_person_number"
-                      value={getUaePhoneDisplayPart(form.contact_person_number)}
-                      aria-invalid={Boolean(showError("contact_person_number"))}
-                      className="min-w-0 flex-1 border-0 shadow-none focus-visible:ring-0"
-                      onBlur={() => {
-                        markTouched("contact_person_number");
-                        if (form.contact_person_number.trim()) {
-                          update(
-                            "contact_person_number",
-                            normalizeUaePhoneInput(form.contact_person_number),
-                          );
-                        }
-                      }}
-                      onChange={(e) =>
-                        update(
-                          "contact_person_number",
-                          normalizeUaePhoneInput(e.target.value),
-                        )
-                      }
-                      placeholder="501234567"
-                    />
-                  </div>
+                  <InternationalPhoneInput
+                    id="contact_person_number"
+                    mode="contact"
+                    value={form.contact_person_number}
+                    aria-invalid={Boolean(showError("contact_person_number"))}
+                    onChange={(value) => update("contact_person_number", value)}
+                    placeholder="Phone number"
+                  />
                 </FormField>
 
                 <FormField
@@ -1476,10 +1419,18 @@ export function CreateShopWizard() {
                 </div>
                 <dl>
                   <PreviewRow label="Login ID" value={form.user_id} />
-                  <PreviewRow label="Shop phone" value={form.phone} />
+                  <PreviewRow
+                    label="Shop phone"
+                    value={<PhoneValue value={form.phone} copyable={false} />}
+                  />
                   <PreviewRow
                     label="Contact number"
-                    value={form.contact_person_number}
+                    value={
+                      <PhoneValue
+                        value={form.contact_person_number}
+                        copyable={false}
+                      />
+                    }
                   />
                   <PreviewRow label="Email" value={form.email} />
                   <PreviewRow label="Ecom slug" value={form.ecom_slug} />
@@ -1502,7 +1453,12 @@ export function CreateShopWizard() {
                         : ""
                     }
                   />
-                  <PreviewRow label="Address phone" value={form.contact_number} />
+                  <PreviewRow
+                    label="Address phone"
+                    value={
+                      <PhoneValue value={form.contact_number} copyable={false} />
+                    }
+                  />
                 </dl>
               </div>
             </WizardSection>

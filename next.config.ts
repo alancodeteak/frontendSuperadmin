@@ -1,4 +1,7 @@
 import type { NextConfig } from "next";
+import path from "path";
+
+const siblingRepoRoot = path.join(__dirname, "..");
 
 /** Normalize origins from env (Vercel/Windows often store `https:\\host`). */
 function normalizeOrigin(value: string, fallback: string) {
@@ -31,6 +34,13 @@ const tunnelHost = tunnelHostRaw
   .replace(/:\d+$/, "");
 
 const nextConfig: NextConfig = {
+  transpilePackages: ["@yaadro/phone-kit", "@yaadro/phone-input"],
+  turbopack: {
+    root: siblingRepoRoot,
+  },
+  experimental: {
+    externalDir: true,
+  },
   // Allow Next.js dev assets/HMR when accessed via Cloudflare tunnel hostname
   allowedDevOrigins: [
     tunnelHost,

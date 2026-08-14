@@ -1,4 +1,5 @@
 import { siteConfig } from "@/config/site";
+import { PHONE_POLICY_VERSION, PHONE_POLICY_VERSION_HEADER } from "@yaadro/phone-kit";
 import {
   clearSession,
   getAccessToken,
@@ -107,6 +108,7 @@ function applyApiHeaders(
 ): Record<string, string> {
   const next: Record<string, string> = {
     ...(options?.json === false ? {} : { "Content-Type": "application/json" }),
+    [PHONE_POLICY_VERSION_HEADER]: PHONE_POLICY_VERSION,
     ...(headers as Record<string, string> | undefined),
   };
 

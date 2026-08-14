@@ -11,6 +11,7 @@ import { Search } from "@/components/animate-ui/icons/search";
 import { PageShell } from "@/components/layout/page-shell";
 import { TopBarSlot } from "@/components/layout/top-bar-slot";
 import { CopyButton } from "@/components/shared/copy-button";
+import { PhoneValue } from "@/components/shared/phone-value";
 import {
   EmptyState,
   ErrorState,
@@ -120,12 +121,7 @@ const groupColumns: ColumnDef<GroupSummary>[] = [
   {
     accessorKey: "phone",
     header: "Phone",
-    cell: ({ row }) =>
-      row.original.phone ? (
-        <CopyableValue value={row.original.phone} />
-      ) : (
-        "—"
-      ),
+    cell: ({ row }) => <PhoneValue value={row.original.phone} />,
     meta: { label: "Phone" },
     size: 140,
   },

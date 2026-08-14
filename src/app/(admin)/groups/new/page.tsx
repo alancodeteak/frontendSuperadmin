@@ -9,11 +9,13 @@ import { PageShell } from "@/components/layout/page-shell";
 import { TopBarSlot } from "@/components/layout/top-bar-slot";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { InternationalPhoneInput } from "@/components/ui/international-phone-input";
 import { Label } from "@/components/ui/label";
 import { parseApiFormError } from "@/lib/api-form-error";
 import { createGroup } from "@/lib/api/groups";
 import { appToast } from "@/lib/app-toast";
 import { cn } from "@/lib/utils";
+import { toE164Phone } from "@yaadro/phone-kit";
 
 function Field({
   label,
@@ -70,11 +72,16 @@ export default function NewGroupPage() {
     setFieldErrors({});
 
     try {
+      const normalizedPhone = phone ? toE164Phone(phone, "contact") : null;
+      if (phone && !normalizedPhone) {
+        setFieldErrors({ phone: "Enter a valid mobile or landline number" });
+        return;
+      }
       const group = await createGroup({
         name: name.trim(),
         password,
         email: email.trim() || undefined,
-        phone: phone.trim() || undefined,
+        phone: normalizedPhone || undefined,
         slug: (slugTouched ? slug : slugify(name)).trim() || undefined,
       });
       appToast.success(`Group “${group.name}” created (user ${group.user_id}).`);
@@ -174,15 +181,14 @@ export default function NewGroupPage() {
           label="Phone"
           htmlFor="phone"
           error={fieldErrors.phone}
-          hint="Optional · 9–15 digits"
+          hint="Optional mobile or landline · UAE selected by default"
         >
-          <Input
+          <InternationalPhoneInput
             id="phone"
-            inputMode="numeric"
-            pattern="[0-9]{9,15}"
+            mode="contact"
             value={phone}
-            onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 15))}
-            placeholder="501234567"
+            onChange={setPhone}
+            placeholder="Phone number"
           />
         </Field>
 

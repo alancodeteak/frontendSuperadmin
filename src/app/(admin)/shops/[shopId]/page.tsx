@@ -28,6 +28,7 @@ import { RiderEditDialog } from "@/components/shops/rider-edit-dialog";
 import { VenuePickerEditDialog } from "@/components/shops/venue-picker-edit-dialog";
 import { CopyButton } from "@/components/shared/copy-button";
 import { DetailList } from "@/components/shared/detail-list";
+import { PhoneValue } from "@/components/shared/phone-value";
 import {
   EmptyState,
   ErrorState,
@@ -37,6 +38,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { DataTable, type ColumnDef } from "@/components/ui/data-table";
 import { Input } from "@/components/ui/input";
+import { InternationalPhoneInput } from "@/components/ui/international-phone-input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -94,12 +96,8 @@ import {
   shopSubscriptionQuery,
   shopVenuePickersQuery,
 } from "@/lib/queries/shops";
-import {
-  digitsOnly,
-  isValidUaePhone,
-  normalizeUaePhoneInput,
-  UAE_COUNTRY_CODE,
-} from "@/lib/shop-create-validation";
+import { digitsOnly, isValidPhone } from "@/lib/shop-create-validation";
+import { toE164Phone } from "@yaadro/phone-kit";
 import { cn, formatCurrency } from "@/lib/utils";
 import {
   cascadeVenueMasterFlagsSnake,
@@ -700,15 +698,28 @@ function OverviewTab({
     setFieldErrors({});
     setHighlightFields([]);
     try {
+      const phone = toE164Phone(form.phone, "contact");
+      const contactPersonPhone = form.contact_person_number
+        ? toE164Phone(form.contact_person_number, "contact")
+        : null;
+      if (!phone || (form.contact_person_number && !contactPersonPhone)) {
+        setFieldErrors({
+          ...(!phone ? { phone: "Enter a valid mobile or landline number" } : {}),
+          ...(form.contact_person_number && !contactPersonPhone
+            ? { contact_person_number: "Enter a valid mobile or landline number" }
+            : {}),
+        });
+        return;
+      }
       await patchShop(shop.shop_id, {
         shop_name: form.shop_name,
         second_name: form.second_name || null,
-        phone: form.phone,
+        phone,
         email: form.email,
         status: form.status,
         status_reason: form.status_reason || null,
         shop_license_no: form.shop_license_no || null,
-        contact_person_number: form.contact_person_number || null,
+        contact_person_number: contactPersonPhone,
         contact_person_email: form.contact_person_email || null,
         upi_id: form.upi_id || null,
         vat_enabled: form.vat_enabled,
@@ -811,13 +822,14 @@ function OverviewTab({
               items={[
                 { label: "Shop name", value: form.shop_name },
                 { label: "Second name", value: form.second_name },
-                { label: "Phone", value: form.phone },
+                { label: "Phone", value: form.phone, phoneMode: "contact" },
                 { label: "Email", value: form.email },
                 { label: "Ecom slug", value: form.ecom_slug },
                 { label: "Shop license no", value: form.shop_license_no },
                 {
                   label: "Contact person number",
                   value: form.contact_person_number,
+                  phoneMode: "contact",
                 },
                 {
                   label: "Contact person email",
@@ -887,6 +899,7 @@ function OverviewTab({
                   {
                     label: "Contact number",
                     value: address?.contact_number,
+                    phoneMode: "contact",
                   },
                   { label: "Full address", value: addressLabel },
                   { label: "Coordinates", value: coordinates },
@@ -920,18 +933,28 @@ function OverviewTab({
                 ] as const
               ).map(([key, label, value]) => (
                 <Field key={key} label={label}>
-                  <Input
-                    id={`overview_${key}`}
-                    data-field={key}
-                    value={value}
-                    aria-invalid={overviewFieldInvalid(key) || undefined}
-                    className={
-                      overviewFieldInvalid(key)
-                        ? "border-destructive focus-visible:ring-destructive/30"
-                        : undefined
-                    }
-                    onChange={(e) => updateOverviewField(key, e.target.value)}
-                  />
+                  {key === "phone" || key === "contact_person_number" ? (
+                    <InternationalPhoneInput
+                      id={`overview_${key}`}
+                      mode="contact"
+                      value={value}
+                      aria-invalid={overviewFieldInvalid(key) || undefined}
+                      onChange={(next) => updateOverviewField(key, next)}
+                    />
+                  ) : (
+                    <Input
+                      id={`overview_${key}`}
+                      data-field={key}
+                      value={value}
+                      aria-invalid={overviewFieldInvalid(key) || undefined}
+                      className={
+                        overviewFieldInvalid(key)
+                          ? "border-destructive focus-visible:ring-destructive/30"
+                          : undefined
+                      }
+                      onChange={(e) => updateOverviewField(key, e.target.value)}
+                    />
+                  )}
                   {fieldErrors[key] ? (
                     <p className="mt-1.5 text-xs font-medium text-destructive">
                       {fieldErrors[key]}
@@ -1071,6 +1094,7 @@ function OverviewTab({
                   {
                     label: "Contact number",
                     value: address?.contact_number,
+                    phoneMode: "contact",
                   },
                   { label: "Full address", value: addressLabel },
                   { label: "Coordinates", value: coordinates },
@@ -2719,20 +2743,7 @@ function RidersTab({ shopId }: { shopId: string }) {
       accessorKey: "phone1",
       header: "Phone",
       cell: ({ row }) => {
-        const phone = row.original.phone1;
-        if (!phone) return "â€”";
-        return (
-          <div className="flex min-w-0 items-center gap-1">
-            <span className="truncate tabular-nums">{phone}</span>
-            <CopyButton
-              value={phone}
-              iconOnly
-              size={13}
-              label={`Copy ${phone}`}
-              className="size-6 shrink-0 p-0"
-            />
-          </div>
-        );
+        return <PhoneValue value={row.original.phone1} mode="mobile" />;
       },
       meta: { label: "Phone" },
       size: 160,
@@ -2991,8 +3002,8 @@ function RidersTab({ shopId }: { shopId: string }) {
   async function onCreate(e: React.FormEvent) {
     e.preventDefault();
     setMessage(null);
-    if (!isValidUaePhone(form.phone1, "mobile")) {
-      const msg = "Enter a valid UAE mobile number. Leading 0 is optional.";
+    if (!isValidPhone(form.phone1, "mobile")) {
+      const msg = "Enter a valid mobile number with its country code.";
       setMessage(msg);
       appToast.error(msg);
       return;
@@ -3004,7 +3015,7 @@ function RidersTab({ shopId }: { shopId: string }) {
         last_name: form.last_name || undefined,
         password: form.password,
         age: Number(form.age),
-        phone1: digitsOnly(form.phone1),
+        phone1: toE164Phone(form.phone1, "mobile")!,
         delivery_partner_id: form.delivery_partner_id || undefined,
         third_party_id: form.third_party_id || undefined,
         vehicle_detail: form.vehicle_detail || undefined,
@@ -3057,23 +3068,13 @@ function RidersTab({ shopId }: { shopId: string }) {
             />
           </Field>
           <Field label="Phone">
-            <div className="flex overflow-hidden rounded-md border border-input bg-background focus-within:ring-1 focus-within:ring-ring">
-              <div className="flex items-center border-r border-input bg-muted px-3 text-sm text-muted-foreground">
-                {UAE_COUNTRY_CODE}
-              </div>
-              <Input
+              <InternationalPhoneInput
                 required
+                mode="mobile"
                 value={form.phone1}
-                className="border-0 shadow-none focus-visible:ring-0"
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    phone1: digitsOnly(e.target.value).slice(0, 10),
-                  })
-                }
-                placeholder="501234567 or 0501234567"
+                onChange={(phone1) => setForm({ ...form, phone1 })}
+                placeholder="Mobile number"
               />
-            </div>
           </Field>
           <Field label="Age">
             <Input
@@ -3279,20 +3280,7 @@ function PickersTab({ shopId }: { shopId: string }) {
       accessorKey: "phone",
       header: "Phone",
       cell: ({ row }) => {
-        const phone = row.original.phone;
-        if (!phone) return "—";
-        return (
-          <div className="flex min-w-0 items-center gap-1">
-            <span className="truncate tabular-nums">{phone}</span>
-            <CopyButton
-              value={phone}
-              iconOnly
-              size={13}
-              label={`Copy ${phone}`}
-              className="size-6 shrink-0 p-0"
-            />
-          </div>
-        );
+        return <PhoneValue value={row.original.phone} mode="mobile" />;
       },
       meta: { label: "Phone" },
       size: 160,
@@ -3457,8 +3445,8 @@ function PickersTab({ shopId }: { shopId: string }) {
   async function onCreate(e: React.FormEvent) {
     e.preventDefault();
     setMessage(null);
-    if (!isValidUaePhone(form.phone, "mobile")) {
-      const msg = "Enter a valid UAE mobile number. Leading 0 is optional.";
+    if (!isValidPhone(form.phone, "mobile")) {
+      const msg = "Enter a valid mobile number with its country code.";
       setMessage(msg);
       appToast.error(msg);
       return;
@@ -3475,7 +3463,7 @@ function PickersTab({ shopId }: { shopId: string }) {
     try {
       await createVenuePicker(shopId, {
         name: form.name.trim(),
-        phone: digitsOnly(form.phone),
+        phone: toE164Phone(form.phone, "mobile")!,
         password: form.password,
         scope: form.scope,
         dining_area_ids: diningAreaIds,
@@ -3516,23 +3504,13 @@ function PickersTab({ shopId }: { shopId: string }) {
             />
           </Field>
           <Field label="Phone">
-            <div className="flex overflow-hidden rounded-md border border-input bg-background focus-within:ring-1 focus-within:ring-ring">
-              <div className="flex items-center border-r border-input bg-muted px-3 text-sm text-muted-foreground">
-                {UAE_COUNTRY_CODE}
-              </div>
-              <Input
+              <InternationalPhoneInput
                 required
+                mode="mobile"
                 value={form.phone}
-                className="border-0 shadow-none focus-visible:ring-0"
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    phone: digitsOnly(e.target.value).slice(0, 10),
-                  })
-                }
-                placeholder="501234567 or 0501234567"
+                onChange={(phone) => setForm({ ...form, phone })}
+                placeholder="Mobile number"
               />
-            </div>
           </Field>
           <Field label="Password">
             <Input

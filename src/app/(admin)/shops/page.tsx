@@ -15,6 +15,7 @@ import {
   type ShopConfirmPhase,
 } from "@/components/shops/shop-confirm-dialog";
 import { CopyButton } from "@/components/shared/copy-button";
+import { PhoneValue } from "@/components/shared/phone-value";
 import {
   EmptyState,
   ErrorState,
@@ -233,12 +234,7 @@ const shopColumns: ColumnDef<ShopListItem>[] = [
   {
     accessorKey: "phone",
     header: "Phone",
-    cell: ({ row }) =>
-      row.original.phone ? (
-        <CopyableValue value={row.original.phone} />
-      ) : (
-        "—"
-      ),
+    cell: ({ row }) => <PhoneValue value={row.original.phone} />,
     meta: { label: "Phone" },
     size: 165,
   },

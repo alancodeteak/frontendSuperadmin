@@ -842,3 +842,54 @@ export type GroupsListResult = {
   unassigned_shops?: UnassignedShopItem[];
 };
 
+export type CustomerMergeStatus =
+  | "pending"
+  | "approved"
+  | "rejected"
+  | "conflicted";
+
+export type CustomerMergeProfileRef = {
+  id: number;
+  customerName: string | null;
+  isDeleted: boolean;
+};
+
+export type CustomerMergeAuditEntry = {
+  audit_id: number;
+  request_id: number;
+  source_profile_id: number;
+  target_profile_id: number;
+  actor_type: string;
+  actor_id: string;
+  reason: string;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+};
+
+export type CustomerMergeRequest = {
+  request_id: string;
+  shop_id: string;
+  source_profile_id: number;
+  target_profile_id: number;
+  status: CustomerMergeStatus;
+  preview_hash: string | null;
+  preview: Record<string, unknown> | null;
+  requested_by: string | null;
+  request_reason: string | null;
+  reviewed_by: string | null;
+  review_reason: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+  updated_at: string;
+  source: CustomerMergeProfileRef | null;
+  target: CustomerMergeProfileRef | null;
+  audit?: CustomerMergeAuditEntry[] | null;
+};
+
+export type CustomerMergeListResult = {
+  items: CustomerMergeRequest[];
+  page: number;
+  limit: number;
+  total: number;
+};
+

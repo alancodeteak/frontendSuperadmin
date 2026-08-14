@@ -1,3 +1,33 @@
+@import "react-phone-number-input/style.css";
+
+.yaadro-phone-input {
+  display: flex;
+  min-height: 2.25rem;
+  width: 100%;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-md);
+  background: var(--background);
+  padding: 0.375rem 0.75rem;
+}
+
+.yaadro-phone-input:focus-within {
+  outline: 2px solid color-mix(in oklab, var(--ring) 50%, transparent);
+  outline-offset: 1px;
+}
+
+.yaadro-phone-input-invalid {
+  border-color: var(--destructive);
+}
+
+.yaadro-phone-input .PhoneInputInput {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+}
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";

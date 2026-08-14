@@ -17,6 +17,7 @@ import type {
   SearchSuggestResponse,
   SearchSyncResponse,
 } from "@/lib/search/types";
+import { PHONE_POLICY_VERSION, PHONE_POLICY_VERSION_HEADER } from "@yaadro/phone-kit";
 
 function adminApiBase() {
   const raw = (
@@ -46,6 +47,7 @@ async function adminFetch<T>(
     const response = await fetch(url.toString(), {
       headers: {
         Accept: "application/json",
+        [PHONE_POLICY_VERSION_HEADER]: PHONE_POLICY_VERSION,
         ...(apiKey ? { "x-api-key": apiKey } : {}),
         ...(authHeader ? { Authorization: authHeader } : {}),
       },

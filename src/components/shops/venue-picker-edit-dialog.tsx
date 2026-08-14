@@ -16,6 +16,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { InternationalPhoneInput } from "@/components/ui/international-phone-input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -34,6 +35,7 @@ import {
   formatDiningAreaIds,
 } from "@/lib/venue-picker-form";
 import type { VenuePickerScope } from "@/types/api";
+import { toE164Phone } from "@yaadro/phone-kit";
 
 type VenuePickerEditDialogProps = {
   shopId: string;
@@ -84,6 +86,11 @@ export function VenuePickerEditDialog({
     setSaving(true);
     setMessage(null);
     try {
+      const phone = toE164Phone(form.phone, "mobile");
+      if (!phone) {
+        setMessage("Enter a valid mobile number.");
+        return;
+      }
       const diningAreaIds = parseDiningAreaIds(form.dining_area_ids);
       if (diningAreaIds === null) {
         const msg = "Dining area IDs must be positive integers (comma-separated).";
@@ -93,7 +100,7 @@ export function VenuePickerEditDialog({
       }
       await patchVenuePicker(shopId, pickerId, {
         name: form.name.trim(),
-        phone: form.phone.trim(),
+        phone,
         scope: form.scope,
         dining_area_ids: diningAreaIds,
         third_party_id: form.third_party_id.trim() || null,
@@ -157,11 +164,12 @@ export function VenuePickerEditDialog({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="picker-phone">Phone</Label>
-                <Input
+                <InternationalPhoneInput
                   id="picker-phone"
                   required
+                  mode="mobile"
                   value={form.phone}
-                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                  onChange={(phone) => setForm({ ...form, phone })}
                 />
               </div>
               <div className="space-y-2">

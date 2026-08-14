@@ -29,6 +29,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { DataTable, type ColumnDef } from "@/components/ui/data-table";
 import { Input } from "@/components/ui/input";
+import { InternationalPhoneInput } from "@/components/ui/international-phone-input";
+import { PhoneValue } from "@/components/shared/phone-value";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -56,6 +58,7 @@ import {
   groupsListQuery,
 } from "@/lib/queries/groups";
 import { cn } from "@/lib/utils";
+import { toE164Phone } from "@yaadro/phone-kit";
 import type {
   GroupDetail,
   GroupShopItem,
@@ -154,7 +157,7 @@ const assignedColumns: ColumnDef<GroupShopItem>[] = [
   {
     accessorKey: "phone",
     header: "Phone",
-    cell: ({ row }) => row.original.phone ?? "—",
+    cell: ({ row }) => <PhoneValue value={row.original.phone} />,
     meta: { label: "Phone" },
   },
 ];
@@ -179,10 +182,15 @@ function ProfileEditor({
     e.preventDefault();
     setSaving(true);
     try {
+      const normalizedPhone = phone ? toE164Phone(phone, "contact") : null;
+      if (phone && !normalizedPhone) {
+        appToast.error("Enter a valid mobile or landline number.");
+        return;
+      }
       await updateGroupProfile(group.group_id, {
         name: name.trim(),
         email: email.trim() ? email.trim().toLowerCase() : null,
-        phone: phone.trim() ? phone.trim() : null,
+        phone: normalizedPhone,
         slug: slug.trim() || undefined,
         status,
       });
@@ -234,14 +242,12 @@ function ProfileEditor({
             onChange={(e) => setEmail(e.target.value)}
           />
         </Field>
-        <Field label="Phone" htmlFor="group-phone" hint="9–15 digits">
-          <Input
+        <Field label="Phone" htmlFor="group-phone" hint="Mobile or landline">
+          <InternationalPhoneInput
             id="group-phone"
-            inputMode="numeric"
+            mode="contact"
             value={phone}
-            onChange={(e) =>
-              setPhone(e.target.value.replace(/\D/g, "").slice(0, 15))
-            }
+            onChange={setPhone}
           />
         </Field>
         <Field label="Status" htmlFor="group-status">

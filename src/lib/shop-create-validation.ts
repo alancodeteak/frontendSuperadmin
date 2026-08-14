@@ -1,6 +1,7 @@
 import type { CreateShopInput, ShopAddress } from "@/types/api";
 import { humanizeApiMessage } from "@/lib/api-form-error";
 import { cascadeVenueMasterFlagsSnake, validateVenueMasterFlagsSnake } from "@/lib/venue-feature-flags";
+import { isPolicyPhoneValid, toE164Phone } from "@yaadro/phone-kit";
 
 /** Matches admin-api / Postman create-shop contract. Cache-bust: wizard-step-valid-v2 */
 export const SHOP_ID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{2,49}$/;
@@ -8,9 +9,6 @@ export const ECOM_SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export const SHOP_USER_ID_MIN = 100000;
 export const SHOP_USER_ID_MAX = 999999;
-export const UAE_COUNTRY_CODE = "+971";
-
-export type UaePhoneType = "mobile" | "landline";
 
 export const SHOP_NAME_MAX_LENGTH = 50;
 
@@ -20,9 +18,7 @@ export type CreateShopFormValues = {
   shop_id: string;
   password: string;
   user_id: string;
-  phone_type: UaePhoneType;
   phone: string;
-  contact_person_number_type: UaePhoneType;
   contact_person_number: string;
   email: string;
   ecom_slug: string;
@@ -44,7 +40,6 @@ export type CreateShopFormValues = {
   address_line_2: string;
   locality: string;
   city: string;
-  contact_number_type: UaePhoneType;
   latitude: string;
   longitude: string;
   contact_number: string;
@@ -60,45 +55,16 @@ export function digitsOnly(value: string) {
   return value.replace(/\D/g, "");
 }
 
-function stripUaeCountryPrefix(digits: string) {
-  if (digits.startsWith("971")) return digits.slice(3);
-  if (digits.startsWith("0")) return digits.slice(1);
-  return digits;
+export function normalizePhoneInput(value: string) {
+  return toE164Phone(value, "contact") ?? value.trim();
 }
 
-export function getUaePhoneLocalPart(value: string) {
-  return stripUaeCountryPrefix(digitsOnly(value));
+export function isValidPhone(value: string, mode: "mobile" | "contact" = "contact") {
+  return isPolicyPhoneValid(value, mode);
 }
 
-export function getUaePhoneDisplayPart(value: string) {
-  // Shown next to the fixed +971 prefix — no leading national trunk 0.
-  return getUaePhoneLocalPart(value);
-}
-
-export function normalizeUaePhoneInput(value: string) {
-  const digits = stripUaeCountryPrefix(digitsOnly(value));
-  if (!digits) return UAE_COUNTRY_CODE;
-  return `${UAE_COUNTRY_CODE}${digits.slice(0, 9)}`;
-}
-
-export function isValidUaePhone(value: string, type?: UaePhoneType) {
-  const nationalNumber = stripUaeCountryPrefix(digitsOnly(value));
-  if (!nationalNumber) return false;
-
-  const isMobile = /^5\d{8}$/.test(nationalNumber);
-  const isLandline = /^[236479]\d{7}$/.test(nationalNumber);
-  if (type === "mobile") return isMobile;
-  if (type === "landline") return isLandline;
-  return isMobile || isLandline;
-}
-
-export function inferUaePhoneType(value: string): UaePhoneType {
-  return isValidUaePhone(value, "mobile") ? "mobile" : "landline";
-}
-
-function hasMeaningfulUaePhone(value: string) {
-  const normalized = normalizeUaePhoneInput(value);
-  return normalized !== UAE_COUNTRY_CODE;
+function hasMeaningfulContactPhone(value: string) {
+  return Boolean(toE164Phone(value, "contact"));
 }
 
 export function normalizeShopId(value: string) {
@@ -180,17 +146,17 @@ export function validateCreateShopField(
     }
     case "phone": {
       const raw = String(value).trim();
-      if (!raw || raw === UAE_COUNTRY_CODE) return "Shop phone is required";
-      if (!isValidUaePhone(raw, "mobile")) {
-        return "Enter a valid UAE mobile number";
+      if (!raw) return "Shop phone is required";
+      if (!isPolicyPhoneValid(raw, "contact")) {
+        return "Enter a valid mobile or landline number";
       }
       return null;
     }
     case "contact_person_number": {
       const raw = String(value).trim();
-      if (!raw || raw === UAE_COUNTRY_CODE) return null;
-      if (!isValidUaePhone(raw, "mobile")) {
-        return "Enter a valid UAE mobile number";
+      if (!raw) return null;
+      if (!isPolicyPhoneValid(raw, "contact")) {
+        return "Enter a valid mobile or landline number";
       }
       return null;
     }
@@ -265,13 +231,11 @@ export function validateCreateShopField(
     }
     case "contact_number": {
       const raw = String(value).trim();
-      if (!raw || raw === UAE_COUNTRY_CODE) {
+      if (!raw) {
         return "Address phone is required";
       }
-      if (!isValidUaePhone(raw, form.contact_number_type)) {
-        return form.contact_number_type === "landline"
-          ? "Enter a valid UAE landline number"
-          : "Enter a valid UAE mobile number";
+      if (!isPolicyPhoneValid(raw, "contact")) {
+        return "Enter a valid mobile or landline number";
       }
       return null;
     }
@@ -307,9 +271,7 @@ export function validateCreateShopForm(
     "shop_id",
     "user_id",
     "password",
-    "phone_type",
     "phone",
-    "contact_person_number_type",
     "contact_person_number",
     "email",
     "ecom_slug",
@@ -327,7 +289,6 @@ export function validateCreateShopForm(
     "address_line_2",
     "locality",
     "city",
-    "contact_number_type",
     "latitude",
     "longitude",
     "contact_number",
@@ -356,9 +317,7 @@ export const SHOP_CREATE_STEP_FIELDS: Record<
     "shop_id",
     "user_id",
     "password",
-    "phone_type",
     "phone",
-    "contact_person_number_type",
     "contact_person_number",
     "email",
     "ecom_slug",
@@ -368,7 +327,6 @@ export const SHOP_CREATE_STEP_FIELDS: Record<
     "address_line_2",
     "locality",
     "city",
-    "contact_number_type",
     "latitude",
     "longitude",
     "contact_number",
@@ -412,8 +370,8 @@ function buildAddress(form: CreateShopFormValues): ShopAddress | undefined {
   const address_line_2 = form.address_line_2.trim() || undefined;
   const locality = form.locality.trim() || undefined;
   const city = form.city.trim() || undefined;
-  const contact_number = hasMeaningfulUaePhone(form.contact_number)
-    ? normalizeUaePhoneInput(form.contact_number)
+  const contact_number = hasMeaningfulContactPhone(form.contact_number)
+    ? normalizePhoneInput(form.contact_number)
     : undefined;
   const latitudeRaw = form.latitude.trim();
   const longitudeRaw = form.longitude.trim();
@@ -482,13 +440,13 @@ export function buildCreateShopPayload(
   const second_name = form.second_name.trim();
   if (second_name) payload.second_name = second_name;
 
-  const phone = hasMeaningfulUaePhone(form.phone)
-    ? normalizeUaePhoneInput(form.phone)
+  const phone = hasMeaningfulContactPhone(form.phone)
+    ? normalizePhoneInput(form.phone)
     : "";
   if (phone) payload.phone = phone;
 
-  const contact_person_number = hasMeaningfulUaePhone(form.contact_person_number)
-    ? normalizeUaePhoneInput(form.contact_person_number)
+  const contact_person_number = hasMeaningfulContactPhone(form.contact_person_number)
+    ? normalizePhoneInput(form.contact_person_number)
     : "";
   if (contact_person_number) {
     payload.contact_person_number = contact_person_number;

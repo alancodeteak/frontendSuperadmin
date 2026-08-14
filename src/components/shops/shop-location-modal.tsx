@@ -18,11 +18,7 @@ import {
 import { ApiError } from "@/lib/api";
 import { patchShop } from "@/lib/api/shops";
 import { DEFAULT_MAP_CENTER } from "@/lib/google-maps-address";
-import {
-  inferUaePhoneType,
-  normalizeUaePhoneInput,
-  UAE_COUNTRY_CODE,
-} from "@/lib/shop-create-validation";
+import { normalizePhoneInput } from "@/lib/shop-create-validation";
 import type { ShopAddress, ShopDetail } from "@/types/api";
 
 function toPickerValue(address: ShopAddress | null | undefined): ShopLocationPickerValue {
@@ -38,12 +34,9 @@ function toPickerValue(address: ShopAddress | null | undefined): ShopLocationPic
     address_line_2: String(address?.address_line_2 ?? ""),
     locality: String(address?.locality ?? ""),
     city: String(address?.city ?? ""),
-    contact_number_type: address?.contact_number
-      ? inferUaePhoneType(String(address.contact_number))
-      : "landline",
     contact_number: address?.contact_number
-      ? normalizeUaePhoneInput(String(address.contact_number))
-      : UAE_COUNTRY_CODE,
+      ? normalizePhoneInput(String(address.contact_number))
+      : "",
     latitude: String(lat),
     longitude: String(lng),
   };
@@ -82,7 +75,7 @@ export function ShopLocationModal({
           address_line_2: form.address_line_2 || null,
           locality: form.locality || null,
           city: form.city || null,
-          contact_number: form.contact_number || null,
+          contact_number: normalizePhoneInput(form.contact_number) || null,
           latitude: Number.isFinite(latitude) ? latitude : null,
           longitude: Number.isFinite(longitude) ? longitude : null,
         },

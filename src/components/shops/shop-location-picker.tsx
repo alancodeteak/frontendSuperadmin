@@ -4,26 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import { MapPinIcon, SearchIcon } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
+import { InternationalPhoneInput } from "@/components/ui/international-phone-input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   DEFAULT_MAP_CENTER,
   parseGeocoderComponents,
   reverseGeocodeAddress,
 } from "@/lib/google-maps-address";
 import { loadGoogleMaps } from "@/lib/google-maps";
-import {
-  getUaePhoneDisplayPart,
-  normalizeUaePhoneInput,
-  UAE_COUNTRY_CODE,
-  type UaePhoneType,
-} from "@/lib/shop-create-validation";
 import { cn } from "@/lib/utils";
 
 export type ShopLocationPickerValue = {
@@ -31,7 +19,6 @@ export type ShopLocationPickerValue = {
   address_line_2: string;
   locality: string;
   city: string;
-  contact_number_type: UaePhoneType;
   contact_number: string;
   latitude: string;
   longitude: string;
@@ -406,45 +393,14 @@ export function ShopLocationPicker({
             error={fieldErrors?.contact_number}
             className="sm:col-span-2"
           >
-            <div className="flex gap-2">
-              <Select
-                value={value.contact_number_type}
-                onValueChange={(next) =>
-                  updateField("contact_number_type", next as UaePhoneType)
-                }
-              >
-                <SelectTrigger className="w-40">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="landline">Landline</SelectItem>
-                  <SelectItem value="mobile">Mobile (+971)</SelectItem>
-                </SelectContent>
-              </Select>
-              <div className="flex min-w-0 flex-1 overflow-hidden rounded-md border border-input bg-background focus-within:ring-1 focus-within:ring-ring">
-                <div className="flex items-center border-r border-input bg-muted px-3 text-sm text-muted-foreground">
-                  {UAE_COUNTRY_CODE}
-                </div>
-                <Input
-                  id="contact_number"
-                  value={getUaePhoneDisplayPart(value.contact_number)}
-                  aria-invalid={Boolean(fieldErrors?.contact_number)}
-                  className="min-w-0 flex-1 border-0 shadow-none focus-visible:ring-0"
-                  onBlur={() => {
-                    onFieldBlur?.("contact_number");
-                    if (value.contact_number.trim()) {
-                      updateField("contact_number", normalizeUaePhoneInput(value.contact_number));
-                    }
-                  }}
-                  onChange={(e) =>
-                    updateField("contact_number", normalizeUaePhoneInput(e.target.value))
-                  }
-                  placeholder={
-                    value.contact_number_type === "landline" ? "42345678" : "501234567"
-                  }
-                />
-              </div>
-            </div>
+            <InternationalPhoneInput
+              id="contact_number"
+              mode="contact"
+              value={value.contact_number}
+              aria-invalid={Boolean(fieldErrors?.contact_number)}
+              onChange={(phone) => updateField("contact_number", phone)}
+              placeholder="Phone number"
+            />
           </FormField>
         ) : null}
         </div>

@@ -16,11 +16,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { InternationalPhoneInput } from "@/components/ui/international-phone-input";
 import { Label } from "@/components/ui/label";
 import { ApiError } from "@/lib/api";
 import { appToast } from "@/lib/app-toast";
 import { deleteRider, patchRider } from "@/lib/api/riders";
 import { shopRiderQuery } from "@/lib/queries/shops";
+import { toE164Phone } from "@yaadro/phone-kit";
 
 type RiderEditDialogProps = {
   shopId: string;
@@ -73,10 +75,15 @@ export function RiderEditDialog({
     setSaving(true);
     setMessage(null);
     try {
+      const phone = toE164Phone(form.phone1, "mobile");
+      if (!phone) {
+        setMessage("Enter a valid mobile number.");
+        return;
+      }
       const payload: Record<string, unknown> = {
         first_name: form.first_name.trim(),
         last_name: form.last_name.trim() || undefined,
-        phone1: form.phone1.trim(),
+        phone1: phone,
         vehicle_detail: form.vehicle_detail.trim() || undefined,
         emirates_id: form.emirates_id.trim() || undefined,
       };
@@ -178,13 +185,12 @@ export function RiderEditDialog({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="rider-phone">Phone</Label>
-                <Input
+                <InternationalPhoneInput
                   id="rider-phone"
                   required
+                  mode="mobile"
                   value={form.phone1}
-                  onChange={(e) =>
-                    setForm({ ...form, phone1: e.target.value })
-                  }
+                  onChange={(phone1) => setForm({ ...form, phone1 })}
                 />
               </div>
               <div className="space-y-2">
