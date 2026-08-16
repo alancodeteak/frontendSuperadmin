@@ -99,6 +99,8 @@ export const POS_DOMAIN_EVENTS = [
   "customer_order_created",
   "Pending",
   "Accepted",
+  "Preparing",
+  "Ready",
   "Rejected",
   "Assigned",
   "Picked Up",
@@ -116,6 +118,8 @@ export const POS_ORDER_CREATE_EVENT_OPTIONS = [
 export const POS_STATUS_OUT_EVENT_OPTIONS = [
   "Pending",
   "Accepted",
+  "Preparing",
+  "Ready",
   "Rejected",
   "Assigned",
   "Picked Up",

@@ -2071,13 +2071,16 @@ function normalizeBonusPenaltyStartStatus(value: unknown): string {
   return BONUS_PENALTY_START_STATUS_VALUES.has(raw) ? raw : "assigned";
 }
 
-function bonusPenaltyStartStatusOptions(current: string) {
-  if (
-    current &&
-    !BONUS_PENALTY_START_STATUS_VALUES.has(current)
-  ) {
+function bonusPenaltyStartStatusOptions(
+  current: string,
+  pickupDisabled: boolean,
+) {
+  const base = pickupDisabled
+    ? BONUS_PENALTY_START_STATUS_OPTIONS.filter((o) => o.value !== "picked_up")
+    : BONUS_PENALTY_START_STATUS_OPTIONS;
+  if (current && !base.some((o) => o.value === current)) {
     return [
-      ...BONUS_PENALTY_START_STATUS_OPTIONS,
+      ...base,
       {
         value: current,
         label: current
@@ -2086,7 +2089,7 @@ function bonusPenaltyStartStatusOptions(current: string) {
       },
     ];
   }
-  return BONUS_PENALTY_START_STATUS_OPTIONS;
+  return base;
 }
 
 function deliveryFormFromData(
@@ -2096,6 +2099,8 @@ function deliveryFormFromData(
     delivery_time: String(data?.delivery_time ?? 30),
     self_assigned: Boolean(data?.self_assigned ?? false),
     pickup_disabled: Boolean(data?.pickup_disabled ?? false),
+    preparing_status_enabled: data?.preparing_status_enabled !== false,
+    ready_status_enabled: data?.ready_status_enabled !== false,
     bonus_penalty: Boolean(data?.bonus_penalty ?? false),
     bonus_penalty_start_status: normalizeBonusPenaltyStartStatus(
       data?.bonus_penalty_start_status,
@@ -2140,6 +2145,8 @@ function DeliveryTab({
         delivery_time: Number(form.delivery_time) || 30,
         self_assigned: form.self_assigned,
         pickup_disabled: form.pickup_disabled,
+        preparing_status_enabled: form.preparing_status_enabled,
+        ready_status_enabled: form.ready_status_enabled,
         bonus_penalty: form.bonus_penalty,
         bonus_penalty_start_status: normalizeBonusPenaltyStartStatus(
           form.bonus_penalty_start_status,
@@ -2191,10 +2198,32 @@ function DeliveryTab({
             />
             <FeatureToggleRow
               id="delivery_pickup_disabled"
-              label="Pickup disabled"
-              description="Disable customer pickup for this shop."
+              label="Skip rider picked-up status"
+              description="When enabled, riders go from Assigned straight to Out for Delivery. The Picked Up step is hidden from customer tracking."
               checked={form.pickup_disabled}
-              onChange={(v) => setField("pickup_disabled", v)}
+              onChange={(v) => {
+                setField("pickup_disabled", v);
+                if (
+                  v &&
+                  form.bonus_penalty_start_status === "picked_up"
+                ) {
+                  setField("bonus_penalty_start_status", "assigned");
+                }
+              }}
+            />
+            <FeatureToggleRow
+              id="delivery_preparing_status_enabled"
+              label="Preparing status"
+              description="When enabled, orders can move to Preparing after Accepted. When off, Preparing is hidden from customer UIs."
+              checked={form.preparing_status_enabled}
+              onChange={(v) => setField("preparing_status_enabled", v)}
+            />
+            <FeatureToggleRow
+              id="delivery_ready_status_enabled"
+              label="Ready status"
+              description="When enabled, orders can move to Ready before assignment. When off, Ready is hidden from customer UIs."
+              checked={form.ready_status_enabled}
+              onChange={(v) => setField("ready_status_enabled", v)}
             />
           </div>
         </div>
@@ -2231,6 +2260,7 @@ function DeliveryTab({
               <SelectContent>
                 {bonusPenaltyStartStatusOptions(
                   form.bonus_penalty_start_status,
+                  form.pickup_disabled,
                 ).map((option) => (
                   <SelectItem key={option.value} value={option.value}>
                     {option.label}

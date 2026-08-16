@@ -31,11 +31,12 @@ import {
 import { ApiError, triggerBrowserDownload } from "@/lib/api";
 import { appToast } from "@/lib/app-toast";
 import { exportShopReport, fetchShopReportBlob } from "@/lib/api/reports";
-import { listShops } from "@/lib/api/shops";
+import { getShop, listShops } from "@/lib/api/shops";
 import { parseExcelBlob, type ExcelWorkbookPreview } from "@/lib/excel";
 import { buildShopAnalyticsPdf, downloadShopAnalyticsPdf } from "@/lib/pdf";
+import { filterReportStatusCounts } from "@/lib/orders/order-status";
 import { cn } from "@/lib/utils";
-import type { ReportDataset, ShopListItem } from "@/types/api";
+import type { ReportDataset, ShopDeliverySettings, ShopListItem } from "@/types/api";
 
 type DatasetMeta = {
   value: ReportDataset;
@@ -122,6 +123,9 @@ export default function ReportsPage() {
     blob: Blob;
     filename: string;
   } | null>(null);
+  const [shopDelivery, setShopDelivery] = useState<ShopDeliverySettings | null>(
+    null,
+  );
 
   useEffect(() => {
     let active = true;
@@ -139,6 +143,26 @@ export default function ReportsPage() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!shopId) {
+      setShopDelivery(null);
+      return;
+    }
+    let active = true;
+    void getShop(shopId)
+      .then((detail) => {
+        if (!active) return;
+        setShopDelivery(detail.delivery ?? null);
+      })
+      .catch(() => {
+        if (!active) return;
+        setShopDelivery(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [shopId]);
 
   useEffect(() => {
     setWorkbook(null);
@@ -283,13 +307,22 @@ export default function ReportsPage() {
         end_date: endDate || startDate,
       });
       const selectedShop = shops.find((shop) => shop.shop_id === shopId);
+      const analyticsData = result as Record<string, unknown>;
+      const filteredPreview = {
+        ...analyticsData,
+        status_counts: filterReportStatusCounts(
+          (analyticsData.status_counts as Record<string, number>) ?? {},
+          shopDelivery,
+        ),
+      };
       const blob = buildShopAnalyticsPdf(
-        result as Record<string, unknown>,
+        filteredPreview,
         selectedShop?.shop_name,
+        shopDelivery,
       );
-      const shopIdPart = (result as Record<string, unknown>).shop_id ?? shopId;
+      const shopIdPart = analyticsData.shop_id ?? shopId;
       const filename = `analytics-${String(shopIdPart)}-${startDate}.pdf`;
-      setJsonPreview(result as Record<string, unknown>);
+      setJsonPreview(filteredPreview);
       setPdfBlob({ blob, filename });
       setMessage("Analytics PDF ready to preview.");
       appToast.success("Analytics PDF ready.");
@@ -317,6 +350,7 @@ export default function ReportsPage() {
       downloadShopAnalyticsPdf(
         jsonPreview ?? {},
         shops.find((s) => s.shop_id === shopId)?.shop_name,
+        shopDelivery,
       );
       appToast.success(`Downloaded ${pdfBlob.filename}`);
       return;
@@ -333,17 +367,27 @@ export default function ReportsPage() {
         end_date: endDate || startDate,
       });
       const selectedShop = shops.find((shop) => shop.shop_id === shopId);
+      const analyticsData = result as Record<string, unknown>;
+      const filteredPreview = {
+        ...analyticsData,
+        status_counts: filterReportStatusCounts(
+          (analyticsData.status_counts as Record<string, number>) ?? {},
+          shopDelivery,
+        ),
+      };
       downloadShopAnalyticsPdf(
-        result as Record<string, unknown>,
+        filteredPreview,
         selectedShop?.shop_name,
+        shopDelivery,
       );
       const blob = buildShopAnalyticsPdf(
-        result as Record<string, unknown>,
+        filteredPreview,
         selectedShop?.shop_name,
+        shopDelivery,
       );
-      const shopIdPart = (result as Record<string, unknown>).shop_id ?? shopId;
+      const shopIdPart = analyticsData.shop_id ?? shopId;
       const filename = `analytics-${String(shopIdPart)}-${startDate}.pdf`;
-      setJsonPreview(result as Record<string, unknown>);
+      setJsonPreview(filteredPreview);
       setPdfBlob({ blob, filename });
       setMessage("Analytics PDF downloaded.");
       appToast.success("Analytics PDF downloaded.");

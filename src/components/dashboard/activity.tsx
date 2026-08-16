@@ -4,10 +4,12 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 
 import { LoadingState, StatusBadge } from "@/components/shared/states";
+import { formatOrderStatusLabel } from "@/lib/orders/order-status";
 import { systemHealthQuery } from "@/lib/queries/dashboard";
 import type {
   DashboardChartsResponse,
   ShopActivityResponse,
+  ShopDeliverySettings,
 } from "@/types/api";
 
 function formatWhen(iso: string) {
@@ -117,11 +119,13 @@ export function ShopOpsActivityCard({
   loading,
   error,
   onRetry,
+  deliveryByShopId,
 }: {
   data?: ShopActivityResponse | null;
   loading?: boolean;
   error?: Error | null;
   onRetry?: () => void;
+  deliveryByShopId?: Record<string, ShopDeliverySettings | null | undefined>;
 }) {
   const counts = data?.order_counts ?? {};
   const backlogItems = data?.backlog?.items ?? [];
@@ -201,7 +205,12 @@ export function ShopOpsActivityCard({
                       {String(item.id ?? "Order")}
                       {item.status ? (
                         <span className="ml-2 text-xs font-normal text-muted-foreground">
-                          {String(item.status)}
+                          {formatOrderStatusLabel(
+                            String(item.status),
+                            item.shop_id
+                              ? deliveryByShopId?.[String(item.shop_id)] ?? null
+                              : null,
+                          )}
                         </span>
                       ) : null}
                     </p>

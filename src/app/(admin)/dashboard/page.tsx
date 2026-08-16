@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import {
@@ -33,6 +33,8 @@ import {
   dashboardSummaryQuery,
   shopOpsActivityQuery,
 } from "@/lib/queries/dashboard";
+import { getShop } from "@/lib/api/shops";
+import type { ShopDeliverySettings } from "@/types/api";
 
 type ChartRange = "day" | "week" | "month";
 
@@ -50,6 +52,43 @@ export default function DashboardPage() {
   const summaryQuery = useQuery(dashboardSummaryQuery());
   const chartsQuery = useQuery(dashboardChartsQuery(range));
   const shopActivityQuery = useQuery(shopOpsActivityQuery());
+  const [deliveryByShopId, setDeliveryByShopId] = useState<
+    Record<string, ShopDeliverySettings | null>
+  >({});
+
+  useEffect(() => {
+    const items = shopActivityQuery.data?.backlog?.items ?? [];
+    const ids = [
+      ...new Set(
+        items
+          .map((item) => item.shop_id)
+          .filter((id): id is string => Boolean(id))
+          .map(String),
+      ),
+    ];
+    if (ids.length === 0) {
+      setDeliveryByShopId({});
+      return;
+    }
+    let active = true;
+    void Promise.all(
+      ids.map(async (id) => {
+        try {
+          const shop = await getShop(id);
+          return [id, shop.delivery ?? null] as const;
+        } catch {
+          return [id, null] as const;
+        }
+      }),
+    ).then((entries) => {
+      if (!active) return;
+      setDeliveryByShopId(Object.fromEntries(entries));
+    });
+    return () => {
+      active = false;
+    };
+  }, [shopActivityQuery.data?.backlog?.items]);
+
   const summary = summaryQuery.data;
   const charts = chartsQuery.data;
   const summaryLoading = summaryQuery.isLoading;
@@ -270,6 +309,7 @@ export default function DashboardPage() {
               <ShopOpsActivityCard
                 data={shopActivityQuery.data}
                 loading={shopActivityQuery.isLoading}
+                deliveryByShopId={deliveryByShopId}
                 error={
                   shopActivityQuery.error instanceof Error
                     ? shopActivityQuery.error

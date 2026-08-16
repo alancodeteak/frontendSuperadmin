@@ -3,6 +3,12 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 
+import {
+  filterReportStatusCounts,
+  formatOrderStatusLabel,
+} from "@/lib/orders/order-status";
+import type { ShopDeliverySettings } from "@/types/api";
+
 // ─── tiny canvas chart helpers ───────────────────────────────────────────────
 
 type BarDatum = { label: string; value: number; color: string };
@@ -287,6 +293,7 @@ function objectRows(
 export function buildShopAnalyticsPdf(
   data: Record<string, unknown>,
   shopName?: string,
+  delivery?: ShopDeliverySettings | null,
 ): Blob {
   const shopId = cellText(data.shop_id as PdfCell);
   const range = data.date_range as Record<string, unknown> | undefined;
@@ -354,14 +361,15 @@ export function buildShopAnalyticsPdf(
   }
 
   // ── Status donut + bar chart side-by-side ───────────────────────────────────
-  const statusCounts = (data.status_counts ?? {}) as Record<string, number>;
+  const rawStatusCounts = (data.status_counts ?? {}) as Record<string, number>;
+  const statusCounts = filterReportStatusCounts(rawStatusCounts, delivery);
   const statusColors = [
     "#7547CC", "#06b6d4", "#10b981", "#f59e0b", "#ef4444",
     "#64748b", "#a855f7", "#0ea5e9",
   ];
   const statusData: DonutDatum[] = Object.entries(statusCounts)
     .map(([label, value], i) => ({
-      label: label.replace(/_/g, " "),
+      label,
       value: Number(value) || 0,
       color: statusColors[i % statusColors.length],
     }))
@@ -418,7 +426,7 @@ export function buildShopAnalyticsPdf(
     ...objectRows(data.totals, "Totals"),
     ...objectRows(data.delivered_totals, "Delivered"),
     ...objectRows(data.average_times, "Avg times"),
-    ...objectRows(data.status_counts, "Status counts"),
+    ...objectRows(statusCounts, "Status counts"),
   ];
 
   if (summaryRows.length > 0) {
@@ -479,13 +487,14 @@ export function buildShopAnalyticsPdf(
 export function downloadShopAnalyticsPdf(
   data: Record<string, unknown>,
   shopName?: string,
+  delivery?: ShopDeliverySettings | null,
 ) {
   const shopId = cellText(data.shop_id as PdfCell);
   const range = data.date_range as Record<string, unknown> | undefined;
   const dateLabel = range
     ? `${cellText((range.start ?? range.start_date) as PdfCell)} to ${cellText((range.end ?? range.end_date) as PdfCell)}`
     : "selected-range";
-  const blob = buildShopAnalyticsPdf(data, shopName);
+  const blob = buildShopAnalyticsPdf(data, shopName, delivery);
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;

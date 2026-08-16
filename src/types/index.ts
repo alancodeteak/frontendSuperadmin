@@ -10,11 +10,16 @@ export type Restaurant = {
 };
 
 export type OrderStatus =
-  | "pending"
-  | "confirmed"
-  | "preparing"
-  | "out_for_delivery"
-  | "delivered"
+  | "Pending"
+  | "Accepted"
+  | "Preparing"
+  | "Ready"
+  | "Assigned"
+  | "Picked Up"
+  | "Out for Delivery"
+  | "Delivered"
+  | "Rejected"
+  | "customer_not_available"
   | "cancelled";
 
 export type Order = {

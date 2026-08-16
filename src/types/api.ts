@@ -135,6 +135,8 @@ export type ShopDeliverySettings = {
   delivery_time?: number | null;
   self_assigned?: boolean | null;
   pickup_disabled?: boolean | null;
+  preparing_status_enabled?: boolean | null;
+  ready_status_enabled?: boolean | null;
   bonus_penalty?: boolean | null;
   bonus_penalty_start_status?: string | null;
   common_penalty_enabled?: boolean | null;
