@@ -50,7 +50,7 @@ const DATASETS: DatasetMeta[] = [
   {
     value: "orders",
     label: "Orders",
-    description: "Order rows with totals, status and timestamps.",
+    description: "Order rows with totals, status, reject/cancel reasons and timestamps.",
     formats: "XLSX",
     icon: ReceiptTextIcon,
   },

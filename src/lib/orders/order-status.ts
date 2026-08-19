@@ -118,6 +118,33 @@ export function formatOrderStatusLabel(
   return normalized;
 }
 
+const CUSTOMER_SAFE_REJECTED_REASON =
+  "This order is not currently deliverable. Please place another order with different items.";
+
+function isInternalPosRejectedReason(value?: string | null): boolean {
+  const text = String(value ?? "").replace(/\s+/g, " ").trim().toLowerCase();
+  if (!text) return true;
+  if (/\b(saleculator|inmenu|cratis)\b/.test(text)) return true;
+  if (/\bupdated from\b/.test(text) && /\bpos\b/.test(text)) return true;
+  if (/\b(?:cancelled|rejected)\s+via\s+pos\b/.test(text)) return true;
+  if (/^pos[\s_-]*(rejected|reject|callback|update|status)\b/.test(text)) return true;
+  return false;
+}
+
+/** Prefer rejected_reason, then cancellation_reason, then a polite default. */
+export function resolveOrderRejectMessage(input?: {
+  status?: string | null;
+  rejected_reason?: string | null;
+  cancellation_reason?: string | null;
+}): string | null {
+  const status = String(input?.status ?? "").trim().toLowerCase();
+  if (status !== "rejected") return null;
+  const provided =
+    input?.rejected_reason?.trim() || input?.cancellation_reason?.trim() || "";
+  if (provided && !isInternalPosRejectedReason(provided)) return provided;
+  return CUSTOMER_SAFE_REJECTED_REASON;
+}
+
 /** Hide gated status keys from report status_counts when shop settings known. */
 export function filterReportStatusCounts(
   counts: Record<string, number> | null | undefined,

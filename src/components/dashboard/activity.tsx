@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 
 import { LoadingState, StatusBadge } from "@/components/shared/states";
-import { formatOrderStatusLabel } from "@/lib/orders/order-status";
+import { formatOrderStatusLabel, resolveOrderRejectMessage } from "@/lib/orders/order-status";
 import { systemHealthQuery } from "@/lib/queries/dashboard";
 import type {
   DashboardChartsResponse,
@@ -199,7 +199,19 @@ export function ShopOpsActivityCard({
             </p>
             <ul className="space-y-2">
               {backlogItems.length > 0 ? (
-                backlogItems.slice(0, 6).map((item, index) => (
+                backlogItems.slice(0, 6).map((item, index) => {
+                  const rejectMessage = resolveOrderRejectMessage({
+                    status: item.status != null ? String(item.status) : null,
+                    rejected_reason:
+                      typeof item.rejected_reason === "string"
+                        ? item.rejected_reason
+                        : null,
+                    cancellation_reason:
+                      typeof item.cancellation_reason === "string"
+                        ? item.cancellation_reason
+                        : null,
+                  });
+                  return (
                   <li key={String(item.id ?? index)} className="text-sm">
                     <p className="font-medium">
                       {String(item.id ?? "Order")}
@@ -219,8 +231,12 @@ export function ShopOpsActivityCard({
                         .filter(Boolean)
                         .join(" · ") || "—"}
                     </p>
+                    {rejectMessage ? (
+                      <p className="mt-0.5 text-xs text-red-600">{rejectMessage}</p>
+                    ) : null}
                   </li>
-                ))
+                  );
+                })
               ) : (
                 <li className="text-sm text-muted-foreground">No backlog.</li>
               )}

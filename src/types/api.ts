@@ -343,6 +343,8 @@ export type ShopBacklogItem = {
   shop_id?: string;
   age_min?: number;
   status?: string;
+  rejected_reason?: string | null;
+  cancellation_reason?: string | null;
   [key: string]: unknown;
 };
 
