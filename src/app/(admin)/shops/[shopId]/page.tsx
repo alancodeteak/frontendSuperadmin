@@ -1188,6 +1188,7 @@ function readShopFeatures(shop: ShopDetail): Required<
     | "ecom_enabled"
     | "ecom_order_confirmation_enabled"
     | "scheduled_order"
+    | "pre_booking_enabled"
     | "merge_order"
     | "return_option"
     | "customer_ticket"
@@ -1213,6 +1214,7 @@ function readShopFeatures(shop: ShopDetail): Required<
       f.ecom_order_confirmation_enabled ?? shop.ecom_order_confirmation_enabled,
     ),
     scheduled_order: Boolean(f.scheduled_order ?? shop.scheduled_order),
+    pre_booking_enabled: Boolean(f.pre_booking_enabled ?? shop.pre_booking_enabled),
     merge_order: Boolean(f.merge_order ?? shop.merge_order),
     return_option: Boolean(f.return_option),
     customer_ticket: Boolean(f.customer_ticket),
@@ -1470,6 +1472,7 @@ function FeaturesTab({
           ? form.ecom_order_confirmation_enabled
           : false,
         scheduled_order: form.scheduled_order,
+        pre_booking_enabled: form.pre_booking_enabled,
         merge_order: form.merge_order,
         return_option: form.return_option,
         customer_ticket: ecomEnabled ? form.customer_ticket : false,
@@ -1596,6 +1599,15 @@ function FeaturesTab({
             invalid={isHighlighted("scheduled_order")}
             error={fieldErrors.scheduled_order}
             onChange={(v) => setFlag("scheduled_order", v)}
+          />
+          <FeatureToggleRow
+            id="feat_pre_booking_enabled"
+            label="Pre-booking"
+            description="Enables food pre-booking events and orders in the shop DMS and customer storefront."
+            checked={form.pre_booking_enabled}
+            invalid={isHighlighted("pre_booking_enabled")}
+            error={fieldErrors.pre_booking_enabled}
+            onChange={(v) => setFlag("pre_booking_enabled", v)}
           />
           <FeatureToggleRow
             id="feat_merge_order"

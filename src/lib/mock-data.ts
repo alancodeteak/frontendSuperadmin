@@ -71,6 +71,7 @@ const mockShops: ShopListItem[] = [
     ecom_slug: "al-noor-kitchen",
     ecom_order_confirmation_enabled: true,
     scheduled_order: false,
+    pre_booking_enabled: false,
     merge_order: false,
     address: {
       address_line_1: "Sheikh Zayed Rd",
@@ -97,6 +98,7 @@ const mockShops: ShopListItem[] = [
     ecom_slug: "marina-bites",
     ecom_order_confirmation_enabled: false,
     scheduled_order: true,
+    pre_booking_enabled: true,
     merge_order: true,
     address: {
       address_line_1: "Marina Walk",
@@ -122,6 +124,7 @@ const mockShops: ShopListItem[] = [
     ecom_slug: "corniche-grill",
     ecom_order_confirmation_enabled: false,
     scheduled_order: false,
+    pre_booking_enabled: false,
     merge_order: false,
     address: {
       address_line_1: "Corniche Rd",
@@ -144,6 +147,7 @@ const mockShops: ShopListItem[] = [
     ecom_slug: "desert-deli",
     ecom_order_confirmation_enabled: false,
     scheduled_order: false,
+    pre_booking_enabled: false,
     merge_order: false,
     address: {
       address_line_1: "Al Quoz",
@@ -550,6 +554,7 @@ export async function mockCreateShop(input: CreateShopInput): Promise<ShopDetail
     ecom_order_confirmation_enabled:
       input.ecom_order_confirmation_enabled ?? false,
     scheduled_order: input.scheduled_order ?? false,
+    pre_booking_enabled: input.pre_booking_enabled ?? false,
     merge_order: input.merge_order ?? false,
     address: input.address ?? null,
     created_at: new Date().toISOString(),
@@ -562,6 +567,7 @@ export async function mockCreateShop(input: CreateShopInput): Promise<ShopDetail
       ecom_enabled: shop.ecom_enabled,
       ecom_order_confirmation_enabled: shop.ecom_order_confirmation_enabled,
       scheduled_order: shop.scheduled_order,
+      pre_booking_enabled: shop.pre_booking_enabled,
       merge_order: shop.merge_order,
       return_option: input.return_option ?? false,
       customer_ticket: input.customer_ticket ?? false,
@@ -660,6 +666,7 @@ export async function mockGetShop(shopId: string): Promise<ShopDetail> {
         shop.ecom_order_confirmation_enabled,
       ),
       scheduled_order: Boolean(shop.scheduled_order),
+      pre_booking_enabled: Boolean(shop.pre_booking_enabled),
       merge_order: Boolean(shop.merge_order),
       return_option: Boolean(stored?.features?.return_option),
       customer_ticket: Boolean(
@@ -822,6 +829,7 @@ export async function mockPatchShop(
     "ecom_enabled",
     "ecom_order_confirmation_enabled",
     "scheduled_order",
+    "pre_booking_enabled",
     "merge_order",
     "return_option",
     "customer_ticket",
@@ -910,6 +918,10 @@ export async function mockPatchShop(
       typeof input.scheduled_order === "boolean"
         ? input.scheduled_order
         : current.scheduled_order,
+    pre_booking_enabled:
+      typeof input.pre_booking_enabled === "boolean"
+        ? input.pre_booking_enabled
+        : current.pre_booking_enabled,
     merge_order:
       typeof input.merge_order === "boolean"
         ? input.merge_order

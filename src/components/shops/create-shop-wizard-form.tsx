@@ -895,6 +895,7 @@ export function CreateShopWizard() {
       label: "Ecom order confirmation",
     },
     { key: "scheduled_order", label: "Scheduled orders" },
+    { key: "pre_booking_enabled", label: "Pre-booking" },
     { key: "merge_order", label: "Merge orders" },
     { key: "return_option", label: "Return option" },
     { key: "customer_ticket", label: "Customer tickets" },
@@ -1279,6 +1280,13 @@ export function CreateShopWizard() {
                 description="Enables scheduled-order APIs in the shop DMS."
                 checked={form.scheduled_order}
                 onChange={(v) => update("scheduled_order", v)}
+              />
+              <FeatureToggleRow
+                id="pre_booking_enabled"
+                label="Pre-booking"
+                description="Enables food pre-booking events and orders in the shop DMS and customer storefront."
+                checked={form.pre_booking_enabled}
+                onChange={(v) => update("pre_booking_enabled", v)}
               />
               <FeatureToggleRow
                 id="merge_order"
