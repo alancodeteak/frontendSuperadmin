@@ -328,6 +328,7 @@ function ecomFormFromData(ecom: ShopEcomSettings | null | undefined) {
   return {
     domain: String(ecom?.domain ?? ""),
     cooking_notes_enabled: Boolean(ecom?.cooking_notes_enabled),
+    item_notes_enabled: Boolean(ecom?.item_notes_enabled),
     delivery_instructions_enabled: Boolean(ecom?.delivery_instructions_enabled),
     cutlery_enabled: Boolean(ecom?.cutlery_enabled),
     operating_hours: parseOperatingHours(ecom?.operating_hours),
@@ -447,6 +448,7 @@ export function ShopEcomTab({
     const ecom: ShopEcomSettings = {
       domain: form.domain.trim() ? form.domain.trim().toLowerCase() : null,
       cooking_notes_enabled: form.cooking_notes_enabled,
+      item_notes_enabled: form.item_notes_enabled,
       delivery_instructions_enabled: form.delivery_instructions_enabled,
       cutlery_enabled: form.cutlery_enabled,
       operating_hours: serializeOperatingHours(form.operating_hours),
@@ -538,6 +540,10 @@ export function ShopEcomTab({
               {
                 label: "Cooking notes",
                 value: yesNo(ecom?.cooking_notes_enabled),
+              },
+              {
+                label: "Item notes",
+                value: yesNo(ecom?.item_notes_enabled),
               },
               {
                 label: "Delivery instructions",
@@ -685,6 +691,13 @@ export function ShopEcomTab({
               description="Let customers add cooking notes on checkout."
               checked={form.cooking_notes_enabled}
               onChange={(v) => setField("cooking_notes_enabled", v)}
+            />
+            <FeatureToggleRow
+              id="ecom_item_notes"
+              label="Allow customers to add notes per menu item"
+              description="Per-item notes on cart lines. Separate from order-level cooking notes; controlled by super admin."
+              checked={form.item_notes_enabled}
+              onChange={(v) => setField("item_notes_enabled", v)}
             />
             <FeatureToggleRow
               id="ecom_delivery_instructions"

@@ -142,6 +142,8 @@ export type ShopDeliverySettings = {
   ready_status_enabled?: boolean | null;
   bonus_penalty?: boolean | null;
   bonus_penalty_start_status?: string | null;
+  dp_commission_enabled?: boolean | null;
+  dp_commission_percent?: number | null;
   common_penalty_enabled?: boolean | null;
   common_penalty_idle_minutes?: number | null;
   common_penalty_min_online_minutes?: number | null;
@@ -188,6 +190,8 @@ export type ShopEcomSettings = {
   /** Hostname only; unique when set. Send null on PATCH to clear. */
   domain?: string | null;
   cooking_notes_enabled?: boolean | null;
+  /** Per-menu-item notes on cart lines; separate from order-level cooking notes. */
+  item_notes_enabled?: boolean | null;
   delivery_instructions_enabled?: boolean | null;
   cutlery_enabled?: boolean | null;
   /**

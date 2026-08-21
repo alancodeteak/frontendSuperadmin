@@ -2117,6 +2117,8 @@ function deliveryFormFromData(
     bonus_penalty_start_status: normalizeBonusPenaltyStartStatus(
       data?.bonus_penalty_start_status,
     ),
+    dp_commission_enabled: Boolean(data?.dp_commission_enabled ?? false),
+    dp_commission_percent: String(data?.dp_commission_percent ?? 0),
     common_penalty_enabled: Boolean(data?.common_penalty_enabled ?? false),
     common_penalty_idle_minutes: String(
       data?.common_penalty_idle_minutes ?? 45,
@@ -2163,6 +2165,8 @@ function DeliveryTab({
         bonus_penalty_start_status: normalizeBonusPenaltyStartStatus(
           form.bonus_penalty_start_status,
         ),
+        dp_commission_enabled: form.dp_commission_enabled,
+        dp_commission_percent: Number(form.dp_commission_percent) || 0,
         common_penalty_enabled: form.common_penalty_enabled,
         common_penalty_idle_minutes:
           Number(form.common_penalty_idle_minutes) || 45,
@@ -2251,6 +2255,36 @@ function DeliveryTab({
             checked={form.bonus_penalty}
             onChange={(v) => setField("bonus_penalty", v)}
           />
+          <FeatureToggleRow
+            id="delivery_dp_commission_enabled"
+            label="DP item commission"
+            description="Enable delivery-partner item commission for this shop."
+            checked={form.dp_commission_enabled}
+            onChange={(v) => setField("dp_commission_enabled", v)}
+          />
+          <Field label="DP commission percent">
+            <Input
+              inputMode="decimal"
+              id="delivery_dp_commission_percent"
+              data-field="dp_commission_percent"
+              value={form.dp_commission_percent}
+              disabled={!form.dp_commission_enabled}
+              onChange={(e) => {
+                const raw = e.target.value.replace(/[^\d.]/g, "");
+                const parts = raw.split(".");
+                const next =
+                  parts.length <= 1
+                    ? raw
+                    : `${parts[0]}.${parts.slice(1).join("").slice(0, 2)}`;
+                setField("dp_commission_percent", next);
+              }}
+              placeholder="0"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Percent of commission-enabled item amount paid to delivery partners
+              (0–100).
+            </p>
+          </Field>
           <Field label="Bonus penalty start status">
             <Select
               value={form.bonus_penalty_start_status || "assigned"}

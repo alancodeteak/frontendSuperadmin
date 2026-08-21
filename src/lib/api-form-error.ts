@@ -43,6 +43,8 @@ export const SHOP_FIELD_LABELS: Record<string, string> = {
   ready_status_enabled: "Ready status enabled",
   bonus_penalty: "Bonus / penalty",
   bonus_penalty_start_status: "Bonus penalty start status",
+  dp_commission_enabled: "DP item commission",
+  dp_commission_percent: "DP commission percent",
   common_penalty_enabled: "Common penalty enabled",
   common_penalty_idle_minutes: "Common penalty idle minutes",
   common_penalty_min_online_minutes: "Common penalty min online minutes",
