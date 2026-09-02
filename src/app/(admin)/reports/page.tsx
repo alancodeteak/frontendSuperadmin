@@ -35,6 +35,7 @@ import { getShop, listShops } from "@/lib/api/shops";
 import { parseExcelBlob, type ExcelWorkbookPreview } from "@/lib/excel";
 import { buildShopAnalyticsPdf, downloadShopAnalyticsPdf } from "@/lib/pdf";
 import { filterReportStatusCounts } from "@/lib/orders/order-status";
+import { reportExportRequiresStartDate } from "@/lib/reports/export-contract";
 import { cn } from "@/lib/utils";
 import type { ReportDataset, ShopDeliverySettings, ShopListItem } from "@/types/api";
 
@@ -182,6 +183,10 @@ export default function ReportsPage() {
       setError("Use Load analytics JSON / Download PDF for analytics.");
       return;
     }
+    if (reportExportRequiresStartDate(dataset) && !startDate) {
+      setError("Select a start date for this report");
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -215,6 +220,10 @@ export default function ReportsPage() {
     }
     if (dataset === "analytics") {
       setError("Analytics exports as JSON/PDF, not XLSX.");
+      return;
+    }
+    if (reportExportRequiresStartDate(dataset) && !startDate) {
+      setError("Select a start date for this report");
       return;
     }
 

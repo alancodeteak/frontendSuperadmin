@@ -27,12 +27,22 @@ export function listRiders(
     q?: string;
     is_blocked?: boolean;
     online_status?: string;
+    /** Dev mock only — admin-api list schema does not accept this. */
     include_deleted?: boolean;
+    /** Dev mock only — admin-api list schema does not accept this. */
     deleted_only?: boolean;
   },
 ) {
   if (isDevelopmentMode()) return mockListRiders(shopId, params);
-  return apiFetch<Paginated<Rider>>(`/v2/shops/${shopId}/riders`, { params });
+  return apiFetch<Paginated<Rider>>(`/v2/shops/${shopId}/riders`, {
+    params: {
+      page: params?.page,
+      limit: params?.limit,
+      q: params?.q,
+      is_blocked: params?.is_blocked,
+      online_status: params?.online_status,
+    },
+  });
 }
 
 export function getNextRiderId(shopId: string) {

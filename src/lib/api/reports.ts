@@ -16,6 +16,13 @@ export type ReportExportParams = {
   start_date?: string;
   end_date?: string;
   delivery_partner_id?: string;
+  venue_picker_id?: string;
+  service_type?:
+    | "dine_in"
+    | "room_service"
+    | "pickup"
+    | "drive_thru"
+    | "delivery";
   top_limit?: number;
 };
 
@@ -34,6 +41,8 @@ export async function fetchShopReportBlob(
       start_date: params.start_date,
       end_date: params.end_date,
       delivery_partner_id: params.delivery_partner_id,
+      venue_picker_id: params.venue_picker_id,
+      service_type: params.service_type,
       top_limit: params.top_limit,
     },
   });
@@ -59,6 +68,8 @@ export async function exportShopReport(
           start_date: params.start_date,
           end_date: params.end_date,
           delivery_partner_id: params.delivery_partner_id,
+          venue_picker_id: params.venue_picker_id,
+          service_type: params.service_type,
           top_limit: params.top_limit,
         },
       },

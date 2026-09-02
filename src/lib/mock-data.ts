@@ -531,6 +531,37 @@ export async function mockListShops(params?: {
   });
 }
 
+export async function mockGetNextShopUserId(): Promise<{ user_id: number }> {
+  const used = new Set<number>();
+  for (const shop of mockShops) {
+    const id = Number(shop.user_id);
+    if (
+      Number.isInteger(id) &&
+      id >= SHOP_USER_ID_MIN &&
+      id <= SHOP_USER_ID_MAX
+    ) {
+      used.add(id);
+    }
+  }
+
+  let candidate = SHOP_USER_ID_MIN;
+  if (used.size > 0) {
+    candidate = Math.min(Math.max(...used) + 1, SHOP_USER_ID_MAX);
+  }
+  while (candidate <= SHOP_USER_ID_MAX) {
+    if (!used.has(candidate)) return delay({ user_id: candidate });
+    candidate += 1;
+  }
+
+  for (let id = SHOP_USER_ID_MIN; id <= SHOP_USER_ID_MAX; id += 1) {
+    if (!used.has(id)) return delay({ user_id: id });
+  }
+
+  throw new Error(
+    `No free shop user_id left in range ${SHOP_USER_ID_MIN}–${SHOP_USER_ID_MAX}`,
+  );
+}
+
 export async function mockCreateShop(input: CreateShopInput): Promise<ShopDetail> {
   if (input.ecom_order_confirmation_enabled && !input.ecom_enabled) {
     throw Object.assign(

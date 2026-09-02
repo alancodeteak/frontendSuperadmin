@@ -8,6 +8,7 @@ import {
   mockGetDeliverySettings,
   mockGetPromotion,
   mockGetShop,
+  mockGetNextShopUserId,
   mockGetShopActivity,
   mockListShopProducts,
   mockListShops,
@@ -162,12 +163,39 @@ export function createShop(input: CreateShopInput) {
   });
 }
 
+export type NextShopUserIdResponse = {
+  user_id: number;
+};
+
+/** GET /v2/shops/next-user-id — preview next login id (does not reserve it). */
+export function getNextShopUserId() {
+  if (isDevelopmentMode()) return mockGetNextShopUserId();
+  return apiFetch<NextShopUserIdResponse>("/v2/shops/next-user-id");
+}
+
 /**
- * Client-side next free shop login `user_id` (100000–999999).
- * API has no GET /shops/next-user-id — scan list and pick the next unused id.
- * Not reserved; race possible if two admins create at once.
+ * Next free shop login `user_id` (100000–999999).
+ * Uses admin-api allocator when available; falls back to list scan on older backends.
  */
 export async function suggestNextShopUserId(): Promise<number> {
+  if (!isDevelopmentMode()) {
+    try {
+      const { user_id } = await getNextShopUserId();
+      if (
+        Number.isInteger(user_id) &&
+        user_id >= SHOP_USER_ID_MIN &&
+        user_id <= SHOP_USER_ID_MAX
+      ) {
+        return user_id;
+      }
+    } catch {
+      // Fall back to client-side scan below.
+    }
+  } else {
+    const { user_id } = await mockGetNextShopUserId();
+    return user_id;
+  }
+
   const { items } = await listAllShops({ pageSize: 100 });
   const used = new Set<number>();
   for (const shop of items) {

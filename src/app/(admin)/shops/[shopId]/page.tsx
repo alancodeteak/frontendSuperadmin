@@ -97,6 +97,7 @@ import {
   shopVenuePickersQuery,
 } from "@/lib/queries/shops";
 import { digitsOnly, isValidPhone } from "@/lib/shop-create-validation";
+import { validateShopDeliverySettings } from "@/lib/delivery-settings";
 import { toE164Phone } from "@yaadro/phone-kit";
 import { cn, formatCurrency } from "@/lib/utils";
 import {
@@ -208,7 +209,7 @@ function SubscriptionDetailRow({
     <div className="flex items-start justify-between gap-4 border-b border-border py-3 text-sm last:border-b-0">
       <dt className="shrink-0 text-muted-foreground">{label}</dt>
       <dd className="min-w-0 text-right font-medium break-words">
-        {value || <span className="font-normal text-muted-foreground">â€”</span>}
+        {value || <span className="font-normal text-muted-foreground">—</span>}
       </dd>
     </div>
   );
@@ -314,7 +315,7 @@ export default function ShopDetailPage() {
         await restoreShop(shopId);
         setConfirmPhase("success");
         appToast.success(
-          "Shop restored. Status is inactive â€” activate if needed.",
+          "Shop restored. Status is inactive — activate if needed.",
         );
         await loadShop();
         window.setTimeout(() => {
@@ -344,7 +345,7 @@ export default function ShopDetailPage() {
       let msg: string;
       if (err instanceof ApiError && confirmAction === "force-logout") {
         if (err.status === 404) {
-          msg = "Shop not found â€” cannot send logout alert.";
+          msg = "Shop not found — cannot send logout alert.";
         } else if (err.status === 403) {
           msg = "You need superadmin access to send logout alerts.";
         } else if (err.status >= 500) {
@@ -404,7 +405,7 @@ export default function ShopDetailPage() {
           confirmVariant: "destructive" as const,
           icon: Trash2Icon,
           iconClassName: "bg-destructive/10 text-destructive",
-          loadingTitle: "Soft-deleting shopâ€¦",
+          loadingTitle: "Soft-deleting shop…",
           loadingDescription: "Marking this shop as deleted.",
           successTitle: "Shop soft-deleted",
           successDescription:
@@ -421,7 +422,7 @@ export default function ShopDetailPage() {
             confirmVariant: "destructive" as const,
             icon: Trash2Icon,
             iconClassName: "bg-destructive/10 text-destructive",
-            loadingTitle: "Deleting shopâ€¦",
+            loadingTitle: "Deleting shop…",
             loadingDescription: "Permanently removing this shop.",
             successTitle: "Shop permanently deleted",
             successDescription:
@@ -433,16 +434,16 @@ export default function ShopDetailPage() {
           ? {
               title: "Restore this shop?",
               description:
-                "Clears the deleted flag. Status stays inactive â€” re-activate the shop if needed. Feature flags are left as they were.",
+                "Clears the deleted flag. Status stays inactive — re-activate the shop if needed. Feature flags are left as they were.",
               confirmLabel: "Restore shop",
               confirmVariant: "default" as const,
               icon: RotateCcwIcon,
               iconClassName: "bg-primary/10 text-primary",
-              loadingTitle: "Restoring shopâ€¦",
+              loadingTitle: "Restoring shop…",
               loadingDescription: "Clearing the deleted flag.",
               successTitle: "Shop restored",
               successDescription:
-                "Status is inactive â€” activate if needed.",
+                "Status is inactive — activate if needed.",
               successActionLabel: "Done",
               errorTitle: "Could not restore shop",
             }
@@ -455,7 +456,7 @@ export default function ShopDetailPage() {
                 confirmVariant: "default" as const,
                 icon: BanIcon,
                 iconClassName: "bg-primary/10 text-primary",
-                loadingTitle: "Sending logout alertâ€¦",
+                loadingTitle: "Sending logout alert…",
                 loadingDescription: "Notifying online sessions.",
                 successTitle: "Logout alert sent",
                 successDescription:
@@ -484,7 +485,7 @@ export default function ShopDetailPage() {
               disabled={logoutBusy || Boolean(shop.is_deleted)}
               onClick={() => openConfirm("force-logout")}
             >
-              {logoutBusy ? "Sendingâ€¦" : "Force logout"}
+              {logoutBusy ? "Sending…" : "Force logout"}
             </Button>
             {shop.is_deleted ? (
               <Button
@@ -1125,7 +1126,7 @@ function OverviewTab({
                 Cancel
               </Button>
               <Button type="submit" disabled={saving}>
-                {saving ? "Savingâ€¦" : "Save changes"}
+                {saving ? "Saving…" : "Save changes"}
               </Button>
             </div>
           </form>
@@ -1812,7 +1813,7 @@ function FeaturesTab({
         ) : null}
 
         <Button type="submit" disabled={saving}>
-          {saving ? "Savingâ€¦" : "Save feature flags"}
+          {saving ? "Saving…" : "Save feature flags"}
         </Button>
       </form>
     </ShopSection>
@@ -1843,7 +1844,7 @@ function FeaturesTab({
       icon={RefreshCwIcon}
       shopName={shopDisplayName}
       shopId={shop.shop_id}
-      loadingTitle="Rotating tokenâ€¦"
+      loadingTitle="Rotating token…"
       loadingDescription="Issuing a new integration secret."
       errorTitle="Could not rotate token"
       errorMessage={rotateError}
@@ -1862,7 +1863,7 @@ const productColumns: ColumnDef<ShopProduct>[] = [
     accessorKey: "id",
     header: "ID",
     cell: ({ row }) => (
-      <span className="font-mono text-xs">{row.original.id ?? "â€”"}</span>
+      <span className="font-mono text-xs">{row.original.id ?? "—"}</span>
     ),
     meta: { label: "ID" },
     size: 80,
@@ -1872,7 +1873,7 @@ const productColumns: ColumnDef<ShopProduct>[] = [
     accessorFn: (row) => row.product_name ?? row.name ?? "",
     header: "Product",
     cell: ({ row }) => {
-      const name = row.original.product_name ?? row.original.name ?? "â€”";
+      const name = row.original.product_name ?? row.original.name ?? "—";
       const alt = row.original.product_name_alt;
       return (
         <div className="min-w-0">
@@ -1891,7 +1892,7 @@ const productColumns: ColumnDef<ShopProduct>[] = [
     header: "Price",
     cell: ({ row }) => {
       const price = row.original.price;
-      if (price == null || price === "") return "â€”";
+      if (price == null || price === "") return "—";
       const amount = Number(price);
       return (
         <span className="tabular-nums">
@@ -1909,7 +1910,7 @@ const productColumns: ColumnDef<ShopProduct>[] = [
     header: "VAT %",
     cell: ({ row }) => {
       const rate = row.original.vat_rate;
-      if (rate == null || rate === "") return "â€”";
+      if (rate == null || rate === "") return "—";
       return <span className="tabular-nums">{String(rate)}%</span>;
     },
     meta: { label: "VAT %" },
@@ -1935,7 +1936,7 @@ const productColumns: ColumnDef<ShopProduct>[] = [
     header: "Availability",
     cell: ({ row }) => (
       <span className="capitalize">
-        {String(row.original.availability ?? "â€”").replaceAll("_", " ")}
+        {String(row.original.availability ?? "—").replaceAll("_", " ")}
       </span>
     ),
     meta: { label: "Availability" },
@@ -1944,7 +1945,7 @@ const productColumns: ColumnDef<ShopProduct>[] = [
   {
     accessorKey: "category_id",
     header: "Category",
-    cell: ({ row }) => row.original.category_id ?? "â€”",
+    cell: ({ row }) => row.original.category_id ?? "—",
     meta: { label: "Category" },
     size: 90,
   },
@@ -1954,7 +1955,7 @@ const productColumns: ColumnDef<ShopProduct>[] = [
     cell: ({ row }) =>
       row.original.diet_type
         ? String(row.original.diet_type).replaceAll("_", " ")
-        : "â€”",
+        : "—",
     meta: { label: "Diet" },
     size: 100,
   },
@@ -1964,7 +1965,7 @@ const productColumns: ColumnDef<ShopProduct>[] = [
     header: "POS ID",
     cell: ({ row }) => (
       <span className="font-mono text-xs">
-        {row.original.pos_product_id ?? row.original.pos_id ?? "â€”"}
+        {row.original.pos_product_id ?? row.original.pos_id ?? "—"}
       </span>
     ),
     meta: { label: "POS ID" },
@@ -1974,7 +1975,7 @@ const productColumns: ColumnDef<ShopProduct>[] = [
     accessorKey: "seo_slug",
     header: "Slug",
     cell: ({ row }) => (
-      <span className="font-mono text-xs">{row.original.seo_slug ?? "â€”"}</span>
+      <span className="font-mono text-xs">{row.original.seo_slug ?? "—"}</span>
     ),
     meta: { label: "Slug" },
     size: 160,
@@ -1982,7 +1983,7 @@ const productColumns: ColumnDef<ShopProduct>[] = [
   {
     accessorKey: "sort_order",
     header: "Sort",
-    cell: ({ row }) => row.original.sort_order ?? "â€”",
+    cell: ({ row }) => row.original.sort_order ?? "—",
     meta: { label: "Sort" },
     size: 70,
   },
@@ -1991,7 +1992,7 @@ const productColumns: ColumnDef<ShopProduct>[] = [
     header: "Description",
     cell: ({ row }) => (
       <span className="line-clamp-2 max-w-[14rem] text-muted-foreground">
-        {row.original.description || "â€”"}
+        {row.original.description || "—"}
       </span>
     ),
     meta: { label: "Description" },
@@ -2003,7 +2004,7 @@ const productColumns: ColumnDef<ShopProduct>[] = [
     cell: ({ row }) =>
       row.original.created_at
         ? new Date(row.original.created_at).toLocaleDateString("en-AE")
-        : "â€”",
+        : "—",
     meta: { label: "Created" },
     size: 110,
   },
@@ -2013,7 +2014,7 @@ const productColumns: ColumnDef<ShopProduct>[] = [
     cell: ({ row }) =>
       row.original.updated_at
         ? new Date(row.original.updated_at).toLocaleDateString("en-AE")
-        : "â€”",
+        : "—",
     meta: { label: "Updated" },
     size: 110,
   },
@@ -2037,7 +2038,7 @@ function ProductsTab({ shopId }: { shopId: string }) {
       title="Products"
       description={
         loading
-          ? "Loading catalogâ€¦"
+          ? "Loading catalog…"
           : `${items.length} product${items.length === 1 ? "" : "s"}`
       }
       className="max-w-none"
@@ -2054,7 +2055,7 @@ function ProductsTab({ shopId }: { shopId: string }) {
         <DataTable
           columns={productColumns}
           data={items}
-          searchPlaceholder="Search productsâ€¦"
+          searchPlaceholder="Search products…"
           emptyMessage="No products match this search."
           getRowId={(row, index) => String(row.id ?? index)}
           initialPageSize={25}
@@ -2155,7 +2156,7 @@ function DeliveryTab({
     setSaving(true);
     setError(null);
     try {
-      await patchShopDelivery(shopId, {
+      const payload = {
         delivery_time: Number(form.delivery_time) || 30,
         self_assigned: form.self_assigned,
         pickup_disabled: form.pickup_disabled,
@@ -2172,7 +2173,15 @@ function DeliveryTab({
           Number(form.common_penalty_idle_minutes) || 45,
         common_penalty_min_online_minutes:
           Number(form.common_penalty_min_online_minutes) || 45,
-      });
+      };
+      const validationError = validateShopDeliverySettings(payload);
+      if (validationError) {
+        setError(validationError);
+        appToast.error(validationError);
+        setSaving(false);
+        return;
+      }
+      await patchShopDelivery(shopId, payload);
       appToast.success("Delivery settings saved.");
       await onSaved();
     } catch (err) {
@@ -2367,7 +2376,7 @@ function DeliveryTab({
           </div>
         ) : null}
         <Button type="submit" disabled={saving}>
-          {saving ? "Savingâ€¦" : "Save delivery settings"}
+          {saving ? "Saving…" : "Save delivery settings"}
         </Button>
       </form>
     </ShopSection>
@@ -2547,7 +2556,7 @@ function SubscriptionTab({
           </div>
         ) : null}
           <Button type="submit" disabled={saving}>
-            {saving ? "Creatingâ€¦" : "Create"}
+            {saving ? "Creating…" : "Create"}
           </Button>
         </form>
       </ShopSection>
@@ -2722,7 +2731,7 @@ function PromotionTab({
               Cancel
             </Button>
             <Button type="submit" disabled={saving}>
-              {saving ? "Savingâ€¦" : "Save promotion"}
+              {saving ? "Saving…" : "Save promotion"}
             </Button>
           </div>
         </form>
@@ -2747,14 +2756,11 @@ function RidersTab({ shopId }: { shopId: string }) {
   const [editDpId, setEditDpId] = useState<string | null>(null);
   const [nextIdLoading, setNextIdLoading] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [riderFilter, setRiderFilter] = useState<"all" | "deleted">("all");
 
   const ridersQuery = useQuery(
     shopRidersQuery(shopId, {
       page: 1,
       limit: 50,
-      include_deleted: riderFilter === "deleted" ? true : undefined,
-      deleted_only: riderFilter === "deleted" ? true : undefined,
     }),
   );
   const items = ridersQuery.data?.items ?? [];
@@ -2775,7 +2781,7 @@ function RidersTab({ shopId }: { shopId: string }) {
       header: "ID",
       cell: ({ row }) => {
         const id = String(row.original.delivery_partner_id ?? "");
-        if (!id) return "â€”";
+        if (!id) return "—";
         return (
           <div className="flex min-w-0 items-center gap-1">
             <span className="truncate font-mono text-xs">{id}</span>
@@ -2803,7 +2809,7 @@ function RidersTab({ shopId }: { shopId: string }) {
           .join(" ");
         return (
           <div className="min-w-0">
-            <p className="truncate font-medium">{name || "â€”"}</p>
+            <p className="truncate font-medium">{name || "—"}</p>
             {row.original.age != null ? (
               <p className="text-xs text-muted-foreground">
                 Age {row.original.age}
@@ -2830,7 +2836,7 @@ function RidersTab({ shopId }: { shopId: string }) {
       header: "Vehicle",
       cell: ({ row }) => (
         <span className="truncate text-muted-foreground">
-          {row.original.vehicle_detail || "â€”"}
+          {row.original.vehicle_detail || "—"}
         </span>
       ),
       meta: { label: "Vehicle" },
@@ -3193,7 +3199,7 @@ function RidersTab({ shopId }: { shopId: string }) {
                 disabled={nextIdLoading || creating}
                 onClick={() => void prefillsNextId()}
               >
-                {nextIdLoading ? "Loadingâ€¦" : "Next ID"}
+                {nextIdLoading ? "Loading…" : "Next ID"}
               </Button>
             </div>
           </Field>
@@ -3226,7 +3232,7 @@ function RidersTab({ shopId }: { shopId: string }) {
           </Field>
           <div className="sm:col-span-2">
             <Button type="submit" disabled={creating}>
-              {creating ? "Creating riderâ€¦" : "Create rider"}
+              {creating ? "Creating rider…" : "Create rider"}
             </Button>
           </div>
         </form>
@@ -3238,26 +3244,10 @@ function RidersTab({ shopId }: { shopId: string }) {
 
       {!loading && !error ? (
         <ShopSection title="Riders" className="max-w-none">
-          <div className="mb-4 flex justify-end">
-            <Select
-              value={riderFilter}
-              onValueChange={(value) =>
-                setRiderFilter((value as "all" | "deleted") ?? "all")
-              }
-            >
-              <SelectTrigger className="w-44">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Active riders</SelectItem>
-                <SelectItem value="deleted">Soft deleted</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
           <DataTable
             columns={riderColumns}
             data={items}
-            searchPlaceholder="Search ridersâ€¦"
+            searchPlaceholder="Search riders…"
             emptyMessage="No riders yet."
             getRowId={(row, index) =>
               String(row.delivery_partner_id ?? index)
