@@ -21,6 +21,7 @@ export const SHOP_FIELD_LABELS: Record<string, string> = {
   ecom_enabled: "Ecom enabled",
   ecom_slug: "Ecom slug",
   ecom_order_confirmation_enabled: "Ecom order confirmation",
+  marketplace_enabled: "Marketplace enabled",
   scheduled_order: "Scheduled orders",
   pre_booking_enabled: "Pre-booking",
   merge_order: "Merge orders",

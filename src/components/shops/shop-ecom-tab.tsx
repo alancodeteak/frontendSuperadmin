@@ -343,6 +343,7 @@ function ecomFormFromData(ecom: ShopEcomSettings | null | undefined) {
     twitter_card: String(ecom?.twitter_card ?? ""),
     robots_index: Boolean(ecom?.robots_index ?? true),
     allow_anonymous_table_orders: Boolean(ecom?.allow_anonymous_table_orders),
+    marketplace_enabled: Boolean(ecom?.marketplace_enabled),
     table_session_policy: normalizeTableSessionPolicy(ecom?.table_session_policy),
     service_configs: serviceConfigsFormFromData(ecom?.service_configs),
   };
@@ -463,6 +464,7 @@ export function ShopEcomTab({
       twitter_card: form.twitter_card.trim() || null,
       robots_index: form.robots_index,
       allow_anonymous_table_orders: form.allow_anonymous_table_orders,
+      marketplace_enabled: form.marketplace_enabled,
       ...(showTableSessionPolicy
         ? { table_session_policy: form.table_session_policy }
         : {}),
@@ -524,6 +526,10 @@ export function ShopEcomTab({
               {
                 label: "Guest QR checkout",
                 value: yesNo(ecom?.allow_anonymous_table_orders),
+              },
+              {
+                label: "Marketplace app",
+                value: yesNo(ecom?.marketplace_enabled),
               },
               ...(showTableSessionPolicy
                 ? [
@@ -720,6 +726,18 @@ export function ShopEcomTab({
               checked={form.allow_anonymous_table_orders}
               onChange={(v) => setField("allow_anonymous_table_orders", v)}
             />
+            <FeatureToggleRow
+              id="ecom_marketplace_enabled"
+              label="Marketplace app"
+              description="List this shop in the Yaadro marketplace mobile app. Requires ecom, slug, shop pin (lat/lng), and delivery enabled with a positive delivery radius."
+              checked={form.marketplace_enabled}
+              onChange={(v) => setField("marketplace_enabled", v)}
+            />
+            {fieldErrors.marketplace_enabled ? (
+              <p className="border-t border-border/70 px-3 pb-3 text-xs font-medium text-destructive">
+                {fieldErrors.marketplace_enabled}
+              </p>
+            ) : null}
             {showTableSessionPolicy ? (
               <div className="space-y-2 border-t border-border/70 px-3 py-3">
                 <Label htmlFor="ecom_table_session_policy">Table session policy</Label>

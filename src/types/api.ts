@@ -225,6 +225,11 @@ export type ShopEcomSettings = {
   allow_anonymous_table_orders?: boolean | null;
   /** Table/room session behaviour for concurrent orders. */
   table_session_policy?: TableSessionPolicyValue | null;
+  /**
+   * Super-admin only: when true, shop may appear in the Yaadro marketplace
+   * mobile app (requires ecom + slug + pin + delivery radius).
+   */
+  marketplace_enabled?: boolean | null;
   [key: string]: unknown;
 };
 
